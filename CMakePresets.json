@@ -1,0 +1,112 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug configuration",
+            "binaryDir": "build",
+            "toolchainFile": "${sourceDir}/build/conan_toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release configuration",
+            "binaryDir": "build",
+            "toolchainFile": "${sourceDir}/build/conan_toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "test",
+            "displayName": "Test configuration",
+            "binaryDir": "build",
+            "toolchainFile": "${sourceDir}/build/conan_toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "LINES_ENABLE_TESTING": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug build",
+            "configurePreset": "debug",
+            "jobs": 8
+        },
+        {
+            "name": "release",
+            "displayName": "Release build",
+            "configurePreset": "release",
+            "jobs": 8
+        },
+        {
+            "name": "test",
+            "displayName": "Test build",
+            "configurePreset": "test",
+            "jobs": 8
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "test",
+            "displayName": "Test",
+            "configurePreset": "test",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "debug"
+                },
+                {
+                    "type": "build",
+                    "name": "debug"
+                }
+            ]
+        },
+        {
+            "name": "release",
+            "displayName": "Release workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "release"
+                },
+                {
+                    "type": "build",
+                    "name": "release"
+                }
+            ]
+        },
+        {
+            "name": "test",
+            "displayName": "Test workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "test"
+                },
+                {
+                    "type": "build",
+                    "name": "test"
+                },
+                {
+                    "type": "test",
+                    "name": "test"
+                }
+            ]
+        }
+    ]
+}
