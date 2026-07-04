@@ -1,7 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <readline/history.h>
 #include <readline/readline.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv) {
     // Evaluating a file if given
@@ -15,30 +15,30 @@ int main(int argc, char **argv) {
             perror(filename);
         }
 
-	fseek(file, 0, SEEK_END);
-	size_t filesize = ftell(file);
-	rewind(file);
+        fseek(file, 0, SEEK_END);
+        size_t filesize = ftell(file);
+        rewind(file);
 
-	char *buf = malloc(filesize + 1);
+        char *buf = malloc(filesize + 1);
 
-	if (!buf) {
-	    fclose(file);
-	    return -1;
-	}
+        if (!buf) {
+            fclose(file);
+            return -1;
+        }
 
-	size_t bytesread = fread(buf, sizeof(char), filesize, file);
-	buf[bytesread] = '\0';
+        size_t bytesread = fread(buf, sizeof(char), filesize, file);
+        buf[bytesread] = '\0';
 
-	printf("File:\n%s", buf);
-	fclose(file);
-	free(buf);
-	return 0;
+        printf("File:\n%s", buf);
+        fclose(file);
+        free(buf);
+        return 0;
     }
 
     // Launching REPL otherwise
-    puts("Lisp REPL version 0");
+    puts("GLisp REPL version 0");
     while (1) {
-        char *input = readline("\nlisp> ");
+        char *input = readline("\nglisp> ");
 
         add_history(input);
 
