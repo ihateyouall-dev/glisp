@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vector.h"
+
 #include <stddef.h>
 
 typedef enum {
@@ -35,8 +37,12 @@ typedef struct {
     Location location;
 } Lexer;
 
+VECTOR_DECLARE(LexToken, LexTokenVector)
+
 void lexer_init(Lexer *lexer, const char *src);
+Lexer make_lexer(const char *src);
 char lexer_current(Lexer *lexer);
 char lexer_peek(Lexer *lexer);
 void lexer_advance(Lexer *lexer);
 LexToken lexer_next(Lexer *lexer);
+LexTokenVector lexer_tokenize(Lexer *lexer);

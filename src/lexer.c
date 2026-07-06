@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "vector.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -123,4 +124,26 @@ static LexToken __lexer_read_token(Lexer *lexer) {
 LexToken lexer_next(Lexer *lexer) {
     __lexer_skip_empty(lexer);
     return __lexer_read_token(lexer);
+}
+
+VECTOR_DEFINE(LexToken, LexTokenVector)
+
+LexTokenVector lexer_tokenize(Lexer *lexer) {
+    LexTokenVector res;
+    LexTokenVector_init(&res);
+
+    LexToken current;
+
+    do {
+        current = lexer_next(lexer);
+        LexTokenVector_push_back(&res, current);
+    } while (current.type != LEX_EOF);
+
+    return res;
+}
+
+Lexer make_lexer(const char *src) {
+    Lexer lexer;
+    lexer_init(&lexer, src);
+    return lexer;
 }
