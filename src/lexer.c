@@ -28,13 +28,35 @@ void lexer_advance(Lexer *lexer) {
     }
 }
 
-static void __lexer_skip_empty(Lexer *lexer) {
-    while (isspace(lexer_current(lexer))) {
+static void __lexer_skip_line(Lexer *lexer) {
+    char current;
+    while ((current = lexer_current(lexer)) != '\n' && current != '\0') {
+        lexer_advance(lexer);
+    }
+
+    // Putting lexer right after newline
+    if (current == '\n') {
         lexer_advance(lexer);
     }
 }
 
-static int __issymbol(char ch) { return isalnum(ch) || ch == '-' || ch == '_'; }
+static void __lexer_skip_empty(Lexer *lexer) {
+begin:
+    while (isspace(lexer_current(lexer))) {
+        lexer_advance(lexer);
+    }
+
+    // Handling comments
+    if (lexer_current(lexer) == ';') {
+        __lexer_skip_line(lexer);
+        goto begin;
+    }
+}
+
+static int __issymbol(char ch) {
+    return !isspace((unsigned char)ch) && ch != '(' && ch != ')' && ch != ';' && ch != '"' &&
+           ch != '\0';
+}
 
 static LexToken __lexer_read_token(Lexer *lexer) {
     LexToken res;
@@ -53,7 +75,6 @@ static LexToken __lexer_read_token(Lexer *lexer) {
         return res;
     case '\0':
         res.type = LEX_EOF;
-        lexer_advance(lexer);
         return res;
     }
 

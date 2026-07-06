@@ -12,7 +12,7 @@ typedef enum {
     LEX_UNKNOWN
 } LexTokenType;
 
-typedef enum { LEX_OK, LEX_ERROR } LexStatus;
+typedef enum { LEX_OK, LEX_ERROR } LexTokenStatus;
 
 typedef struct {
     size_t pos;
@@ -22,7 +22,7 @@ typedef struct {
 
 typedef struct {
     LexTokenType type;
-    LexStatus status;
+    LexTokenStatus status;
     char *value;
 
     Location location;

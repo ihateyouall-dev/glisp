@@ -6,7 +6,7 @@
 int test_status = 0;
 
 int main(void) {
-    const char *src = "(1 3.14 abc \n@)";
+    const char *src = "(1 3.14 abc ; comment\n\" 42.a$%+-><)";
     Lexer lexer;
 
     lexer_init(&lexer, src);
@@ -48,23 +48,31 @@ int main(void) {
 
     TEST(token.type == LEX_UNKNOWN, "UNKNOWN");
     TEST(token.status == LEX_ERROR, "UNKNOWN status");
-    TEST(token.location.pos == 13, "UNKNOWN pos");
+    TEST(token.location.pos == 22, "UNKNOWN pos");
     TEST(token.location.line == 2, "UNKNOWN line");
     TEST(token.location.column == 1, "UNKNOWN column");
 
     token = lexer_next(&lexer);
 
+    TEST(token.type == LEX_SYMBOL, "Complex SYMBOL");
+    TEST(strcmp(token.value, "42.a$%+-><") == 0, "Complex SYMBOL value");
+    TEST(token.location.pos == 24, "Complex SYMBOL pos");
+    TEST(token.location.line == 2, "Complex SYMBOL line");
+    TEST(token.location.column == 3, "Complex SYMBOL column");
+
+    token = lexer_next(&lexer);
+
     TEST(token.type == LEX_RPAREN, "RPAREN");
-    TEST(token.location.pos == 14, "RPAREN pos");
+    TEST(token.location.pos == 34, "RPAREN pos");
     TEST(token.location.line == 2, "RPAREN line");
-    TEST(token.location.column == 2, "RPAREN column");
+    TEST(token.location.column == 13, "RPAREN column");
 
     token = lexer_next(&lexer);
 
     TEST(token.type == LEX_EOF, "EOF");
-    TEST(token.location.pos == 15, "EOF pos");
+    TEST(token.location.pos == 35, "EOF pos");
     TEST(token.location.line == 2, "EOF line");
-    TEST(token.location.column == 3, "EOF column");
+    TEST(token.location.column == 14, "EOF column");
 
     return test_status;
 }
