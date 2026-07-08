@@ -3,8 +3,7 @@
 
 int test_status = 0;
 
-VECTOR_DECLARE(int, vector)
-VECTOR_DEFINE(int, vector)
+VECTOR_DECLARE_DEFINE(int, vector)
 
 int main(void) {
     vector vec;
@@ -33,6 +32,15 @@ int main(void) {
     for (int i = 0; i < 8; ++i) {
         TEST(*vector_at(&vec, i) == i + 1, "Data preserved");
     }
+
+    vector_reserve(&vec, 100);
+
+    TEST(vec.capacity == 100, "Reservation");
+
+    vector_resize(&vec, 120);
+
+    TEST(vec.size == 120, "Size after resizing");
+    TEST(vec.capacity == 120, "Capacity after resizing");
 
     vector_destroy(&vec);
 
