@@ -8,6 +8,7 @@ typedef enum {
     LEX_EOF,
     LEX_LPAREN,
     LEX_RPAREN,
+    LEX_QUOTE,
     LEX_INTLITERAL,
     LEX_FLOATLITERAL,
     LEX_SYMBOL,

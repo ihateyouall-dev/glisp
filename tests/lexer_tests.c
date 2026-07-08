@@ -75,20 +75,21 @@ void lexer_test(void) {
 }
 
 void lexer_tokenize_test(void) {
-    Lexer lexer = make_lexer("(1 3.14 abc ; comment\n\" 42.a$%+-><)");
+    Lexer lexer = make_lexer("(1 3.14 abc ; comment\n\" '42.a$%+-><)");
 
     LexTokenVector tokens = lexer_tokenize(&lexer);
 
-    TEST(tokens.size == 8, "Tokens amount");
+    TEST(tokens.size == 9, "Tokens amount");
 
     TEST(LexTokenVector_at(&tokens, 0)->type == LEX_LPAREN, "Token access");
     TEST(LexTokenVector_at(&tokens, 1)->type == LEX_INTLITERAL, "Token access");
     TEST(LexTokenVector_at(&tokens, 2)->type == LEX_FLOATLITERAL, "Token access");
     TEST(LexTokenVector_at(&tokens, 3)->type == LEX_SYMBOL, "Token access");
     TEST(LexTokenVector_at(&tokens, 4)->type == LEX_UNKNOWN, "Token access");
-    TEST(LexTokenVector_at(&tokens, 5)->type == LEX_SYMBOL, "Token access");
-    TEST(LexTokenVector_at(&tokens, 6)->type == LEX_RPAREN, "Token access");
-    TEST(LexTokenVector_at(&tokens, 7)->type == LEX_EOF, "Token access");
+    TEST(LexTokenVector_at(&tokens, 5)->type == LEX_QUOTE, "Token access");
+    TEST(LexTokenVector_at(&tokens, 6)->type == LEX_SYMBOL, "Token access");
+    TEST(LexTokenVector_at(&tokens, 7)->type == LEX_RPAREN, "Token access");
+    TEST(LexTokenVector_at(&tokens, 8)->type == LEX_EOF, "Token access");
 }
 
 int main(void) {

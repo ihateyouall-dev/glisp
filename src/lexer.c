@@ -74,6 +74,10 @@ static LexToken __lexer_read_token(Lexer *lexer) {
         res.type = LEX_RPAREN;
         lexer_advance(lexer);
         return res;
+    case '\'':
+        res.type = LEX_QUOTE;
+        lexer_advance(lexer);
+        return res;
     case '\0':
         res.type = LEX_EOF;
         return res;
