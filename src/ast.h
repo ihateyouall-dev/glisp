@@ -2,10 +2,10 @@
 
 #include <stdint.h>
 
-typedef enum { AST_INT, AST_FLOAT, AST_SYMBOL, AST_CONS, AST_NIL } ASTNodeType;
+typedef enum { GL_AST_INT, GL_AST_FLOAT, GL_AST_SYMBOL, GL_AST_CONS, GL_AST_NIL } gl_ast_node_type;
 
-typedef struct ASTNode {
-    ASTNodeType type;
+typedef struct gl_ast_node {
+    gl_ast_node_type type;
 
     union {
         int64_t integral;
@@ -13,15 +13,15 @@ typedef struct ASTNode {
         char *symbol;
 
         struct {
-            struct ASTNode *car;
-            struct ASTNode *cdr;
+            struct gl_ast_node *car;
+            struct gl_ast_node *cdr;
         } cons;
     } value;
-} ASTNode;
+} gl_ast_node;
 
-ASTNode *ast_make_int(int64_t num);
-ASTNode *ast_make_float(long double num);
-ASTNode *ast_make_symbol(const char *sym);
-ASTNode *ast_make_cons(ASTNode *car, ASTNode *cdr);
-ASTNode *ast_make_nil(void);
-void ast_destroy(ASTNode *node);
+gl_ast_node *gl_ast_make_int(int64_t num);
+gl_ast_node *gl_ast_make_float(long double num);
+gl_ast_node *gl_ast_make_symbol(const char *sym);
+gl_ast_node *gl_ast_make_cons(gl_ast_node *car, gl_ast_node *cdr);
+gl_ast_node *gl_ast_make_nil(void);
+void gl_ast_destroy(gl_ast_node *node);

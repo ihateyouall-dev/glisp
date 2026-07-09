@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void lexer_init(Lexer *lexer, const char *src) {
+void gl_lexer_init(gl_lexer *lexer, const char *src) {
     lexer->src = src;
 
     lexer->len = strlen(src);
@@ -14,11 +14,11 @@ void lexer_init(Lexer *lexer, const char *src) {
     lexer->location.column = 1;
 }
 
-char lexer_current(Lexer *lexer) { return lexer->src[lexer->location.pos]; }
+char gl_lexer_current(gl_lexer *lexer) { return lexer->src[lexer->location.pos]; }
 
-char lexer_peek(Lexer *lexer) { return lexer->src[lexer->location.pos + 1]; }
+char gl_lexer_peek(gl_lexer *lexer) { return lexer->src[lexer->location.pos + 1]; }
 
-void lexer_advance(Lexer *lexer) {
+void gl_lexer_advance(gl_lexer *lexer) {
     char ch = lexer->src[++lexer->location.pos];
 
     if (ch == '\n') {
@@ -29,26 +29,26 @@ void lexer_advance(Lexer *lexer) {
     }
 }
 
-static void __lexer_skip_line(Lexer *lexer) {
+static void __lexer_skip_line(gl_lexer *lexer) {
     char current;
-    while ((current = lexer_current(lexer)) != '\n' && current != '\0') {
-        lexer_advance(lexer);
+    while ((current = gl_lexer_current(lexer)) != '\n' && current != '\0') {
+        gl_lexer_advance(lexer);
     }
 
     // Putting lexer right after newline
     if (current == '\n') {
-        lexer_advance(lexer);
+        gl_lexer_advance(lexer);
     }
 }
 
-static void __lexer_skip_empty(Lexer *lexer) {
+static void __lexer_skip_empty(gl_lexer *lexer) {
 begin:
-    while (isspace(lexer_current(lexer))) {
-        lexer_advance(lexer);
+    while (isspace(gl_lexer_current(lexer))) {
+        gl_lexer_advance(lexer);
     }
 
     // Handling comments
-    if (lexer_current(lexer) == ';') {
+    if (gl_lexer_current(lexer) == ';') {
         __lexer_skip_line(lexer);
         goto begin;
     }
@@ -59,27 +59,27 @@ static int __issymbol(char ch) {
            ch != '\0';
 }
 
-static LexToken __lexer_read_token(Lexer *lexer) {
-    LexToken res;
-    res.type = LEX_UNKNOWN;
+static gl_lex_token __lexer_read_token(gl_lexer *lexer) {
+    gl_lex_token res;
+    res.type = GL_LEX_UNKNOWN;
     res.status = LEX_OK;
     res.location = lexer->location;
 
-    switch (lexer_current(lexer)) {
+    switch (gl_lexer_current(lexer)) {
     case '(':
-        res.type = LEX_LPAREN;
-        lexer_advance(lexer);
+        res.type = GL_LEX_LPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case ')':
-        res.type = LEX_RPAREN;
-        lexer_advance(lexer);
+        res.type = GL_LEX_RPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case '\'':
-        res.type = LEX_QUOTE;
-        lexer_advance(lexer);
+        res.type = GL_LEX_QUOTE;
+        gl_lexer_advance(lexer);
         return res;
     case '\0':
-        res.type = LEX_EOF;
+        res.type = GL_LEX_EOF;
         return res;
     }
 
@@ -87,28 +87,28 @@ static LexToken __lexer_read_token(Lexer *lexer) {
     const size_t start_pos = lexer->location.pos;
 
     // Detecting possible numeric literal
-    if (isdigit(lexer_current(lexer))) {
-        res.type = LEX_INTLITERAL;
-        while (isdigit(lexer_current(lexer))) {
-            lexer_advance(lexer);
+    if (isdigit(gl_lexer_current(lexer))) {
+        res.type = GL_LEX_INTLITERAL;
+        while (isdigit(gl_lexer_current(lexer))) {
+            gl_lexer_advance(lexer);
         }
         // Detecting float literal
-        if (lexer_current(lexer) == '.') {
-            res.type = LEX_FLOATLITERAL;
-            lexer_advance(lexer);
+        if (gl_lexer_current(lexer) == '.') {
+            res.type = GL_LEX_FLOATLITERAL;
+            gl_lexer_advance(lexer);
             // Counting rest of digits after delimiter
-            while (isdigit(lexer_current(lexer))) {
-                lexer_advance(lexer);
+            while (isdigit(gl_lexer_current(lexer))) {
+                gl_lexer_advance(lexer);
             }
         }
     }
-    while (__issymbol(lexer_current(lexer))) {
-        res.type = LEX_SYMBOL;
-        lexer_advance(lexer);
+    while (__issymbol(gl_lexer_current(lexer))) {
+        res.type = GL_LEX_SYMBOL;
+        gl_lexer_advance(lexer);
     }
-    if (res.type == LEX_UNKNOWN) {
+    if (res.type == GL_LEX_UNKNOWN) {
         res.status = LEX_ERROR;
-        lexer_advance(lexer);
+        gl_lexer_advance(lexer);
         return res;
     }
 
@@ -125,29 +125,29 @@ static LexToken __lexer_read_token(Lexer *lexer) {
     return res;
 }
 
-LexToken lexer_next(Lexer *lexer) {
+gl_lex_token gl_lexer_next(gl_lexer *lexer) {
     __lexer_skip_empty(lexer);
     return __lexer_read_token(lexer);
 }
 
-VECTOR_DEFINE(LexToken, LexTokenVector)
+VECTOR_DEFINE(gl_lex_token, gl_lex_token_vector)
 
-LexTokenVector lexer_tokenize(Lexer *lexer) {
-    LexTokenVector res;
-    LexTokenVector_init(&res);
+gl_lex_token_vector gl_lexer_tokenize(gl_lexer *lexer) {
+    gl_lex_token_vector res;
+    gl_lex_token_vector_init(&res);
 
-    LexToken current;
+    gl_lex_token current;
 
     do {
-        current = lexer_next(lexer);
-        LexTokenVector_push_back(&res, current);
-    } while (current.type != LEX_EOF);
+        current = gl_lexer_next(lexer);
+        gl_lex_token_vector_push_back(&res, current);
+    } while (current.type != GL_LEX_EOF);
 
     return res;
 }
 
-Lexer make_lexer(const char *src) {
-    Lexer lexer;
-    lexer_init(&lexer, src);
+gl_lexer gl_make_lexer(const char *src) {
+    gl_lexer lexer;
+    gl_lexer_init(&lexer, src);
     return lexer;
 }

@@ -5,45 +5,45 @@
 #include <stddef.h>
 
 typedef enum {
-    LEX_EOF,
-    LEX_LPAREN,
-    LEX_RPAREN,
-    LEX_QUOTE,
-    LEX_INTLITERAL,
-    LEX_FLOATLITERAL,
-    LEX_SYMBOL,
-    LEX_UNKNOWN
-} LexTokenType;
+    GL_LEX_EOF,
+    GL_LEX_LPAREN,
+    GL_LEX_RPAREN,
+    GL_LEX_QUOTE,
+    GL_LEX_INTLITERAL,
+    GL_LEX_FLOATLITERAL,
+    GL_LEX_SYMBOL,
+    GL_LEX_UNKNOWN
+} gl_lex_token_type;
 
-typedef enum { LEX_OK, LEX_ERROR } LexTokenStatus;
+typedef enum { LEX_OK, LEX_ERROR } gl_lex_token_status;
 
 typedef struct {
     size_t pos;
     size_t line;
     size_t column;
-} Location;
+} gl_location;
 
 typedef struct {
-    LexTokenType type;
-    LexTokenStatus status;
+    gl_lex_token_type type;
+    gl_lex_token_status status;
     char *value;
 
-    Location location;
-} LexToken;
+    gl_location location;
+} gl_lex_token;
 
 typedef struct {
     const char *src;
     size_t len;
 
-    Location location;
-} Lexer;
+    gl_location location;
+} gl_lexer;
 
-VECTOR_DECLARE(LexToken, LexTokenVector)
+VECTOR_DECLARE(gl_lex_token, gl_lex_token_vector)
 
-void lexer_init(Lexer *lexer, const char *src);
-Lexer make_lexer(const char *src);
-char lexer_current(Lexer *lexer);
-char lexer_peek(Lexer *lexer);
-void lexer_advance(Lexer *lexer);
-LexToken lexer_next(Lexer *lexer);
-LexTokenVector lexer_tokenize(Lexer *lexer);
+void gl_lexer_init(gl_lexer *lexer, const char *src);
+gl_lexer gl_make_lexer(const char *src);
+char gl_lexer_current(gl_lexer *lexer);
+char gl_lexer_peek(gl_lexer *lexer);
+void gl_lexer_advance(gl_lexer *lexer);
+gl_lex_token gl_lexer_next(gl_lexer *lexer);
+gl_lex_token_vector gl_lexer_tokenize(gl_lexer *lexer);
