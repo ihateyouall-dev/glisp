@@ -8,11 +8,11 @@ int test_status = 0;
 void lexer_test(void) {
     const char *src = "(1 3.14 abc ; comment\n\" 42.a$%+-><)";
 
-    gl_lexer lexer = gl_make_lexer(src);
+    gl_lexer_t lexer = gl_make_lexer(src);
 
     TEST(lexer.len == strlen(src), "Length");
 
-    gl_lex_token token = gl_lexer_next(&lexer);
+    gl_lex_token_t token = gl_lexer_next(&lexer);
 
     TEST(token.type == GL_LEX_LPAREN, "LPAREN");
     TEST(token.location.pos == 0, "LPAREN pos");
@@ -75,9 +75,9 @@ void lexer_test(void) {
 }
 
 void lexer_tokenize_test(void) {
-    gl_lexer lexer = gl_make_lexer("(1 3.14 abc ; comment\n\" '42.a$%+-><)");
+    gl_lexer_t lexer = gl_make_lexer("(1 3.14 abc ; comment\n\" '42.a$%+-><)");
 
-    gl_lex_token_vector tokens = gl_lexer_tokenize(&lexer);
+    gl_lex_token_vector_t tokens = gl_lexer_tokenize(&lexer);
 
     TEST(tokens.size == 9, "Tokens amount");
 

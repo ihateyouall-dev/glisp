@@ -9,32 +9,32 @@
 #define strdup _strdup
 #endif
 
-gl_ast_node *gl_ast_make_int(int64_t num) {
-    gl_ast_node *res = malloc(sizeof(gl_ast_node));
+gl_ast_node_t *gl_ast_make_int(int64_t num) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_INT;
     res->value.integral = num;
     return res;
 }
 
-gl_ast_node *gl_ast_make_float(long double num) {
-    gl_ast_node *res = malloc(sizeof(gl_ast_node));
+gl_ast_node_t *gl_ast_make_float(long double num) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_FLOAT;
     res->value.floating = num;
     return res;
 }
 
-gl_ast_node *gl_ast_make_symbol(const char *sym) {
-    gl_ast_node *res = malloc(sizeof(gl_ast_node));
+gl_ast_node_t *gl_ast_make_symbol(const char *sym) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_SYMBOL;
     res->value.symbol = strdup(sym);
     return res;
 }
 
-gl_ast_node *gl_ast_make_cons(gl_ast_node *car, gl_ast_node *cdr) {
-    gl_ast_node *res = malloc(sizeof(gl_ast_node));
+gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_CONS;
     res->value.cons.car = car;
@@ -42,14 +42,14 @@ gl_ast_node *gl_ast_make_cons(gl_ast_node *car, gl_ast_node *cdr) {
     return res;
 }
 
-gl_ast_node *gl_ast_make_nil(void) {
-    gl_ast_node *res = malloc(sizeof(gl_ast_node));
+gl_ast_node_t *gl_ast_make_nil(void) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_NIL;
     return res;
 }
 
-void gl_ast_destroy(gl_ast_node *node) {
+void gl_ast_destroy(gl_ast_node_t *node) {
     if (!node) {
         return;
     }

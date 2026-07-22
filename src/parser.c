@@ -6,31 +6,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void gl_parser_init(gl_parser *parser, const char *src) {
-    gl_lexer lexer = gl_make_lexer(src);
+void gl_parser_init(gl_parser_t *parser, const char *src) {
+    gl_lexer_t lexer = gl_make_lexer(src);
     parser->tokens = gl_lexer_tokenize(&lexer);
     parser->pos = 0;
 }
 
-gl_parser gl_make_parser(const char *src) {
-    gl_parser res;
+gl_parser_t gl_make_parser(const char *src) {
+    gl_parser_t res;
     gl_parser_init(&res, src);
     return res;
 }
 
-void gl_parser_destroy(gl_parser *parser) {
+void gl_parser_destroy(gl_parser_t *parser) {
     gl_lex_token_vector_destroy(&parser->tokens);
     parser->pos = 0;
 }
 
-static gl_lex_token __gl_parser_current_token(gl_parser *parser) {
+static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {
     return *gl_lex_token_vector_at(&parser->tokens, parser->pos);
 }
 
-static void __gl_parser_advance(gl_parser *parser) { ++parser->pos; }
+static void __gl_parser_advance(gl_parser_t *parser) { ++parser->pos; }
 
-static gl_ast_node *__gl_parser_parse_int(gl_parser *parser) {
-    gl_lex_token token = __gl_parser_current_token(parser);
+static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
+    gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
     errno = 0;
@@ -46,14 +46,14 @@ static gl_ast_node *__gl_parser_parse_int(gl_parser *parser) {
     return gl_ast_make_int(val);
 }
 
-static gl_ast_node *__gl_parser_parse_symbol(gl_parser *parser) {
-    gl_lex_token token = __gl_parser_current_token(parser);
+static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser) {
+    gl_lex_token_t token = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);
     return gl_ast_make_symbol(token.value);
 }
 
-static gl_ast_node *__gl_parser_parse_float(gl_parser *parser) {
-    gl_lex_token token = __gl_parser_current_token(parser);
+static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
+    gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
     errno = 0;
@@ -69,11 +69,11 @@ static gl_ast_node *__gl_parser_parse_float(gl_parser *parser) {
     return gl_ast_make_float(val);
 }
 
-static gl_ast_node *__gl_parser_parse_list(gl_parser *parser);
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
 
 // Decides what parser functions will need to call next.
-static gl_ast_node *__gl_parser_parse_expression(gl_parser *parser) {
-    gl_lex_token token = __gl_parser_current_token(parser);
+static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
+    gl_lex_token_t token = __gl_parser_current_token(parser);
 
     if (token.type == GL_LEX_LPAREN) {
         __gl_parser_advance(parser); // Skip '('
@@ -94,25 +94,25 @@ static gl_ast_node *__gl_parser_parse_expression(gl_parser *parser) {
     }
 }
 
-static gl_ast_node *__gl_parser_parse_list(gl_parser *parser) {
-    gl_ast_node *list_head = NULL;
-    gl_ast_node *current_tail = NULL;
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
+    gl_ast_node_t *list_head = NULL;
+    gl_ast_node_t *current_tail = NULL;
 
     while (1) {
-        gl_lex_token token = __gl_parser_current_token(parser);
+        gl_lex_token_t token = __gl_parser_current_token(parser);
 
         if (token.type == GL_LEX_RPAREN) {
             __gl_parser_advance(parser);
             break;
         }
 
-        gl_ast_node *new_node = __gl_parser_parse_expression(parser);
+        gl_ast_node_t *new_node = __gl_parser_parse_expression(parser);
 
         if (list_head == NULL) {
             list_head = gl_ast_make_cons(new_node, gl_ast_make_nil());
             current_tail = list_head;
         } else {
-            gl_ast_node *next_cons = gl_ast_make_cons(new_node, current_tail->value.cons.cdr);
+            gl_ast_node_t *next_cons = gl_ast_make_cons(new_node, current_tail->value.cons.cdr);
             current_tail->value.cons.cdr = next_cons;
             current_tail = next_cons;
         }
@@ -121,4 +121,4 @@ static gl_ast_node *__gl_parser_parse_list(gl_parser *parser) {
     return list_head;
 }
 
-gl_ast_node *gl_parser_parse(gl_parser *parser) { return __gl_parser_parse_expression(parser); }
+gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) { return __gl_parser_parse_expression(parser); }

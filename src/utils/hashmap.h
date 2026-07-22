@@ -8,20 +8,20 @@
     typedef struct {                                                                               \
         const char *key;                                                                           \
         T value;                                                                                   \
-    } Name##Entry;                                                                                 \
-    VECTOR_DECLARE(Name##Entry, Name##Bucket)                                                      \
+    } Name##Entry_t;                                                                               \
+    VECTOR_DECLARE(Name##Entry_t, Name##Bucket)                                                    \
     typedef struct {                                                                               \
-        Name##Bucket *buckets;                                                                     \
+        Name##Bucket_t *buckets;                                                                   \
         size_t size;                                                                               \
         size_t buckets_count;                                                                      \
-    } Name;                                                                                        \
-    void Name##_init(Name *map);                                                                   \
-    void Name##_insert(Name *map, const char *key, T value);                                       \
-    T *Name##_get(Name *map, const char *key);                                                     \
-    void Name##_destroy(Name *map);
+    } Name##_t;                                                                                    \
+    void Name##_init(Name##_t *map);                                                               \
+    void Name##_insert(Name##_t *map, const char *key, T value);                                   \
+    T *Name##_get(Name##_t *map, const char *key);                                                 \
+    void Name##_destroy(Name##_t *map);
 
 #define HASHMAP_DEFINE(T, Name)                                                                    \
-    VECTOR_DEFINE(Name##Entry, Name##Bucket)                                                       \
+    VECTOR_DEFINE(Name##Entry_t, Name##Bucket)                                                     \
     static unsigned long long __##Name##_fnv1a(const char *key) {                                  \
         unsigned long long res = 14695981039346656037ULL;                                          \
         const unsigned long long prime = 1099511628211ULL;                                         \
@@ -31,15 +31,15 @@
         }                                                                                          \
         return res;                                                                                \
     }                                                                                              \
-    static void __##Name##_rehash(Name *map, size_t new_buckets_count) {                           \
-        Name##Bucket *new = calloc(new_buckets_count, sizeof(Name##Bucket));                       \
+    static void __##Name##_rehash(Name##_t *map, size_t new_buckets_count) {                       \
+        Name##Bucket_t *new = calloc(new_buckets_count, sizeof(Name##Bucket_t));                   \
         for (size_t i = 0; i < new_buckets_count; ++i) {                                           \
             Name##Bucket_init(&new[i]);                                                            \
         }                                                                                          \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
-            Name##Bucket *bucket = &map->buckets[i];                                               \
+            Name##Bucket_t *bucket = &map->buckets[i];                                             \
             for (size_t j = 0; j < bucket->size; ++j) {                                            \
-                Name##Entry *entry = Name##Bucket_at(bucket, j);                                   \
+                Name##Entry_t *entry = Name##Bucket_at(bucket, j);                                 \
                 size_t idx = __##Name##_fnv1a(entry->key) % new_buckets_count;                     \
                 Name##Bucket_push_back(&new[idx], *entry);                                         \
             }                                                                                      \
@@ -51,18 +51,18 @@
         map->buckets = new;                                                                        \
         map->buckets_count = new_buckets_count;                                                    \
     }                                                                                              \
-    void Name##_init(Name *map) {                                                                  \
+    void Name##_init(Name##_t *map) {                                                              \
         map->buckets_count = 32;                                                                   \
-        map->buckets = calloc(map->buckets_count, sizeof(Name##Bucket));                           \
+        map->buckets = calloc(map->buckets_count, sizeof(Name##Bucket_t));                         \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
             Name##Bucket_init(&map->buckets[i]);                                                   \
         }                                                                                          \
         map->size = 0;                                                                             \
     }                                                                                              \
-    void Name##_insert(Name *map, const char *key, T value) {                                      \
-        Name##Bucket *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];          \
+    void Name##_insert(Name##_t *map, const char *key, T value) {                                  \
+        Name##Bucket_t *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];        \
         for (size_t i = 0; i < bucket->size; ++i) {                                                \
-            Name##Entry *prev = Name##Bucket_at(bucket, i);                                        \
+            Name##Entry_t *prev = Name##Bucket_at(bucket, i);                                      \
             if (strcmp(key, prev->key) == 0) {                                                     \
                 prev->value = value;                                                               \
                 return;                                                                            \
@@ -72,23 +72,23 @@
             __##Name##_rehash(map, map->buckets_count * 2);                                        \
             bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];                    \
         }                                                                                          \
-        Name##Entry entry;                                                                         \
+        Name##Entry_t entry;                                                                       \
         entry.key = key;                                                                           \
         entry.value = value;                                                                       \
         Name##Bucket_push_back(bucket, entry);                                                     \
         ++map->size;                                                                               \
     }                                                                                              \
-    T *Name##_get(Name *map, const char *key) {                                                    \
-        Name##Bucket *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];          \
+    T *Name##_get(Name##_t *map, const char *key) {                                                \
+        Name##Bucket_t *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];        \
         for (size_t i = 0; i < bucket->size; ++i) {                                                \
-            Name##Entry *entry = Name##Bucket_at(bucket, i);                                       \
+            Name##Entry_t *entry = Name##Bucket_at(bucket, i);                                     \
             if (strcmp(key, entry->key) == 0) {                                                    \
                 return &entry->value;                                                              \
             }                                                                                      \
         }                                                                                          \
         return NULL;                                                                               \
     }                                                                                              \
-    void Name##_destroy(Name *map) {                                                               \
+    void Name##_destroy(Name##_t *map) {                                                           \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
             Name##Bucket_destroy(&map->buckets[i]);                                                \
         }                                                                                          \

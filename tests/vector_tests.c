@@ -6,7 +6,7 @@ int test_status = 0;
 VECTOR_DECLARE_DEFINE(int, vector)
 
 int main(void) {
-    vector vec;
+    vector_t vec;
     vector_init(&vec);
 
     TEST(vec.size == 0, "Initial size");

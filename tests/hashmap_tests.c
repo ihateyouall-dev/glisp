@@ -6,7 +6,7 @@ int test_status = 0;
 HASHMAP_DECLARE_DEFINE(int, map)
 
 int main(void) {
-    map hm;
+    map_t hm;
     map_init(&hm);
 
     map_insert(&hm, "x", 12);

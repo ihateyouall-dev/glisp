@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void gl_lexer_init(gl_lexer *lexer, const char *src) {
+void gl_lexer_init(gl_lexer_t *lexer, const char *src) {
     lexer->src = src;
 
     lexer->len = strlen(src);
@@ -14,11 +14,11 @@ void gl_lexer_init(gl_lexer *lexer, const char *src) {
     lexer->location.column = 1;
 }
 
-char gl_lexer_current(gl_lexer *lexer) { return lexer->src[lexer->location.pos]; }
+char gl_lexer_current(gl_lexer_t *lexer) { return lexer->src[lexer->location.pos]; }
 
-char gl_lexer_peek(gl_lexer *lexer) { return lexer->src[lexer->location.pos + 1]; }
+char gl_lexer_peek(gl_lexer_t *lexer) { return lexer->src[lexer->location.pos + 1]; }
 
-void gl_lexer_advance(gl_lexer *lexer) {
+void gl_lexer_advance(gl_lexer_t *lexer) {
     char ch = lexer->src[++lexer->location.pos];
 
     if (ch == '\n') {
@@ -29,7 +29,7 @@ void gl_lexer_advance(gl_lexer *lexer) {
     }
 }
 
-static void __lexer_skip_line(gl_lexer *lexer) {
+static void __lexer_skip_line(gl_lexer_t *lexer) {
     char current;
     while ((current = gl_lexer_current(lexer)) != '\n' && current != '\0') {
         gl_lexer_advance(lexer);
@@ -41,7 +41,7 @@ static void __lexer_skip_line(gl_lexer *lexer) {
     }
 }
 
-static void __lexer_skip_empty(gl_lexer *lexer) {
+static void __lexer_skip_empty(gl_lexer_t *lexer) {
 begin:
     while (isspace(gl_lexer_current(lexer))) {
         gl_lexer_advance(lexer);
@@ -59,8 +59,8 @@ static int __issymbol(char ch) {
            ch != '\0';
 }
 
-static gl_lex_token __lexer_read_token(gl_lexer *lexer) {
-    gl_lex_token res;
+static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
+    gl_lex_token_t res;
     res.type = GL_LEX_UNKNOWN;
     res.status = LEX_OK;
     res.location = lexer->location;
@@ -125,18 +125,18 @@ static gl_lex_token __lexer_read_token(gl_lexer *lexer) {
     return res;
 }
 
-gl_lex_token gl_lexer_next(gl_lexer *lexer) {
+gl_lex_token_t gl_lexer_next(gl_lexer_t *lexer) {
     __lexer_skip_empty(lexer);
     return __lexer_read_token(lexer);
 }
 
-VECTOR_DEFINE(gl_lex_token, gl_lex_token_vector)
+VECTOR_DEFINE(gl_lex_token_t, gl_lex_token_vector)
 
-gl_lex_token_vector gl_lexer_tokenize(gl_lexer *lexer) {
-    gl_lex_token_vector res;
+gl_lex_token_vector_t gl_lexer_tokenize(gl_lexer_t *lexer) {
+    gl_lex_token_vector_t res;
     gl_lex_token_vector_init(&res);
 
-    gl_lex_token current;
+    gl_lex_token_t current;
 
     do {
         current = gl_lexer_next(lexer);
@@ -146,8 +146,8 @@ gl_lex_token_vector gl_lexer_tokenize(gl_lexer *lexer) {
     return res;
 }
 
-gl_lexer gl_make_lexer(const char *src) {
-    gl_lexer lexer;
+gl_lexer_t gl_make_lexer(const char *src) {
+    gl_lexer_t lexer;
     gl_lexer_init(&lexer, src);
     return lexer;
 }
