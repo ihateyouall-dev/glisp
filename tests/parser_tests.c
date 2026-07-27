@@ -12,6 +12,7 @@ void test_parse_int(void) {
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_INT, "Parse INT");
     TEST(node->value.integral == 123, "Parse INT value");
+    gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 }
 
@@ -21,6 +22,7 @@ void test_parse_float(void) {
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_FLOAT, "Parse FLOAT");
     TEST(node->value.floating == 45.67, "Parse FLOAT value");
+    gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 }
 
@@ -30,6 +32,7 @@ void test_parse_symbol(void) {
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_SYMBOL, "Parse SYMBOL");
     TEST(strcmp(node->value.symbol, "my_symbol") == 0, "Parse SYMBOL value");
+    gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 }
 
@@ -43,6 +46,7 @@ void test_parse_simple_list(void) {
     TEST(list->value.cons.cdr->type == GL_AST_CONS, "List cdr type");
     TEST(list->value.cons.cdr->value.cons.car->type == GL_AST_INT, "List car 2");
     TEST(list->value.cons.cdr->value.cons.car->value.integral == 2, "List car 2 value");
+    gl_ast_destroy(list);
     gl_parser_destroy(&parser);
 }
 
@@ -72,6 +76,7 @@ void test_parse_nested_list(void) {
          "Nested inner cdr car 4 value");
     TEST(inner->value.cons.cdr->value.cons.cdr->type == GL_AST_NIL,
          "Nested inner cdr car 4 cdr NIL");
+    gl_ast_destroy(list);
     gl_parser_destroy(&parser);
 }
 
@@ -98,6 +103,70 @@ void test_parse_complex_list(void) {
     TEST(strcmp(list->value.cons.cdr->value.cons.car->value.symbol, "c") == 0,
          "Complex list cdr car symbol value");
     TEST(list->value.cons.cdr->value.cons.cdr->type == GL_AST_NIL, "Complex list cdr car cdr NIL");
+    gl_ast_destroy(list);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_empty_list(void) {
+    const char *src = "()";
+    gl_parser_t parser = gl_make_parser(src);
+    gl_ast_node_t *list = gl_parser_parse(&parser);
+    TEST(list->type == GL_AST_NIL, "Empty list type");
+    gl_ast_destroy(list);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_quoted_symbol(void) {
+    const char *src = "'hello world";
+    gl_parser_t parser = gl_make_parser(src);
+    gl_ast_node_t *quoted = gl_parser_parse(&parser);
+    gl_ast_node_t *not_quoted = gl_parser_parse(&parser);
+
+    TEST(quoted->type == GL_AST_SYMBOL, "Quoted type");
+    TEST(strcmp(quoted->value.symbol, "hello") == 0, "Quoted value");
+    TEST(quoted->quoted, "Quoted quoted");
+
+    TEST(not_quoted->type == GL_AST_SYMBOL, "Not quoted type");
+    TEST(strcmp(not_quoted->value.symbol, "world") == 0, "Not quoted value");
+    TEST(!not_quoted->quoted, "Not quoted quoted");
+
+    gl_ast_destroy(quoted);
+    gl_ast_destroy(not_quoted);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_quoted_complex_list(void) {
+    const char *src = "'((a b) c)";
+    gl_parser_t parser = gl_make_parser(src);
+    gl_ast_node_t *list = gl_parser_parse(&parser);
+    TEST(list->type == GL_AST_CONS, "Parse quoted complex list type");
+    TEST(list->quoted, "Quoted complex list quoted");
+    TEST(list->value.cons.car->type == GL_AST_CONS, "Quoted complex list car type");
+    TEST(list->value.cons.car->quoted, "Quoted complex list car quoted");
+    TEST(list->value.cons.car->value.cons.car->type == GL_AST_SYMBOL,
+         "Quoted complex list car car symbol");
+    TEST(list->value.cons.car->value.cons.car->quoted, "Quoted complex list car car quoted");
+    TEST(strcmp(list->value.cons.car->value.cons.car->value.symbol, "a") == 0,
+         "Quoted complex list car car symbol value");
+    TEST(list->value.cons.car->value.cons.cdr->type == GL_AST_CONS,
+         "Quoted complex list car car cdr");
+    TEST(list->value.cons.car->value.cons.cdr->value.cons.car->type == GL_AST_SYMBOL,
+         "Quoted complex list car car cdr car symbol");
+    TEST(list->value.cons.car->value.cons.cdr->value.cons.car->quoted,
+         "Quoted complex list car car cdr car quoted");
+    TEST(strcmp(list->value.cons.car->value.cons.cdr->value.cons.car->value.symbol, "b") == 0,
+         "Quoted complex list car car cdr car symbol value");
+    TEST(list->value.cons.car->value.cons.cdr->value.cons.cdr->type == GL_AST_NIL,
+         "Quoted complex list car car cdr cdr NIL");
+    TEST(list->value.cons.cdr->type == GL_AST_CONS, "Quoted complex list cdr type");
+    TEST(list->value.cons.cdr->value.cons.car->type == GL_AST_SYMBOL,
+         "Quoted complex list cdr car symbol");
+    TEST(list->value.cons.cdr->value.cons.car->quoted, "Quoted complex list cdr car quoted");
+    TEST(strcmp(list->value.cons.cdr->value.cons.car->value.symbol, "c") == 0,
+         "Quoted complex list cdr car symbol value");
+    TEST(list->value.cons.cdr->value.cons.cdr->type == GL_AST_NIL,
+         "Quoted complex list cdr car cdr NIL");
+    gl_ast_destroy(list);
     gl_parser_destroy(&parser);
 }
 
@@ -108,6 +177,9 @@ void parser_test(void) {
     test_parse_simple_list();
     test_parse_nested_list();
     test_parse_complex_list();
+    test_parse_empty_list();
+    test_parse_quoted_symbol();
+    test_parse_quoted_complex_list();
 }
 
 int main(void) {

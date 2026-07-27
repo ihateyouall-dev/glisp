@@ -6,6 +6,7 @@
 typedef struct gl_parser_t {
     gl_lex_token_vector_t tokens;
     size_t pos;
+    int quote_mode;
 } gl_parser_t;
 
 void gl_parser_init(gl_parser_t *parser, const char *src);

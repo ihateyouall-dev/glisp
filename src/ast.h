@@ -12,6 +12,7 @@ typedef enum {
 
 typedef struct gl_ast_node_t {
     gl_ast_node_type_t type;
+    int quoted; // Flag indicating if this node was parsed/constructed as a literal quote block
 
     union {
         int64_t integral;
@@ -25,9 +26,12 @@ typedef struct gl_ast_node_t {
     } value;
 } gl_ast_node_t;
 
-gl_ast_node_t *gl_ast_make_int(int64_t num);
-gl_ast_node_t *gl_ast_make_float(long double num);
-gl_ast_node_t *gl_ast_make_symbol(const char *sym);
-gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr);
+// Note: The 'quoted' flag now controls whether the value/structure
+// should be treated as a non-evaluated literal block by the interpreter.
+
+gl_ast_node_t *gl_ast_make_int(int64_t num, int quoted);
+gl_ast_node_t *gl_ast_make_float(long double num, int quoted);
+gl_ast_node_t *gl_ast_make_symbol(const char *sym, int quoted);
+gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, int quoted);
 gl_ast_node_t *gl_ast_make_nil(void);
 void gl_ast_destroy(gl_ast_node_t *node);

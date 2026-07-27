@@ -29,7 +29,7 @@ static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {
 
 static void __gl_parser_advance(gl_parser_t *parser) { ++parser->pos; }
 
-static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser, int quoted) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
@@ -43,16 +43,16 @@ static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_int(val);
+    return gl_ast_make_int(val, quoted);
 }
 
-static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser, int quoted) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);
-    return gl_ast_make_symbol(token.value);
+    return gl_ast_make_symbol(token.value, quoted);
 }
 
-static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser, int quoted) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
@@ -66,27 +66,34 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_float(val);
+    return gl_ast_make_float(val, quoted);
 }
 
-static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted);
 
 // Decides what parser functions will need to call next.
-static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser, int explicit_quotation) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
+    int quoted = explicit_quotation;
+
+    if (token.type == GL_LEX_QUOTE) {
+        __gl_parser_advance(parser); // Consume the quote token
+        token = __gl_parser_current_token(parser);
+        quoted = 1;
+    }
 
     if (token.type == GL_LEX_LPAREN) {
         __gl_parser_advance(parser); // Skip '('
-        return __gl_parser_parse_list(parser);
+        return __gl_parser_parse_list(parser, quoted);
     }
 
     switch (token.type) {
     case GL_LEX_INTLITERAL:
-        return __gl_parser_parse_int(parser);
+        return __gl_parser_parse_int(parser, quoted);
     case GL_LEX_FLOATLITERAL:
-        return __gl_parser_parse_float(parser);
+        return __gl_parser_parse_float(parser, quoted);
     case GL_LEX_SYMBOL:
-        return __gl_parser_parse_symbol(parser);
+        return __gl_parser_parse_symbol(parser, quoted);
     default:
         fprintf(stderr, "Parser Error at line %zu, column %zu: Unexpected token type %d\n",
                 token.location.line, token.location.column, token.type);
@@ -94,7 +101,7 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     }
 }
 
-static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted) {
     gl_ast_node_t *list_head = NULL;
     gl_ast_node_t *current_tail = NULL;
 
@@ -103,16 +110,21 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
 
         if (token.type == GL_LEX_RPAREN) {
             __gl_parser_advance(parser);
+            // Empty list is similar to nil
+            if (list_head == NULL) {
+                return gl_ast_make_nil();
+            }
             break;
         }
 
-        gl_ast_node_t *new_node = __gl_parser_parse_expression(parser);
+        gl_ast_node_t *new_node = __gl_parser_parse_expression(parser, quoted);
 
         if (list_head == NULL) {
-            list_head = gl_ast_make_cons(new_node, gl_ast_make_nil());
+            list_head = gl_ast_make_cons(new_node, gl_ast_make_nil(), quoted);
             current_tail = list_head;
         } else {
-            gl_ast_node_t *next_cons = gl_ast_make_cons(new_node, current_tail->value.cons.cdr);
+            gl_ast_node_t *next_cons =
+                gl_ast_make_cons(new_node, current_tail->value.cons.cdr, quoted);
             current_tail->value.cons.cdr = next_cons;
             current_tail = next_cons;
         }
@@ -121,4 +133,6 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     return list_head;
 }
 
-gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) { return __gl_parser_parse_expression(parser); }
+gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) {
+    return __gl_parser_parse_expression(parser, 0);
+}
