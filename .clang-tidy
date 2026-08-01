@@ -1,0 +1,4 @@
+Checks: '-*,bugprone-*,performance-*,readability-*,clang-analyzer-*'
+Diagnostics:
+  - warning: "unused-variable"
+  - warning: "unused-function"

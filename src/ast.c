@@ -2,12 +2,8 @@
 
 #include <assert.h>
 #include <stdlib.h>
-#include <string.h>
 
-// MSVC has _strdup instead of strdup
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
+#include "utils/strdup.h"
 
 gl_ast_node_t *gl_ast_make_int(int64_t num, int quoted) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
