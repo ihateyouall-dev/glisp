@@ -33,4 +33,5 @@ gl_ast_node_t *gl_ast_make_float(long double num, int quoted);
 gl_ast_node_t *gl_ast_make_symbol(const char *sym, int quoted);
 gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, int quoted);
 gl_ast_node_t *gl_ast_make_nil(void);
+gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node);
 void gl_ast_destroy(gl_ast_node_t *node);

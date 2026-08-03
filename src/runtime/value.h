@@ -1,0 +1,56 @@
+#pragma once
+
+#include "ast.h"
+#include "utils/array.h"
+#include "utils/cons.h"
+#include <stdint.h>
+
+typedef enum {
+    GL_VAL_NIL,
+    GL_VAL_INT,
+    GL_VAL_FLOAT,
+    GL_VAL_SYMBOL,
+    GL_VAL_FUNCTION,
+    GL_VAL_BUILTIN,
+    GL_VAL_CONS
+} gl_value_type_t;
+
+typedef struct {
+    gl_value_type_t type;
+    void *val;
+} gl_value_t;
+
+CONS_DECLARE(gl_value_t *, gl_value_cons)
+
+void gl_value_destroy(gl_value_t **val);
+
+gl_value_t *gl_value_copy(gl_value_t *val);
+
+gl_value_t *gl_value_make_int(int64_t num);
+
+gl_value_t *gl_value_make_float(long double num);
+
+gl_value_t *gl_value_make_symbol(const char *sym);
+
+gl_value_t *gl_value_make_cons(gl_ast_cons_t cons);
+
+gl_value_t *gl_value_make_nil(void);
+
+typedef struct gl_env_t gl_env_t;
+
+ARRAY_DECLARE(gl_value_t *, gl_value_array)
+
+typedef gl_value_t *(*gl_builtin_t)(gl_env_t *env, gl_value_array_t *args);
+
+gl_value_t *gl_value_make_builtin(gl_builtin_t builtin);
+
+ARRAY_DECLARE(char *, gl_function_params)
+
+typedef struct {
+    gl_ast_node_t *tree;
+    gl_function_params_t *params;
+    gl_env_t *closure;
+} gl_function_t;
+
+gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *params,
+                                   gl_env_t *closure);
