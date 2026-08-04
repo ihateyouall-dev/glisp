@@ -94,6 +94,8 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser, int expl
         return __gl_parser_parse_float(parser, quoted);
     case GL_LEX_SYMBOL:
         return __gl_parser_parse_symbol(parser, quoted);
+    case GL_LEX_EOF:
+        return NULL;
     default:
         fprintf(stderr, "Parser Error at line %zu, column %zu: Unexpected token type %d\n",
                 token.location.line, token.location.column, token.type);

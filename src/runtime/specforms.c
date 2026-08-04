@@ -2,8 +2,8 @@
 
 #include "ast.h"
 #include "eval.h"
+#include "runtime/env.h"
 #include "runtime/value.h"
-#include "utils/vector.h"
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -34,21 +34,24 @@ GL_SPECIAL_FORM(defun) {
     assert(args);
     assert(args->type == GL_AST_CONS);
 
-    gl_ast_node_t *params = gl_ast_cons_nth_car(args, 0);
-    gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 0);
+    gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
 
-    gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
+    gl_function_params_t *func_params = NULL;
 
-    if (params->type == GL_AST_NIL) {
-        func_params = NULL;
-    } else {
+    if (params->type != GL_AST_NIL) {
+        func_params = malloc(sizeof(gl_function_params_t));
         gl_function_params_init(func_params, gl_ast_cons_length(params), &gl_function_param_free);
+        for (size_t i = 0; i < func_params->size; ++i) {
+            gl_ast_node_t *param = gl_ast_cons_nth_car(params, i);
+            func_params->data[i] = strdup(param->value.symbol);
+        }
     }
 
-    for (size_t i = 0; i < func_params->size; ++i) {
-        gl_ast_node_t *param = gl_ast_cons_nth_car(params, i);
-        func_params->data[i] = strdup(param->value.symbol);
-    }
+    gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 1);
+    gl_value_t *res = gl_value_make_function(gl_ast_copy(tree), func_params, env);
 
-    return gl_value_make_function(tree, func_params, env);
+    const char *name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    gl_env_set_fun(env, name, res);
+
+    return res;
 }

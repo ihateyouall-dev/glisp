@@ -130,6 +130,10 @@ void test_parse_quoted_symbol(void) {
     TEST(strcmp(not_quoted->value.symbol, "world") == 0, "Not quoted value");
     TEST(!not_quoted->quoted, "Not quoted quoted");
 
+    gl_ast_node_t *last = gl_parser_parse(&parser);
+
+    TEST(!last, "Last parser node");
+
     gl_ast_destroy(quoted);
     gl_ast_destroy(not_quoted);
     gl_parser_destroy(&parser);
