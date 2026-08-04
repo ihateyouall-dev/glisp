@@ -1,8 +1,13 @@
 #include "value.h"
 
 #include "ast.h"
+
+#ifdef _WIN32
 #include "utils/strdup.h"
+#endif
+
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -93,7 +98,7 @@ gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *pa
     return res;
 }
 
-static void __free_str(char **str) { free(*str); }
+void gl_function_param_free(char **param) { free(*param); }
 
 gl_value_t *gl_value_copy(gl_value_t *val) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
@@ -122,13 +127,16 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         func->tree = gl_ast_copy(((gl_function_t *)val->val)->tree);
         func->closure = ((gl_function_t *)val->val)->closure;
         gl_function_params_init(func->params, ((gl_function_t *)val->val)->params->size,
-                                &__free_str);
+                                &gl_function_param_free);
         for (size_t i = 0; i < func->params->size; ++i) {
             func->params->data[i] = strdup(((gl_function_t *)val->val)->params->data[i]);
         }
         return res;
     case GL_VAL_BUILTIN:
         bytes = sizeof(gl_builtin_t);
+        break;
+    case GL_VAL_SPFORM:
+        bytes = sizeof(gl_special_form_t);
         break;
     case GL_VAL_NIL:
         res->val = NULL;
@@ -161,4 +169,47 @@ void gl_value_destroy(gl_value_t **val) {
     }
     free(*val);
     *val = NULL;
+}
+
+gl_value_t *gl_value_make_specform(gl_special_form_t spform) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_SPFORM;
+    res->val = malloc(sizeof(gl_special_form_t));
+    *(gl_special_form_t *)res->val = spform;
+    return res;
+}
+
+void gl_value_print(gl_value_t *val) {
+    switch (val->type) {
+    case GL_VAL_INT:
+        printf("%lld", (*(int64_t *)val->val));
+        break;
+    case GL_VAL_FLOAT:
+        printf("%Lf", (*(long double *)val->val));
+        break;
+    case GL_VAL_SYMBOL:
+        printf("%s", (char *)val->val);
+        break;
+    case GL_VAL_NIL:
+        printf("nil");
+        break;
+    case GL_VAL_BUILTIN:
+    case GL_VAL_FUNCTION:
+    case GL_VAL_SPFORM:
+        // Nothing to print now
+        break;
+    case GL_VAL_CONS:
+        printf("(");
+        gl_value_cons_t *cons = val->val;
+
+        while (cons->cdr->type != GL_VAL_NIL) {
+            gl_value_print(cons->car);
+
+            if (cons->cdr->type != GL_VAL_NIL) {
+                printf(" ");
+            }
+            cons = cons->cdr->val;
+        }
+        printf(")");
+    }
 }

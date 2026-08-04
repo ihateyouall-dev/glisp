@@ -12,6 +12,7 @@ typedef enum {
     GL_VAL_SYMBOL,
     GL_VAL_FUNCTION,
     GL_VAL_BUILTIN,
+    GL_VAL_SPFORM,
     GL_VAL_CONS
 } gl_value_type_t;
 
@@ -40,11 +41,13 @@ typedef struct gl_env_t gl_env_t;
 
 ARRAY_DECLARE(gl_value_t *, gl_value_array)
 
-typedef gl_value_t *(*gl_builtin_t)(gl_env_t *env, gl_value_array_t *args);
+typedef gl_value_t *(*gl_builtin_t)(gl_env_t *, gl_value_array_t *);
 
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin);
 
 ARRAY_DECLARE(char *, gl_function_params)
+
+void gl_function_param_free(char **param);
 
 typedef struct {
     gl_ast_node_t *tree;
@@ -54,3 +57,9 @@ typedef struct {
 
 gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *params,
                                    gl_env_t *closure);
+
+typedef gl_value_t *(*gl_special_form_t)(gl_env_t *, gl_ast_node_t *);
+
+gl_value_t *gl_value_make_specform(gl_special_form_t spform);
+
+void gl_value_print(gl_value_t *val);
