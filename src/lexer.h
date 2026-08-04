@@ -31,6 +31,8 @@ typedef struct gl_lex_token_t {
     gl_location_t location;
 } gl_lex_token_t;
 
+void gl_lex_token_destroy(gl_lex_token_t *tok);
+
 typedef struct gl_lexer_t {
     const char *src;
     size_t len;

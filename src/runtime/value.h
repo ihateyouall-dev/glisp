@@ -41,7 +41,7 @@ typedef struct gl_env_t gl_env_t;
 
 ARRAY_DECLARE(gl_value_t *, gl_value_array)
 
-typedef gl_value_t *(*gl_builtin_t)(gl_env_t *, gl_value_array_t *);
+typedef gl_value_t *(*gl_builtin_t)(gl_value_array_t *);
 
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin);
 

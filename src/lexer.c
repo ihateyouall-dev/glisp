@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+void gl_lex_token_destroy(gl_lex_token_t *tok) {
+    if (tok->type != GL_LEX_EOF && tok->type != GL_LEX_LPAREN && tok->type != GL_LEX_RPAREN &&
+        tok->type != GL_LEX_QUOTE && tok->type != GL_LEX_UNKNOWN)
+        free(tok->value);
+}
+
 void gl_lexer_init(gl_lexer_t *lexer, const char *src) {
     lexer->src = src;
 
@@ -116,12 +122,11 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
     const size_t current_pos = lexer->location.pos;
     const size_t length = current_pos - start_pos;
 
-    char *buf = malloc(length + 1);
+    res.value = malloc(length + 1);
 
-    memcpy(buf, start, length);
-    buf[length] = '\0';
+    memcpy(res.value, start, length);
+    res.value[length] = '\0';
 
-    res.value = buf;
     return res;
 }
 
@@ -134,7 +139,7 @@ VECTOR_DEFINE(gl_lex_token_t, gl_lex_token_vector)
 
 gl_lex_token_vector_t gl_lexer_tokenize(gl_lexer_t *lexer) {
     gl_lex_token_vector_t res;
-    gl_lex_token_vector_init(&res);
+    gl_lex_token_vector_init(&res, gl_lex_token_destroy);
 
     gl_lex_token_t current;
 

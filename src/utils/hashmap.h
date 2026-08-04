@@ -7,13 +7,10 @@
 #define HASHMAP_DECLARE(T, Name)                                                                   \
     static void (*Name##_destroy_fn)(T *) = NULL;                                                  \
     typedef struct {                                                                               \
-        const char *key;                                                                           \
+        char *key;                                                                                 \
         T value;                                                                                   \
     } Name##Entry_t;                                                                               \
-    void Name##Entry_destroy(Name##Entry_t *entry) {                                               \
-        free(entry->key);                                                                          \
-        Name##_destroy_fn(&entry->value);                                                          \
-    }                                                                                              \
+    void Name##Entry_destroy(Name##Entry_t *entry) { Name##_destroy_fn(&entry->value); }           \
     VECTOR_DECLARE(Name##Entry_t, Name##Bucket)                                                    \
     typedef struct {                                                                               \
         Name##Bucket_t *buckets;                                                                   \

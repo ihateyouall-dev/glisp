@@ -5,9 +5,11 @@ int test_status = 0;
 
 HASHMAP_DECLARE_DEFINE(int, map)
 
+void dummy(int *unused) {}
+
 int main(void) {
     map_t hm;
-    map_init(&hm);
+    map_init(&hm, dummy);
 
     map_insert(&hm, "x", 12);
     TEST(*map_get(&hm, "x") == 12, "Access by key");

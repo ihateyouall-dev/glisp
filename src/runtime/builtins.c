@@ -57,6 +57,7 @@ GL_BUILTIN(add) {
     return res;
 }
 
+// TODO
 GL_BUILTIN(sub) {
     assert(args->data);
     gl_value_t *res = malloc(sizeof(gl_value_t));

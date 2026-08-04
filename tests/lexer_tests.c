@@ -90,6 +90,8 @@ void lexer_tokenize_test(void) {
     TEST(gl_lex_token_vector_at(&tokens, 6)->type == GL_LEX_SYMBOL, "Token access");
     TEST(gl_lex_token_vector_at(&tokens, 7)->type == GL_LEX_RPAREN, "Token access");
     TEST(gl_lex_token_vector_at(&tokens, 8)->type == GL_LEX_EOF, "Token access");
+
+    gl_lex_token_vector_destroy(&tokens);
 }
 
 int main(void) {

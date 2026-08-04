@@ -36,7 +36,7 @@ gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n) {
 
 size_t gl_ast_cons_length(gl_ast_node_t *cons) {
     if (cons->type != GL_AST_CONS) {
-        return NULL;
+        return 0;
     }
     size_t res = 0;
 

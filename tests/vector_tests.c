@@ -5,9 +5,11 @@ int test_status = 0;
 
 VECTOR_DECLARE_DEFINE(int, vector)
 
+void dummy(int *) {} // NOLINT
+
 int main(void) {
     vector_t vec;
-    vector_init(&vec);
+    vector_init(&vec, dummy);
 
     TEST(vec.size == 0, "Initial size");
     TEST(vec.capacity == 8, "Initial capacity");
