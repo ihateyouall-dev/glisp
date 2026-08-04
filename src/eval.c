@@ -22,11 +22,9 @@ static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node, gl_env_t *env) {
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
 static gl_value_array_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
-    // If have no args, return empty array
+    // If have no args, return nothing
     if (args->type == GL_AST_NIL) {
-        gl_value_array_t *res = malloc(sizeof(gl_value_array_t));
-        res->size = 0;
-        return res;
+        return NULL;
     }
 
     size_t argc = 0;
@@ -65,6 +63,27 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     return res;
 }
 
+static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t *args) {
+    assert(function->tree->type == GL_AST_CONS);
+
+    gl_env_t *local_env = malloc(sizeof(gl_env_t));
+
+    local_env->parent = function->closure;
+
+    if (args) {
+        __gl_define_function_args(function, args, local_env);
+    }
+
+    gl_value_t *res = __gl_eval_function_tree(function->tree, local_env);
+    // Copying value to avoid use after free if desctruction of local_env affected result
+    res = gl_value_copy(res);
+
+    gl_env_destroy(local_env);
+    free(local_env);
+
+    return res;
+}
+
 static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     if (node->quoted) {
         return gl_value_make_cons(node->value.cons);
@@ -79,34 +98,28 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
 
     gl_value_t *func_ptr = gl_env_get_fun(env, func_name);
 
-    gl_value_array_t *argv = __gl_eval_args(args, env);
-
-    // Evaluating function or builtin
-    if (func_ptr->type == GL_VAL_BUILTIN) {
+    // Evaluating function
+    switch (func_ptr->type) {
+    case GL_VAL_BUILTIN: {
         gl_builtin_t builtin = func_ptr->val;
+        gl_value_array_t *argv = __gl_eval_args(args, env);
 
         return builtin(env, argv);
-    } else if (func_ptr->type == GL_VAL_FUNCTION) {
-        gl_function_t *function = func_ptr->val;
-
-        assert(function->tree->type == GL_AST_CONS);
-
-        gl_env_t *local_env = malloc(sizeof(gl_env_t));
-
-        local_env->parent = function->closure;
-
-        __gl_define_function_args(function, argv, local_env);
-
-        gl_value_t *res = __gl_eval_function_tree(function->tree, local_env);
-        // Copying value to avoid use after free if desctruction of local_env affected result
-        res = gl_value_copy(res);
-
-        gl_env_destroy(local_env);
-        free(local_env);
-
-        return res;
     }
-    assert(0 && "UNREACHABLE");
+    case GL_VAL_SPFORM: {
+        gl_special_form_t spform = func_ptr->val;
+
+        return spform(env, args);
+    }
+    case GL_VAL_FUNCTION: {
+        gl_function_t *function = func_ptr->val;
+        gl_value_array_t *argv = __gl_eval_args(args, env);
+
+        return __gl_eval_function(function, argv);
+    }
+    default:
+        assert(0 && "UNREACHABLE");
+    }
 }
 
 gl_value_t *gl_eval(gl_ast_node_t *node, gl_env_t *env) {

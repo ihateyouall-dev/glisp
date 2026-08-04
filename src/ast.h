@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils/cons.h"
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {
@@ -27,6 +28,10 @@ typedef struct gl_ast_node_t {
         gl_ast_cons_t cons;
     } value;
 } gl_ast_node_t;
+
+gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n);
+gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n);
+size_t gl_ast_cons_length(gl_ast_node_t *cons);
 
 gl_ast_node_t *gl_ast_make_int(int64_t num, int quoted);
 gl_ast_node_t *gl_ast_make_float(long double num, int quoted);

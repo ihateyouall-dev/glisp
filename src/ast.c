@@ -2,8 +2,49 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
+#ifdef _WIN32
 #include "utils/strdup.h"
+#endif
+
+gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n) {
+    if (cons->type != GL_AST_CONS) {
+        return NULL;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        if (cons->value.cons.cdr->type == GL_AST_NIL) {
+            return NULL;
+        }
+        cons = cons->value.cons.cdr;
+    }
+    return cons->value.cons.car;
+}
+
+gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n) {
+    if (cons->type != GL_AST_CONS) {
+        return NULL;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        if (cons->type == GL_AST_NIL) {
+            return NULL;
+        }
+        cons = cons->value.cons.cdr;
+    }
+    return cons->value.cons.cdr;
+}
+
+size_t gl_ast_cons_length(gl_ast_node_t *cons) {
+    if (cons->type != GL_AST_CONS) {
+        return NULL;
+    }
+    size_t res = 0;
+
+    while (cons->type != GL_AST_NIL) {
+        ++res;
+    }
+    return res;
+}
 
 gl_ast_node_t *gl_ast_make_int(int64_t num, int quoted) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
