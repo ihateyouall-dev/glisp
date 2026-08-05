@@ -10,7 +10,6 @@
         char *key;                                                                                 \
         T value;                                                                                   \
     } Name##Entry_t;                                                                               \
-    void Name##Entry_destroy(Name##Entry_t *entry) { Name##_destroy_fn(&entry->value); }           \
     VECTOR_DECLARE(Name##Entry_t, Name##Bucket)                                                    \
     typedef struct {                                                                               \
         Name##Bucket_t *buckets;                                                                   \
@@ -24,6 +23,7 @@
     void Name##_destroy(Name##_t *map);
 
 #define HASHMAP_DEFINE(T, Name)                                                                    \
+    static void Name##Entry_destroy(Name##Entry_t *entry) { Name##_destroy_fn(&entry->value); }    \
     VECTOR_DEFINE(Name##Entry_t, Name##Bucket)                                                     \
     static unsigned long long __##Name##_fnv1a(const char *key) {                                  \
         unsigned long long res = 14695981039346656037ULL;                                          \

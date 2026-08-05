@@ -56,7 +56,8 @@ void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val) {
 }
 
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
-    assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION);
+    assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION ||
+           val->type == GL_VAL_SPFORM);
     gl_value_table_insert(env->functions, sym, val);
 }
 

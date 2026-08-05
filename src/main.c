@@ -1,3 +1,7 @@
+#include "runtime/env.h"
+#include "runtime/eval.h"
+#include "runtime/value.h"
+#include <assert.h>
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <stdio.h>
@@ -6,13 +10,13 @@
 int main(int argc, char **argv) {
     // Evaluating a file if given
     if (argc == 2) {
-        // Evaluation
         const char *filename = argv[1];
 
         FILE *file = fopen(filename, "r");
 
         if (!file) {
             perror(filename);
+            return -1;
         }
 
         fseek(file, 0, SEEK_END);
@@ -27,9 +31,10 @@ int main(int argc, char **argv) {
         }
 
         size_t bytesread = fread(buf, sizeof(char), filesize, file);
+        assert(bytesread == filesize);
         buf[bytesread] = '\0';
 
-        printf("File:\n%s", buf);
+        gl_parse_and_eval(buf, gl_make_global_env());
         fclose(file);
         free(buf);
         return 0;
@@ -38,12 +43,12 @@ int main(int argc, char **argv) {
     // Launching REPL otherwise
     puts("GLisp REPL version 0");
     while (1) {
+        gl_env_t *global_env = gl_make_global_env();
         char *input = readline("\nglisp> ");
 
         add_history(input);
 
-        // Must be replaced with evaluation
-        printf("You are passed: %s\n", input);
+        gl_value_print(gl_parse_and_eval(input, global_env));
 
         free(input);
     }

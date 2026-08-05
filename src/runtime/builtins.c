@@ -17,7 +17,7 @@ GL_BUILTIN(print) {
     for (size_t i = 0; i < args->size; ++i) {
         gl_value_print(args->data[i]);
     }
-    return gl_value_make_nil();
+    return NULL;
 }
 
 GL_BUILTIN(add) {

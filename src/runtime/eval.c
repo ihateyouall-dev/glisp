@@ -31,7 +31,7 @@ static gl_value_array_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
     size_t argc = 0;
     gl_ast_node_t *current = args;
 
-    while (current->value.cons.cdr->type != GL_AST_NIL) {
+    while (current->type != GL_AST_NIL) {
         current = current->value.cons.cdr;
         ++argc;
     }
@@ -121,6 +121,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     default:
         assert(0 && "UNREACHABLE");
     }
+    return NULL;
 }
 
 gl_value_t *gl_eval(gl_ast_node_t *node, gl_env_t *env) {
@@ -152,6 +153,7 @@ gl_value_t *gl_parse_and_eval(const char *restrict src, gl_env_t *env) {
 
     while (current) {
         res = gl_eval(current, env);
+        current = gl_parser_parse(&parser);
     }
 
     return res;

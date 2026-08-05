@@ -13,7 +13,7 @@ add_executable(${PROJECT_NAME} src/main.c)
 
 add_subdirectory(src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE readline::readline)
+target_link_libraries(${PROJECT_NAME} PRIVATE readline::readline runtime)
 
 if(GLISP_ENABLE_TESTING)
   enable_testing()

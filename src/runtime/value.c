@@ -81,10 +81,11 @@ gl_value_t *gl_value_make_nil(void) {
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_BUILTIN;
-    res->val = malloc(sizeof(gl_builtin_t));
-    *(gl_builtin_t *)res->val = builtin;
+    res->val = builtin;
     return res;
 }
+
+ARRAY_DEFINE(char *, gl_function_params)
 
 gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *params,
                                    gl_env_t *closure) {
@@ -174,12 +175,14 @@ void gl_value_destroy(gl_value_t **val) {
 gl_value_t *gl_value_make_specform(gl_special_form_t spform) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_SPFORM;
-    res->val = malloc(sizeof(gl_special_form_t));
-    *(gl_special_form_t *)res->val = spform;
+    res->val = spform;
     return res;
 }
 
 void gl_value_print(gl_value_t *val) {
+    if (!val) {
+        return;
+    }
     switch (val->type) {
     case GL_VAL_INT:
         printf("%lld", (*(int64_t *)val->val));
@@ -202,13 +205,15 @@ void gl_value_print(gl_value_t *val) {
         printf("(");
         gl_value_cons_t *cons = val->val;
 
-        while (cons->cdr->type != GL_VAL_NIL) {
+        while (1) {
             gl_value_print(cons->car);
 
-            if (cons->cdr->type != GL_VAL_NIL) {
-                printf(" ");
-            }
+            printf(" ");
             cons = cons->cdr->val;
+            if (cons->cdr->type == GL_VAL_NIL) {
+                gl_value_print(cons->car);
+                break;
+            }
         }
         printf(")");
     }
