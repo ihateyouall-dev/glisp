@@ -42,8 +42,10 @@ int main(int argc, char **argv) {
 
     // Launching REPL otherwise
     puts("GLisp REPL version 0");
+
+    gl_env_t *global_env = gl_make_global_env();
+
     while (1) {
-        gl_env_t *global_env = gl_make_global_env();
         char *input = readline("\nglisp> ");
 
         add_history(input);

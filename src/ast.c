@@ -42,6 +42,7 @@ size_t gl_ast_cons_length(gl_ast_node_t *cons) {
 
     while (cons->type != GL_AST_NIL) {
         ++res;
+        cons = cons->value.cons.cdr;
     }
     return res;
 }

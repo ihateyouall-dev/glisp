@@ -57,7 +57,7 @@ static void __gl_define_function_args(const gl_function_t *function, gl_value_ar
 static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *env) {
     gl_ast_node_t *current = func_tree;
     gl_value_t *res = NULL;
-    while (current->value.cons.cdr->type != GL_AST_NIL) {
+    while (current->type != GL_AST_NIL) {
         res = gl_eval(current->value.cons.car, env);
         current = current->value.cons.cdr;
     }
@@ -67,9 +67,7 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t *args) {
     assert(function->tree->type == GL_AST_CONS);
 
-    gl_env_t *local_env = malloc(sizeof(gl_env_t));
-
-    local_env->parent = function->closure;
+    gl_env_t *local_env = gl_make_env(function->closure);
 
     if (args) {
         __gl_define_function_args(function, args, local_env);
@@ -80,7 +78,6 @@ static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t 
     res = gl_value_copy(res);
 
     gl_env_destroy(local_env);
-    free(local_env);
 
     return res;
 }
@@ -98,6 +95,9 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     const char *func_name = func->value.symbol;
 
     gl_value_t *func_ptr = gl_env_get_fun(env, func_name);
+    if (!func_ptr || !func_ptr->val) {
+        abort();
+    }
 
     // Evaluating function
     switch (func_ptr->type) {

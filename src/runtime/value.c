@@ -103,15 +103,18 @@ void gl_function_param_free(char **param) { free(*param); }
 
 gl_value_t *gl_value_copy(gl_value_t *val) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
+    assert(val);
+    assert(val->type == GL_VAL_NIL || val->val);
     res->type = val->type;
-    size_t bytes = 0;
 
     switch (val->type) {
     case GL_VAL_INT:
-        bytes = sizeof(int64_t);
+        res->val = malloc(sizeof(int64_t));
+        *(int64_t *)res->val = *(int64_t *)val->val;
         break;
     case GL_VAL_FLOAT:
-        bytes = sizeof(long double);
+        res->val = malloc(sizeof(long double));
+        *(long double *)res->val = *(long double *)val->val;
         break;
     case GL_VAL_CONS:
         res->val = malloc(sizeof(gl_value_cons_t));
@@ -134,16 +137,16 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         }
         return res;
     case GL_VAL_BUILTIN:
-        bytes = sizeof(gl_builtin_t);
+        // Builtins and special forms are just pointers to functions
+        res->val = val->val;
         break;
     case GL_VAL_SPFORM:
-        bytes = sizeof(gl_special_form_t);
+        res->val = val->val;
         break;
     case GL_VAL_NIL:
         res->val = NULL;
         return res;
     }
-    memcpy(res->val, val->val, bytes);
     return res;
 }
 
@@ -158,7 +161,6 @@ void gl_value_destroy(gl_value_t **val) {
     case GL_VAL_FLOAT:
     case GL_VAL_SYMBOL:
     case GL_VAL_FUNCTION:
-    case GL_VAL_BUILTIN:
         free((*val)->val);
         break;
     case GL_VAL_CONS:

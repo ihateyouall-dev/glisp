@@ -62,21 +62,21 @@ void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
 }
 
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
-    gl_value_t *res = *gl_value_table_get(env->variables, sym);
+    gl_value_t **res = gl_value_table_get(env->variables, sym);
 
     // Checking for variable in parent environment if not found in current
     if (res == NULL && env->parent != NULL) {
         return gl_env_get_var(env->parent, sym);
     }
-    return res;
+    return *res;
 }
 
 gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
-    gl_value_t *res = *gl_value_table_get(env->functions, sym);
+    gl_value_t **res = gl_value_table_get(env->functions, sym);
 
     // Checking for function in parent environment if not found in current
     if (res == NULL && env->parent != NULL) {
         return gl_env_get_fun(env->parent, sym);
     }
-    return res;
+    return *res;
 }
