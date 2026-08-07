@@ -50,7 +50,7 @@ static gl_value_array_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
 static void __gl_define_function_args(const gl_function_t *function, gl_value_array_t *args,
                                       gl_env_t *env) {
     for (size_t i = 0; i < function->params->size; ++i) {
-        gl_env_set_var(env, function->params->data[i], args->data[i]);
+        gl_env_set_var(env, function->params->data[i], gl_value_copy(args->data[i]));
     }
 }
 

@@ -50,9 +50,14 @@ int main(int argc, char **argv) {
 
         add_history(input);
 
-        gl_value_print(gl_parse_and_eval(input, global_env));
+        gl_value_t *res = gl_parse_and_eval(input, global_env);
+
+        gl_value_print(res);
+
+        gl_value_destroy(&res);
 
         free(input);
     }
+    gl_env_destroy(global_env);
     return 0;
 }

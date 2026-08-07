@@ -8,6 +8,14 @@ GL_BUILTIN(exit);
 
 GL_BUILTIN(print);
 
+GL_BUILTIN(println);
+
+GL_BUILTIN(car);
+
+GL_BUILTIN(cdr);
+
 GL_BUILTIN(add);
 
 GL_BUILTIN(sub);
+
+GL_BUILTIN(mul);

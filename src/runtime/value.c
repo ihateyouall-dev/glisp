@@ -220,3 +220,67 @@ void gl_value_print(gl_value_t *val) {
         printf(")");
     }
 }
+int64_t gl_value_get_int(gl_value_t *val) {
+    assert(val->type == GL_VAL_INT);
+    return *(int64_t *)val->val;
+}
+long double gl_value_get_float(gl_value_t *val) {
+    assert(val->type == GL_VAL_FLOAT);
+    return *(long double *)val->val;
+}
+char *gl_value_get_symbol(gl_value_t *val) {
+    assert(val->type == GL_VAL_SYMBOL);
+    return val->val;
+}
+gl_value_cons_t *gl_value_get_cons(gl_value_t *val) {
+    assert(val->type == GL_VAL_CONS);
+    return val->val;
+}
+gl_builtin_t gl_value_get_builtin(gl_value_t *val) {
+    assert(val->type == GL_VAL_BUILTIN);
+    return val->val;
+}
+gl_function_t *gl_value_get_function(gl_value_t *val) {
+    assert(val->type == GL_VAL_FUNCTION);
+    return val->val;
+}
+gl_special_form_t gl_value_get_specform(gl_value_t *val) {
+    assert(val->type == GL_VAL_SPFORM);
+    return val->val;
+}
+void gl_value_set_int(gl_value_t *val, int64_t num) {
+    if (val->type != GL_VAL_INT) {
+        val->type = GL_VAL_INT;
+    }
+    *(int64_t *)val->val = num;
+}
+void gl_value_set_float(gl_value_t *val, long double num) {
+    if (val->type != GL_VAL_FLOAT) {
+        val->type = GL_VAL_FLOAT;
+    }
+    *(long double *)val->val = num;
+}
+void gl_value_set_symbol(gl_value_t *val, char *sym) {
+    if (val->type != GL_VAL_SYMBOL) {
+        val->type = GL_VAL_SYMBOL;
+    }
+    val->val = strdup(sym);
+}
+void gl_value_set_builtin(gl_value_t *val, gl_builtin_t builtin) {
+    if (val->type != GL_VAL_BUILTIN) {
+        val->type = GL_VAL_BUILTIN;
+    }
+    val->val = builtin;
+}
+void gl_value_set_function(gl_value_t *val, gl_function_t *func) {
+    if (val->type != GL_VAL_FUNCTION) {
+        val->type = GL_VAL_FUNCTION;
+    }
+    val->val = func;
+}
+void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform) {
+    if (val->type != GL_VAL_SPFORM) {
+        val->type = GL_VAL_SPFORM;
+    }
+    val->val = specform;
+}

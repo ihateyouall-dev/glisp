@@ -55,3 +55,29 @@ GL_SPECIAL_FORM(defun) {
 
     return res;
 }
+
+GL_SPECIAL_FORM(set) {
+    assert(args);
+    assert(args->type == GL_AST_CONS);
+
+    const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0), env);
+
+    gl_env_set_var(env, var_name, var_value);
+
+    return gl_value_make_symbol(var_name);
+}
+
+GL_SPECIAL_FORM(progn) {
+    assert(args);
+    assert(args->type == GL_AST_CONS);
+
+    gl_ast_node_t *current = args;
+    gl_value_t *res = NULL;
+
+    while (current->type != GL_AST_NIL) {
+        res = gl_eval(current->value.cons.car, env);
+        current = current->value.cons.cdr;
+    }
+    return res;
+}

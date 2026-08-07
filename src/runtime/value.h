@@ -63,3 +63,29 @@ typedef gl_value_t *(*gl_special_form_t)(gl_env_t *, gl_ast_node_t *);
 gl_value_t *gl_value_make_specform(gl_special_form_t spform);
 
 void gl_value_print(gl_value_t *val);
+
+int64_t gl_value_get_int(gl_value_t *val);
+
+long double gl_value_get_float(gl_value_t *val);
+
+char *gl_value_get_symbol(gl_value_t *val);
+
+gl_value_cons_t *gl_value_get_cons(gl_value_t *val);
+
+gl_builtin_t gl_value_get_builtin(gl_value_t *val);
+
+gl_function_t *gl_value_get_function(gl_value_t *val);
+
+gl_special_form_t gl_value_get_specform(gl_value_t *val);
+
+void gl_value_set_int(gl_value_t *val, int64_t num);
+
+void gl_value_set_float(gl_value_t *val, long double num);
+
+void gl_value_set_symbol(gl_value_t *val, char *sym);
+
+void gl_value_set_builtin(gl_value_t *val, gl_builtin_t builtin);
+
+void gl_value_set_function(gl_value_t *val, gl_function_t *func);
+
+void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform);
