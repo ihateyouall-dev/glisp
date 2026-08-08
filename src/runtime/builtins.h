@@ -14,8 +14,17 @@ GL_BUILTIN(car);
 
 GL_BUILTIN(cdr);
 
+// Arithmetic operator +
 GL_BUILTIN(add);
 
+// Arithmetic operator -
 GL_BUILTIN(sub);
 
+// Arithmetic operator *
 GL_BUILTIN(mul);
+
+// Arithmetic operator /
+GL_BUILTIN(div);
+
+// Arithmetic operator % (mod)
+GL_BUILTIN(mod);

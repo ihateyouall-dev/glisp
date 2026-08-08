@@ -29,8 +29,14 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "exit", gl_value_make_builtin(gl_builtin_exit));
     gl_env_set_fun(env, "print", gl_value_make_builtin(gl_builtin_print));
     gl_env_set_fun(env, "println", gl_value_make_builtin(gl_builtin_println));
+
     gl_env_set_fun(env, "+", gl_value_make_builtin(gl_builtin_add));
     gl_env_set_fun(env, "-", gl_value_make_builtin(gl_builtin_sub));
+    gl_env_set_fun(env, "*", gl_value_make_builtin(gl_builtin_mul));
+    gl_env_set_fun(env, "/", gl_value_make_builtin(gl_builtin_div));
+    gl_env_set_fun(env, "%", gl_value_make_builtin(gl_builtin_mod));
+    gl_env_set_fun(env, "mod", gl_value_make_builtin(gl_builtin_mod));
+
     gl_env_set_fun(env, "car", gl_value_make_builtin(gl_builtin_car));
     gl_env_set_fun(env, "cdr", gl_value_make_builtin(gl_builtin_cdr));
 }

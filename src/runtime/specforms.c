@@ -17,8 +17,7 @@ GL_SPECIAL_FORM(if) {
     gl_ast_node_t *if_false = gl_ast_cons_nth_cdr(args, 1);
     gl_value_t *condition_val = gl_eval(condition, env);
 
-    // Everything except NIL is interpreted as true
-    if (condition_val->type != GL_VAL_NIL) {
+    if (gl_value_get_bool(condition_val)) {
         return gl_eval(if_true, env);
     } else {
         gl_value_t *res;

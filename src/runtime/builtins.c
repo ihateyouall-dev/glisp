@@ -140,3 +140,101 @@ GL_BUILTIN(sub) {
     }
     return res;
 }
+
+GL_BUILTIN(mul) {
+    assert(args->data);
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_INT;
+    int64_t isum = 0;
+    long double fsum = 0;
+    if (args->data[0]->type == GL_VAL_INT) {
+        isum = gl_value_get_int(args->data[0]);
+    } else {
+        res->type = GL_VAL_FLOAT;
+        fsum = gl_value_get_float(args->data[0]);
+    }
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *current = *(args->data + i);
+        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        if (res->type == GL_VAL_INT) {
+            if (current->type == GL_VAL_FLOAT) {
+                // Transfering integral sum to the float
+                res->type = GL_VAL_FLOAT;
+                fsum = (long double)isum;
+            } else {
+                isum *= gl_value_get_int(current);
+            }
+        }
+        if (res->type == GL_VAL_FLOAT) {
+            if (current->type == GL_VAL_INT) {
+                fsum *= (long double)gl_value_get_int(current);
+            } else {
+                fsum *= gl_value_get_float(current);
+            }
+        }
+    }
+    // Finally assigning sum to result
+    if (res->type == GL_VAL_INT) {
+        res->val = malloc(sizeof(int64_t));
+        gl_value_set_int(res, isum);
+    } else {
+        res->val = malloc(sizeof(long double));
+        gl_value_set_float(res, fsum);
+    }
+    return res;
+}
+
+GL_BUILTIN(div) {
+    assert(args->data);
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_INT;
+    int64_t isum = 0;
+    long double fsum = 0;
+    if (args->data[0]->type == GL_VAL_INT) {
+        isum = gl_value_get_int(args->data[0]);
+    } else {
+        res->type = GL_VAL_FLOAT;
+        fsum = gl_value_get_float(args->data[0]);
+    }
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *current = *(args->data + i);
+        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        if (res->type == GL_VAL_INT) {
+            if (current->type == GL_VAL_FLOAT) {
+                // Transfering integral sum to the float
+                res->type = GL_VAL_FLOAT;
+                fsum = (long double)isum;
+            } else {
+                isum /= gl_value_get_int(current);
+            }
+        }
+        if (res->type == GL_VAL_FLOAT) {
+            if (current->type == GL_VAL_INT) {
+                fsum /= (long double)gl_value_get_int(current);
+            } else {
+                fsum /= gl_value_get_float(current);
+            }
+        }
+    }
+    // Finally assigning sum to result
+    if (res->type == GL_VAL_INT) {
+        res->val = malloc(sizeof(int64_t));
+        gl_value_set_int(res, isum);
+    } else {
+        res->val = malloc(sizeof(long double));
+        gl_value_set_float(res, fsum);
+    }
+    return res;
+}
+
+GL_BUILTIN(mod) {
+    assert(args->data);
+    assert(args->size == 2);
+
+    gl_value_t *lhs = args->data[0];
+    gl_value_t *rhs = args->data[1];
+    assert(lhs->type == GL_VAL_INT);
+    assert(rhs->type == GL_VAL_INT);
+
+    return gl_value_make_int(gl_value_get_int(lhs) % gl_value_get_int(rhs));
+}

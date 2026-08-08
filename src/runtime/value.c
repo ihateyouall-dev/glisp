@@ -248,6 +248,13 @@ gl_special_form_t gl_value_get_specform(gl_value_t *val) {
     assert(val->type == GL_VAL_SPFORM);
     return val->val;
 }
+int gl_value_get_bool(gl_value_t *val) {
+    // Everything except NIL is interpreted as true
+    if (val->type != GL_VAL_NIL) {
+        return 1;
+    }
+    return 0;
+}
 void gl_value_set_int(gl_value_t *val, int64_t num) {
     if (val->type != GL_VAL_INT) {
         val->type = GL_VAL_INT;

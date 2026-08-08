@@ -78,6 +78,8 @@ gl_function_t *gl_value_get_function(gl_value_t *val);
 
 gl_special_form_t gl_value_get_specform(gl_value_t *val);
 
+int gl_value_get_bool(gl_value_t *val);
+
 void gl_value_set_int(gl_value_t *val, int64_t num);
 
 void gl_value_set_float(gl_value_t *val, long double num);
