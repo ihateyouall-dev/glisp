@@ -1,5 +1,7 @@
 #include "builtins.h"
+#include "ast.h"
 #include "runtime/value.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -445,4 +447,57 @@ GL_BUILTIN(list_p) {
         }
     }
     return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(int_con) {
+    assert(args->data);
+
+    gl_value_t *val = args->data[0];
+
+    if (val->type == GL_VAL_INT) {
+        return val;
+    } else if (val->type == GL_VAL_FLOAT) {
+        return gl_value_make_int((int64_t)gl_value_get_float(val));
+    } else {
+        assert(0 && "Only types castable to INT is INT and FLOAT");
+    }
+}
+
+GL_BUILTIN(float_con) {
+    assert(args->data);
+
+    gl_value_t *val = args->data[0];
+
+    if (val->type == GL_VAL_INT) {
+        return gl_value_make_float((long double)gl_value_get_int(val));
+    } else if (val->type == GL_VAL_FLOAT) {
+        return val;
+    } else {
+        assert(0 && "Only types castable to FLOAT is FLOAT and INT");
+    }
+}
+
+GL_BUILTIN(list_con) {
+    if (args->size == 0) {
+        return gl_value_make_nil();
+    }
+
+    gl_value_cons_t *list = malloc(sizeof(gl_value_cons_t));
+
+    gl_value_cons_t *current = list;
+    for (size_t i = 0; i < args->size; ++i) {
+        current->car = args->data[i];
+        if (i == args->size - 1) {
+            current->cdr = gl_value_make_nil();
+        } else {
+            current->cdr = malloc(sizeof(gl_value_t));
+            current->cdr->type = GL_VAL_CONS;
+            current->cdr->val = malloc(sizeof(gl_value_cons_t));
+            current = (gl_value_cons_t *)current->cdr->val;
+        }
+    }
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_CONS;
+    res->val = list;
+    return res;
 }

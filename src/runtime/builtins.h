@@ -50,6 +50,8 @@ GL_BUILTIN(and);
 
 GL_BUILTIN(or);
 
+// Utilities for types
+
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
 
@@ -66,3 +68,11 @@ GL_BUILTIN(nil_p);
 GL_BUILTIN(function_p);
 
 GL_BUILTIN(list_p);
+
+// Type constructors
+
+GL_BUILTIN(int_con);
+
+GL_BUILTIN(float_con);
+
+GL_BUILTIN(list_con);
