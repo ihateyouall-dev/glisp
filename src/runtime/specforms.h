@@ -10,6 +10,9 @@ GL_SPECIAL_FORM(if);
 
 GL_SPECIAL_FORM(defun);
 
+// Same as defun, but does not define function in environment
+GL_SPECIAL_FORM(lambda);
+
 GL_SPECIAL_FORM(set);
 
 GL_SPECIAL_FORM(progn);

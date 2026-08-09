@@ -90,11 +90,18 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     gl_ast_node_t *func = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
 
-    assert(func->type == GL_AST_SYMBOL);
+    gl_value_t *func_ptr = NULL;
 
-    const char *func_name = func->value.symbol;
+    // Trying to evaluate expression given instead of function name
+    if (func->type != GL_AST_SYMBOL) {
+        func_ptr = gl_eval(func, env);
+        assert(func_ptr->type == GL_VAL_FUNCTION || func_ptr->type == GL_VAL_BUILTIN ||
+               func_ptr->type == GL_VAL_SPFORM);
+    } else {
+        const char *func_name = func->value.symbol;
+        func_ptr = gl_env_get_fun(env, func_name);
+    }
 
-    gl_value_t *func_ptr = gl_env_get_fun(env, func_name);
     if (!func_ptr || !func_ptr->val) {
         abort();
     }

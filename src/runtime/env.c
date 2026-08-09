@@ -27,6 +27,7 @@ gl_env_t *gl_make_env(gl_env_t *parent) {
 
 static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "exit", gl_value_make_builtin(gl_builtin_exit));
+    gl_env_set_fun(env, "typeof", gl_value_make_builtin(gl_builtin_typeof));
     gl_env_set_fun(env, "print", gl_value_make_builtin(gl_builtin_print));
     gl_env_set_fun(env, "println", gl_value_make_builtin(gl_builtin_println));
 
@@ -57,6 +58,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "if", gl_value_make_specform(&gl_specform_if));
     gl_env_set_fun(env, "defun", gl_value_make_specform(&gl_specform_defun));
+    gl_env_set_fun(env, "lambda", gl_value_make_specform(&gl_specform_lambda));
     gl_env_set_fun(env, "set", gl_value_make_specform(&gl_specform_set));
     gl_env_set_fun(env, "progn", gl_value_make_specform(&gl_specform_progn));
     gl_env_set_fun(env, "while", gl_value_make_specform(&gl_specform_while));

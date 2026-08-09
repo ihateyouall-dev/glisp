@@ -344,3 +344,27 @@ GL_BUILTIN(or) {
     }
     return gl_value_make_bool(1);
 }
+
+GL_BUILTIN(typeof) {
+    assert(args->data);
+    assert(args->size == 1);
+
+    switch (args->data[0]->type) {
+    case GL_VAL_INT:
+        return gl_value_make_symbol("int");
+    case GL_VAL_FLOAT:
+        return gl_value_make_symbol("float");
+    case GL_VAL_SYMBOL:
+        return gl_value_make_symbol("symbol");
+    case GL_VAL_NIL:
+        return gl_value_make_symbol("nil");
+    case GL_VAL_FUNCTION:
+        return gl_value_make_symbol("function");
+    case GL_VAL_BUILTIN:
+        return gl_value_make_symbol("builtin");
+    case GL_VAL_SPFORM:
+        return gl_value_make_symbol("specform");
+    default:
+        return gl_value_make_nil();
+    }
+}

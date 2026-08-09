@@ -49,3 +49,6 @@ GL_BUILTIN(not );
 GL_BUILTIN(and);
 
 GL_BUILTIN(or);
+
+// Return symbol representing type of arg
+GL_BUILTIN(typeof);
