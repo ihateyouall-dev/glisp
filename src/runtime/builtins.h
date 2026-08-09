@@ -52,3 +52,15 @@ GL_BUILTIN(or);
 
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
+
+GL_BUILTIN(int_p);
+
+GL_BUILTIN(float_p);
+
+GL_BUILTIN(number_p);
+
+GL_BUILTIN(symbol_p);
+
+GL_BUILTIN(nil_p);
+
+GL_BUILTIN(function_p);

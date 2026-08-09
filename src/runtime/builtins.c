@@ -368,3 +368,70 @@ GL_BUILTIN(typeof) {
         return gl_value_make_nil();
     }
 }
+
+GL_BUILTIN(int_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_INT) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(float_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_FLOAT) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(number_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_INT && args->data[i]->type != GL_VAL_FLOAT) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(symbol_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_SYMBOL) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(nil_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_NIL) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(function_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_FUNCTION && args->data[i]->type != GL_VAL_BUILTIN &&
+            args->data[i]->type != GL_VAL_SPFORM) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
