@@ -85,3 +85,28 @@ GL_SPECIAL_FORM(progn) {
     }
     return res;
 }
+
+GL_SPECIAL_FORM(while) {
+    assert(args);
+    assert(args->type == GL_AST_CONS);
+    gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
+    gl_value_t *condition_val = gl_eval(condition, env);
+
+    gl_ast_node_t *body = gl_ast_cons_nth_cdr(args, 0);
+
+    while (gl_value_get_bool(condition_val)) {
+        gl_specform_progn(env, body);
+        condition_val = gl_eval(condition, env);
+    }
+    return gl_value_make_nil();
+}
+
+GL_SPECIAL_FORM(quote) {
+    assert(args);
+
+    assert(args->value.cons.cdr->type == GL_AST_NIL);
+
+    args->value.cons.car->quoted = 1;
+
+    return gl_eval(args->value.cons.car, env);
+}

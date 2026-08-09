@@ -156,5 +156,7 @@ gl_value_t *gl_parse_and_eval(const char *restrict src, gl_env_t *env) {
         current = gl_parser_parse(&parser);
     }
 
+    gl_parser_destroy(&parser);
+
     return res;
 }

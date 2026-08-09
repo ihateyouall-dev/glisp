@@ -13,3 +13,7 @@ GL_SPECIAL_FORM(defun);
 GL_SPECIAL_FORM(set);
 
 GL_SPECIAL_FORM(progn);
+
+GL_SPECIAL_FORM(while);
+
+GL_SPECIAL_FORM(quote);
