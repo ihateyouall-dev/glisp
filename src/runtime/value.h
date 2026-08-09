@@ -37,6 +37,8 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons);
 
 gl_value_t *gl_value_make_nil(void);
 
+gl_value_t *gl_value_make_bool(int b);
+
 typedef struct gl_env_t gl_env_t;
 
 ARRAY_DECLARE(gl_value_t *, gl_value_array)
@@ -91,3 +93,6 @@ void gl_value_set_builtin(gl_value_t *val, gl_builtin_t builtin);
 void gl_value_set_function(gl_value_t *val, gl_function_t *func);
 
 void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform);
+
+// Returns 0 if two values are equal, otherwise returns >0 or <0
+int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs);

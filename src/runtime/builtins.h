@@ -28,3 +28,24 @@ GL_BUILTIN(div);
 
 // Arithmetic operator % (mod)
 GL_BUILTIN(mod);
+
+// Logical equation
+GL_BUILTIN(eq);
+
+// Logical >
+GL_BUILTIN(gt);
+
+// Logical <
+GL_BUILTIN(lt);
+
+// Logical >=
+GL_BUILTIN(ge);
+
+// Logical <=
+GL_BUILTIN(le);
+
+GL_BUILTIN(not );
+
+GL_BUILTIN(and);
+
+GL_BUILTIN(or);

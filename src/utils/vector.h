@@ -19,7 +19,8 @@
     void Name##_reserve(Name##_t *vec, size_t capacity);                                           \
     void Name##_resize(Name##_t *vec, size_t size);                                                \
     void Name##_clear(Name##_t *vec);                                                              \
-    int Name##_empty(const Name##_t *vec);
+    int Name##_empty(const Name##_t *vec);                                                         \
+    Name##_t Name##_copy(Name##_t *vec, T (*copy_fn)(T));
 
 #define VECTOR_DEFINE(T, Name)                                                                     \
     void Name##_init(Name##_t *vec, void (*destroy_fn)(T *)) {                                     \
@@ -82,7 +83,17 @@
         }                                                                                          \
         vec->size = 0;                                                                             \
     }                                                                                              \
-    int Name##_empty(const Name##_t *vec) { return vec->size == 0; }
+    int Name##_empty(const Name##_t *vec) { return vec->size == 0; }                               \
+    Name##_t Name##_copy(Name##_t *vec, T (*copy_fn)(T)) {                                         \
+        Name##_t res;                                                                              \
+        Name##_init(&res, vec->destroy_fn);                                                        \
+        Name##_reserve(&res, vec->capacity);                                                       \
+        res.size = vec->size;                                                                      \
+        for (size_t i = 0; i < vec->size; ++i) {                                                   \
+            res.data[i] = copy_fn(vec->data[i]);                                                   \
+        }                                                                                          \
+        return res;                                                                                \
+    }
 
 #define VECTOR_DECLARE_DEFINE(T, Name)                                                             \
     VECTOR_DECLARE(T, Name)                                                                        \

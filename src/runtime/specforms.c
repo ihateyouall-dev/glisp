@@ -13,9 +13,14 @@ GL_SPECIAL_FORM(if) {
     assert(args);
     assert(args->type == GL_AST_CONS);
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
+    gl_value_t *condition_val = gl_eval(condition, env);
+
+    // If have no actions, return boolean
+    if (args->value.cons.cdr->type == GL_AST_NIL) {
+        return gl_value_make_bool(gl_value_get_bool(condition_val));
+    }
     gl_ast_node_t *if_true = gl_ast_cons_nth_car(args, 1);
     gl_ast_node_t *if_false = gl_ast_cons_nth_cdr(args, 1);
-    gl_value_t *condition_val = gl_eval(condition, env);
 
     if (gl_value_get_bool(condition_val)) {
         return gl_eval(if_true, env);

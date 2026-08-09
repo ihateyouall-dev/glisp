@@ -6,6 +6,7 @@ int test_status = 0;
 VECTOR_DECLARE_DEFINE(int, vector)
 
 void dummy(int *) {} // NOLINT
+int copy_fn(int x) { return x; }
 
 int main(void) {
     vector_t vec;
@@ -33,6 +34,15 @@ int main(void) {
 
     for (int i = 0; i < 8; ++i) {
         TEST(*vector_at(&vec, i) == i + 1, "Data preserved");
+    }
+
+    vector_t copy = vector_copy(&vec, copy_fn);
+
+    TEST(copy.size == vec.size, "Size of copy");
+    TEST(copy.capacity == vec.capacity, "Capacity of copy");
+
+    for (int i = 0; i < 8; ++i) {
+        TEST(*vector_at(&copy, i) == *vector_at(&vec, i), "Copy data preserved");
     }
 
     vector_reserve(&vec, 100);

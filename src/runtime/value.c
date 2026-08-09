@@ -78,6 +78,14 @@ gl_value_t *gl_value_make_nil(void) {
     return res;
 }
 
+gl_value_t *gl_value_make_bool(int b) {
+    if (b) {
+        return gl_value_make_symbol("t");
+    } else {
+        return gl_value_make_nil();
+    }
+}
+
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_BUILTIN;
@@ -290,4 +298,95 @@ void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform) {
         val->type = GL_VAL_SPFORM;
     }
     val->val = specform;
+}
+
+static int __gl_value_is_number(gl_value_t *val) {
+    return val->type == GL_VAL_INT || val->type == GL_VAL_FLOAT;
+}
+
+static int __gl_value_compare_numbers(gl_value_t *lhs, gl_value_t *rhs) {
+    if (lhs->type == GL_VAL_INT) {
+        int lhs_val = gl_value_get_int(lhs);
+        if (rhs->type == GL_VAL_INT) { // Comparing INT to INT
+            int rhs_val = gl_value_get_int(rhs);
+
+            if (lhs_val == rhs_val) {
+                return 0;
+            } else if (lhs_val > rhs_val) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } else { // Comparing INT to FLOAT
+            long double rhs_val = gl_value_get_float(rhs);
+
+            if ((long double)lhs_val == rhs_val) {
+                return 0;
+            } else if ((long double)lhs_val > rhs_val) {
+                return 1;
+            } else {
+                return -1;
+            }
+        }
+    } else {
+        long double lhs_val = gl_value_get_float(lhs);
+        if (rhs->type == GL_VAL_INT) { // Comparing FLOAT to INT
+            int rhs_val = gl_value_get_int(rhs);
+
+            if (lhs_val == (long double)rhs_val) {
+                return 0;
+            } else if (lhs_val > (long double)rhs_val) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } else { // Comparing FLOAT to FLOAT
+            long double rhs_val = gl_value_get_float(rhs);
+
+            if (lhs_val == rhs_val) {
+                return 0;
+            } else if (lhs_val > rhs_val) {
+                return 1;
+            } else {
+                return -1;
+            }
+        }
+    }
+}
+
+int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
+    if (__gl_value_is_number(lhs)) {
+        if (__gl_value_is_number(rhs)) {
+            return __gl_value_compare_numbers(lhs, rhs);
+        } else {
+            abort();
+        }
+    }
+
+    if (lhs->type == GL_VAL_SYMBOL) {
+        if (rhs->type == GL_VAL_SYMBOL) {
+            return strcmp(gl_value_get_symbol(lhs), gl_value_get_symbol(rhs));
+        } else {
+            abort();
+        }
+    }
+
+    if (lhs->type == GL_VAL_NIL || rhs->type == GL_VAL_NIL) {
+        if (lhs->type == rhs->type) {
+            return 0;
+        } else {
+            return -1;
+        }
+    }
+
+    if (lhs->type == GL_VAL_BUILTIN || GL_VAL_SPFORM) {
+        if (lhs->type == rhs->type) {
+            if (lhs->val == rhs->val) {
+                return 0;
+            }
+        } else {
+            return -1;
+        }
+    }
+    return -1;
 }

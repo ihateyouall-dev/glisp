@@ -15,11 +15,11 @@ gl_env_t *gl_make_env(gl_env_t *parent) {
     res->parent = parent;
 
     gl_value_table_t *values = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(values, &gl_value_destroy);
+    gl_value_table_init(values, gl_value_destroy, gl_value_copy);
     res->variables = values;
 
     gl_value_table_t *functions = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(functions, &gl_value_destroy);
+    gl_value_table_init(functions, gl_value_destroy, gl_value_copy);
     res->functions = functions;
 
     return res;
@@ -36,6 +36,19 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "/", gl_value_make_builtin(gl_builtin_div));
     gl_env_set_fun(env, "%", gl_value_make_builtin(gl_builtin_mod));
     gl_env_set_fun(env, "mod", gl_value_make_builtin(gl_builtin_mod));
+
+    gl_env_set_fun(env, "=", gl_value_make_builtin(gl_builtin_eq));
+    gl_env_set_fun(env, "eq", gl_value_make_builtin(gl_builtin_eq));
+    gl_env_set_fun(env, ">", gl_value_make_builtin(gl_builtin_gt));
+    gl_env_set_fun(env, "<", gl_value_make_builtin(gl_builtin_lt));
+    gl_env_set_fun(env, ">=", gl_value_make_builtin(gl_builtin_ge));
+    gl_env_set_fun(env, "<=", gl_value_make_builtin(gl_builtin_le));
+    gl_env_set_fun(env, "!", gl_value_make_builtin(gl_builtin_not));
+    gl_env_set_fun(env, "not", gl_value_make_builtin(gl_builtin_not));
+    gl_env_set_fun(env, "&", gl_value_make_builtin(gl_builtin_and));
+    gl_env_set_fun(env, "and", gl_value_make_builtin(gl_builtin_and));
+    gl_env_set_fun(env, "|", gl_value_make_builtin(gl_builtin_or));
+    gl_env_set_fun(env, "or", gl_value_make_builtin(gl_builtin_or));
 
     gl_env_set_fun(env, "car", gl_value_make_builtin(gl_builtin_car));
     gl_env_set_fun(env, "cdr", gl_value_make_builtin(gl_builtin_cdr));

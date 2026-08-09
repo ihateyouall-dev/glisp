@@ -4,8 +4,13 @@
 
 #include <string.h>
 
+#ifdef MSC_VER
+#include "strdup.h"
+#endif
+
 #define HASHMAP_DECLARE(T, Name)                                                                   \
     static void (*Name##_destroy_fn)(T *) = NULL;                                                  \
+    static T (*Name##_copy_fn)(T) = NULL;                                                          \
     typedef struct {                                                                               \
         char *key;                                                                                 \
         T value;                                                                                   \
@@ -17,13 +22,16 @@
         size_t buckets_count;                                                                      \
         void (*destroy_fn)(T *);                                                                   \
     } Name##_t;                                                                                    \
-    void Name##_init(Name##_t *map, void (*destroy_fn)(T *));                                      \
+    void Name##_init(Name##_t *map, void (*destroy_fn)(T *), T (*copy_fn)(T));                     \
     void Name##_insert(Name##_t *map, const char *key, T value);                                   \
     T *Name##_get(Name##_t *map, const char *key);                                                 \
     void Name##_destroy(Name##_t *map);
 
 #define HASHMAP_DEFINE(T, Name)                                                                    \
-    static void Name##Entry_destroy(Name##Entry_t *entry) { Name##_destroy_fn(&entry->value); }    \
+    static void Name##Entry_destroy(Name##Entry_t *entry) {                                        \
+        Name##_destroy_fn(&entry->value);                                                          \
+        free(entry->key);                                                                          \
+    }                                                                                              \
     VECTOR_DEFINE(Name##Entry_t, Name##Bucket)                                                     \
     static unsigned long long __##Name##_fnv1a(const char *key) {                                  \
         unsigned long long res = 14695981039346656037ULL;                                          \
@@ -32,6 +40,12 @@
             res ^= (unsigned char)*key++;                                                          \
             res *= prime;                                                                          \
         }                                                                                          \
+        return res;                                                                                \
+    }                                                                                              \
+    static Name##Entry_t Name##Entry_copy(Name##Entry_t *entry) {                                  \
+        Name##Entry_t res;                                                                         \
+        res.key = strdup(entry->key);                                                              \
+        res.value = Name##_copy_fn(entry->value);                                                  \
         return res;                                                                                \
     }                                                                                              \
     static void __##Name##_rehash(Name##_t *map, size_t new_buckets_count) {                       \
@@ -43,18 +57,18 @@
             Name##Bucket_t *bucket = &map->buckets[i];                                             \
             for (size_t j = 0; j < bucket->size; ++j) {                                            \
                 Name##Entry_t *entry = Name##Bucket_at(bucket, j);                                 \
-                size_t idx = __##Name##_fnv1a(entry->key) % new_buckets_count;                     \
-                Name##Bucket_push_back(&new[idx], *entry);                                         \
+                Name##Entry_t copy = Name##Entry_copy(entry);                                      \
+                assert(&copy != entry);                                                            \
+                size_t idx = __##Name##_fnv1a(copy.key) % new_buckets_count;                       \
+                Name##Bucket_push_back(&new[idx], copy);                                           \
             }                                                                                      \
-        }                                                                                          \
-        for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
-            Name##Bucket_destroy(&map->buckets[i]);                                                \
+            Name##Bucket_destroy(bucket);                                                          \
         }                                                                                          \
         free(map->buckets);                                                                        \
         map->buckets = new;                                                                        \
         map->buckets_count = new_buckets_count;                                                    \
     }                                                                                              \
-    void Name##_init(Name##_t *map, void (*destroy_fn)(T *)) {                                     \
+    void Name##_init(Name##_t *map, void (*destroy_fn)(T *), T (*copy_fn)(T)) {                    \
         map->buckets_count = 32;                                                                   \
         map->buckets = calloc(map->buckets_count, sizeof(Name##Bucket_t));                         \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
@@ -63,6 +77,7 @@
         map->size = 0;                                                                             \
         map->destroy_fn = destroy_fn;                                                              \
         Name##_destroy_fn = destroy_fn;                                                            \
+        Name##_copy_fn = copy_fn;                                                                  \
     }                                                                                              \
     void Name##_insert(Name##_t *map, const char *key, T value) {                                  \
         Name##Bucket_t *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];        \
@@ -79,7 +94,7 @@
             bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];                    \
         }                                                                                          \
         Name##Entry_t entry;                                                                       \
-        entry.key = key;                                                                           \
+        entry.key = strdup(key);                                                                   \
         entry.value = value;                                                                       \
         Name##Bucket_push_back(bucket, entry);                                                     \
         ++map->size;                                                                               \

@@ -238,3 +238,109 @@ GL_BUILTIN(mod) {
 
     return gl_value_make_int(gl_value_get_int(lhs) % gl_value_get_int(rhs));
 }
+
+GL_BUILTIN(eq) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (gl_value_compare(first, second) != 0) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(gt) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (gl_value_compare(first, second) <= 0) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(lt) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (gl_value_compare(first, second) >= 0) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(ge) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (gl_value_compare(first, second) < 0) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(le) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (gl_value_compare(first, second) > 0) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(not ) {
+    assert(args->data);
+
+    int val = gl_value_get_bool(args->data[0]);
+
+    return gl_value_make_bool(!val);
+}
+
+GL_BUILTIN(and) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (!(gl_value_get_bool(first) && gl_value_get_bool(second))) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(or) {
+    assert(args->data);
+
+    gl_value_t *first = args->data[0];
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_t *second = args->data[i];
+
+        if (!(gl_value_get_bool(first) || gl_value_get_bool(second))) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
