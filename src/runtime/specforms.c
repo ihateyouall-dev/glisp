@@ -92,7 +92,26 @@ GL_SPECIAL_FORM(set) {
 
     gl_env_set_var(env, var_name, var_value);
 
-    return gl_value_make_symbol(var_name);
+    return var_value;
+}
+
+GL_SPECIAL_FORM(set_global) {
+    assert(args);
+    assert(args->type == GL_AST_CONS);
+
+    const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0), env);
+
+    // Getting the global environment
+    gl_env_t *global_env = env->parent;
+
+    while (global_env->parent != NULL) {
+        global_env = global_env->parent;
+    }
+
+    gl_env_set_var(global_env, var_name, var_value);
+
+    return var_value;
 }
 
 GL_SPECIAL_FORM(progn) {

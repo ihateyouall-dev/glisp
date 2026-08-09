@@ -15,6 +15,8 @@ GL_SPECIAL_FORM(lambda);
 
 GL_SPECIAL_FORM(set);
 
+GL_SPECIAL_FORM(set_global);
+
 GL_SPECIAL_FORM(progn);
 
 GL_SPECIAL_FORM(while);

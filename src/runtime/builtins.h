@@ -64,3 +64,5 @@ GL_BUILTIN(symbol_p);
 GL_BUILTIN(nil_p);
 
 GL_BUILTIN(function_p);
+
+GL_BUILTIN(list_p);

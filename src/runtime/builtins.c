@@ -435,3 +435,14 @@ GL_BUILTIN(function_p) {
     }
     return gl_value_make_bool(1);
 }
+
+GL_BUILTIN(list_p) {
+    assert(args->data);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->type != GL_VAL_CONS) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}

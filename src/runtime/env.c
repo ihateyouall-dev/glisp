@@ -57,6 +57,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "symbol?", gl_value_make_builtin(gl_builtin_symbol_p));
     gl_env_set_fun(env, "nil?", gl_value_make_builtin(gl_builtin_nil_p));
     gl_env_set_fun(env, "function?", gl_value_make_builtin(gl_builtin_function_p));
+    gl_env_set_fun(env, "list?", gl_value_make_builtin(gl_builtin_list_p));
 
     gl_env_set_fun(env, "car", gl_value_make_builtin(gl_builtin_car));
     gl_env_set_fun(env, "cdr", gl_value_make_builtin(gl_builtin_cdr));
@@ -67,6 +68,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "defun", gl_value_make_specform(&gl_specform_defun));
     gl_env_set_fun(env, "lambda", gl_value_make_specform(&gl_specform_lambda));
     gl_env_set_fun(env, "set", gl_value_make_specform(&gl_specform_set));
+    gl_env_set_fun(env, "set-global", gl_value_make_specform(&gl_specform_set_global));
     gl_env_set_fun(env, "progn", gl_value_make_specform(&gl_specform_progn));
     gl_env_set_fun(env, "while", gl_value_make_specform(&gl_specform_while));
     gl_env_set_fun(env, "quote", gl_value_make_specform(&gl_specform_quote));
