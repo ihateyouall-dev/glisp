@@ -152,3 +152,11 @@ GL_SPECIAL_FORM(quote) {
 
     return gl_eval(args->value.cons.car, env);
 }
+
+GL_SPECIAL_FORM(function) {
+    assert(args);
+
+    const char *func_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+
+    return gl_env_get_fun(env, func_name);
+}

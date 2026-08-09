@@ -76,6 +76,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "progn", gl_value_make_specform(&gl_specform_progn));
     gl_env_set_fun(env, "while", gl_value_make_specform(&gl_specform_while));
     gl_env_set_fun(env, "quote", gl_value_make_specform(&gl_specform_quote));
+    gl_env_set_fun(env, "function", gl_value_make_specform(&gl_specform_function));
 }
 
 gl_env_t *gl_make_global_env() {
