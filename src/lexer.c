@@ -7,7 +7,7 @@
 
 void gl_lex_token_destroy(gl_lex_token_t *tok) {
     if (tok->type != GL_LEX_EOF && tok->type != GL_LEX_LPAREN && tok->type != GL_LEX_RPAREN &&
-        tok->type != GL_LEX_QUOTE && tok->type != GL_LEX_UNKNOWN)
+        tok->type != GL_LEX_QUOTE && tok->type != GL_LEX_FUNQUOTE && tok->type != GL_LEX_UNKNOWN)
         free(tok->value);
 }
 
@@ -84,6 +84,15 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         res.type = GL_LEX_QUOTE;
         gl_lexer_advance(lexer);
         return res;
+    case '#':
+        if (gl_lexer_peek(lexer) == '\'') {
+            res.type = GL_LEX_FUNQUOTE;
+            // Skipping # and '
+            gl_lexer_advance(lexer);
+            gl_lexer_advance(lexer);
+            return res;
+        }
+        break;
     case '\0':
         res.type = GL_LEX_EOF;
         return res;

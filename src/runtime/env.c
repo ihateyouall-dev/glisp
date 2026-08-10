@@ -118,6 +118,10 @@ gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
     if (res == NULL && env->parent != NULL) {
         return gl_env_get_var(env->parent, sym);
     }
+    // If have not found in parent environments, return NULL
+    if (res == NULL) {
+        return NULL;
+    }
     return *res;
 }
 
@@ -127,6 +131,10 @@ gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
     // Checking for function in parent environment if not found in current
     if (res == NULL && env->parent != NULL) {
         return gl_env_get_fun(env->parent, sym);
+    }
+    // If have not found in parent environments, return NULL
+    if (res == NULL) {
+        return NULL;
     }
     return *res;
 }

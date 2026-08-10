@@ -29,7 +29,7 @@ static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {
 
 static void __gl_parser_advance(gl_parser_t *parser) { ++parser->pos; }
 
-static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser, int quoted) {
+static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
@@ -43,16 +43,16 @@ static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser, int quoted) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_int(val, quoted);
+    return gl_ast_make_int(val);
 }
 
-static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser, int quoted) {
+static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);
-    return gl_ast_make_symbol(token.value, quoted);
+    return gl_ast_make_symbol(token.value);
 }
 
-static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser, int quoted) {
+static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
     char *endptr;
@@ -66,34 +66,46 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser, int quoted) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_float(val, quoted);
+    return gl_ast_make_float(val);
 }
 
-static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted);
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
 
 // Decides what parser functions will need to call next.
-static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser, int explicit_quotation) {
+static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
-    int quoted = explicit_quotation;
+    int quoted = 0;
+    int funquoted = 0;
 
     if (token.type == GL_LEX_QUOTE) {
-        __gl_parser_advance(parser); // Consume the quote token
+        __gl_parser_advance(parser);
         token = __gl_parser_current_token(parser);
         quoted = 1;
     }
 
+    if (token.type == GL_LEX_FUNQUOTE) {
+        __gl_parser_advance(parser);
+        token = __gl_parser_current_token(parser);
+        funquoted = 1;
+    }
+
     if (token.type == GL_LEX_LPAREN) {
         __gl_parser_advance(parser); // Skip '('
-        return __gl_parser_parse_list(parser, quoted);
+        return __gl_parser_parse_list(parser);
     }
+
+    gl_ast_node_t *res = NULL;
 
     switch (token.type) {
     case GL_LEX_INTLITERAL:
-        return __gl_parser_parse_int(parser, quoted);
+        res = __gl_parser_parse_int(parser);
+        break;
     case GL_LEX_FLOATLITERAL:
-        return __gl_parser_parse_float(parser, quoted);
+        res = __gl_parser_parse_float(parser);
+        break;
     case GL_LEX_SYMBOL:
-        return __gl_parser_parse_symbol(parser, quoted);
+        res = __gl_parser_parse_symbol(parser);
+        break;
     case GL_LEX_EOF:
         return NULL;
     default:
@@ -101,9 +113,16 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser, int expl
                 token.location.line, token.location.column, token.type);
         exit(1);
     }
+    if (quoted) {
+        return gl_ast_make_quote(res);
+    }
+    if (funquoted) {
+        return gl_ast_make_funquote(res);
+    }
+    return res;
 }
 
-static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted) {
+static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     gl_ast_node_t *list_head = NULL;
     gl_ast_node_t *current_tail = NULL;
 
@@ -119,14 +138,13 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted) {
             break;
         }
 
-        gl_ast_node_t *new_node = __gl_parser_parse_expression(parser, quoted);
+        gl_ast_node_t *new_node = __gl_parser_parse_expression(parser);
 
         if (list_head == NULL) {
-            list_head = gl_ast_make_cons(new_node, gl_ast_make_nil(), quoted);
+            list_head = gl_ast_make_cons(new_node, gl_ast_make_nil());
             current_tail = list_head;
         } else {
-            gl_ast_node_t *next_cons =
-                gl_ast_make_cons(new_node, current_tail->value.cons.cdr, quoted);
+            gl_ast_node_t *next_cons = gl_ast_make_cons(new_node, current_tail->value.cons.cdr);
             current_tail->value.cons.cdr = next_cons;
             current_tail = next_cons;
         }
@@ -135,6 +153,4 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser, int quoted) {
     return list_head;
 }
 
-gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) {
-    return __gl_parser_parse_expression(parser, 0);
-}
+gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) { return __gl_parser_parse_expression(parser); }

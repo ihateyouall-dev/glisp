@@ -47,40 +47,45 @@ size_t gl_ast_cons_length(gl_ast_node_t *cons) {
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_int(int64_t num, int quoted) {
+gl_ast_node_t *gl_ast_make_quote(gl_ast_node_t *node) {
+    return gl_ast_make_cons(gl_ast_make_symbol("quote"), gl_ast_make_cons(node, gl_ast_make_nil()));
+}
+
+gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node) {
+    return gl_ast_make_cons(gl_ast_make_symbol("function"),
+                            gl_ast_make_cons(node, gl_ast_make_nil()));
+}
+
+gl_ast_node_t *gl_ast_make_int(int64_t num) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_INT;
     res->value.integral = num;
-    res->quoted = quoted;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_float(long double num, int quoted) {
+gl_ast_node_t *gl_ast_make_float(long double num) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_FLOAT;
     res->value.floating = num;
-    res->quoted = quoted;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_symbol(const char *sym, int quoted) {
+gl_ast_node_t *gl_ast_make_symbol(const char *sym) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_SYMBOL;
     res->value.symbol = strdup(sym);
-    res->quoted = quoted;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, int quoted) {
+gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_CONS;
     res->value.cons.car = car;
     res->value.cons.cdr = cdr;
-    res->quoted = quoted;
     return res;
 }
 
@@ -88,7 +93,6 @@ gl_ast_node_t *gl_ast_make_nil(void) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_NIL;
-    res->quoted = 0;
     return res;
 }
 
@@ -100,7 +104,6 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     assert(res);
 
     res->type = node->type;
-    res->quoted = node->quoted;
 
     switch (node->type) {
     case GL_AST_INT:
@@ -115,7 +118,6 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
         res->value.cons.cdr = gl_ast_copy(node->value.cons.cdr);
         break;
     case GL_AST_NIL:
-        res->quoted = 0;
         break;
     }
     return res;

@@ -14,9 +14,6 @@ static gl_value_t *__gl_eval_float(gl_ast_node_t *node) {
 }
 
 static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node, gl_env_t *env) {
-    if (node->quoted) {
-        return gl_value_make_symbol(node->value.symbol);
-    }
     return gl_env_get_var(env, node->value.symbol);
 }
 
@@ -56,7 +53,7 @@ static void __gl_define_function_args(const gl_function_t *function, gl_value_ar
 
 static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *env) {
     gl_ast_node_t *current = func_tree;
-    gl_value_t *res = NULL;
+    gl_value_t *res = gl_value_make_nil();
     while (current->type != GL_AST_NIL) {
         res = gl_eval(current->value.cons.car, env);
         current = current->value.cons.cdr;
@@ -65,8 +62,6 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
 }
 
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t *args) {
-    assert(function->tree->type == GL_AST_CONS);
-
     gl_env_t *local_env = gl_make_env(function->closure);
 
     if (args) {
@@ -83,10 +78,6 @@ static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t 
 }
 
 static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
-    if (node->quoted) {
-        return gl_value_make_cons(node->value.cons);
-    }
-    // Otherwise list is evaluated as function
     gl_ast_node_t *func = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
 
@@ -100,6 +91,11 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     } else {
         const char *func_name = func->value.symbol;
         func_ptr = gl_env_get_fun(env, func_name);
+        // Evaluating variable value if function is undefined. We trying it because variables can
+        // also store functions
+        if (func_ptr == NULL) {
+            func_ptr = gl_env_get_var(env, func_name);
+        }
     }
 
     if (!func_ptr || !func_ptr->val) {
@@ -126,7 +122,8 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
         return __gl_eval_function(function, argv);
     }
     default:
-        assert(0 && "UNREACHABLE");
+        assert(0 && "Function type must be one of these: GL_VAL_FUNCTION, GL_VALUE_BUILTIN, "
+                    "GL_VALUE_SPFORM");
     }
     return NULL;
 }

@@ -366,6 +366,8 @@ GL_BUILTIN(typeof) {
         return gl_value_make_symbol("builtin");
     case GL_VAL_SPFORM:
         return gl_value_make_symbol("specform");
+    case GL_VAL_CONS:
+        return gl_value_make_symbol("list");
     default:
         return gl_value_make_nil();
     }

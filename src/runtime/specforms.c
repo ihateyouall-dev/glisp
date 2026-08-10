@@ -148,15 +148,41 @@ GL_SPECIAL_FORM(quote) {
 
     assert(args->value.cons.cdr->type == GL_AST_NIL);
 
-    args->value.cons.car->quoted = 1;
+    gl_ast_node_t *node = gl_ast_cons_nth_car(args, 0);
 
-    return gl_eval(args->value.cons.car, env);
+    if (node->type == GL_AST_SYMBOL) {
+        return gl_value_make_symbol(node->value.symbol);
+    }
+
+    if (node->type == GL_AST_CONS) {
+        return gl_value_make_cons(node->value.cons);
+    }
+
+    return gl_eval(node, env);
 }
 
 GL_SPECIAL_FORM(function) {
     assert(args);
 
-    const char *func_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    assert(args->value.cons.cdr->type == GL_AST_NIL);
 
-    return gl_env_get_fun(env, func_name);
+    gl_ast_node_t *func = gl_ast_cons_nth_car(args, 0);
+
+    if (func->type == GL_AST_SYMBOL) {
+        const char *func_name = func->value.symbol;
+
+        gl_value_t *res = gl_env_get_fun(env, func_name);
+
+        if (res == NULL) {
+            return gl_env_get_var(env, func_name);
+        }
+        return res;
+    }
+
+    gl_value_t *res = gl_eval(func, env);
+
+    if (res->type != GL_VAL_FUNCTION && res->type != GL_VAL_BUILTIN && res->type != GL_VAL_SPFORM) {
+        return NULL;
+    }
+    return res;
 }
