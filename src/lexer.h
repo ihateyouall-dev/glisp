@@ -1,5 +1,6 @@
 #pragma once
 
+#include "location.h"
 #include "vector.h"
 
 #include <stddef.h>
@@ -17,12 +18,6 @@ typedef enum {
 } gl_lex_token_type_t;
 
 typedef enum { LEX_OK, LEX_ERROR } gl_lex_token_status_t;
-
-typedef struct gl_location_t {
-    size_t pos;
-    size_t line;
-    size_t column;
-} gl_location_t;
 
 typedef struct gl_lex_token_t {
     gl_lex_token_type_t type;

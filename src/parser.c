@@ -1,20 +1,24 @@
 #include "parser.h"
 #include "ast.h"
+#include "diagnostics.h"
 #include "lexer.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-void gl_parser_init(gl_parser_t *parser, const char *src) {
+void gl_parser_init(gl_parser_t *parser, const char *src, const char *name) {
     gl_lexer_t lexer = gl_make_lexer(src);
     parser->tokens = gl_lexer_tokenize(&lexer);
+    parser->src = src;
+    parser->name = name;
     parser->pos = 0;
 }
 
-gl_parser_t gl_make_parser(const char *src) {
+gl_parser_t gl_make_parser(const char *src, const char *name) {
     gl_parser_t res;
-    gl_parser_init(&res, src);
+    gl_parser_init(&res, src, name);
     return res;
 }
 
@@ -81,16 +85,17 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
         __gl_parser_advance(parser);
         token = __gl_parser_current_token(parser);
         quoted = 1;
+        return gl_ast_make_quote(__gl_parser_parse_expression(parser));
     }
 
     if (token.type == GL_LEX_FUNQUOTE) {
         __gl_parser_advance(parser);
         token = __gl_parser_current_token(parser);
         funquoted = 1;
+        return gl_ast_make_funquote(__gl_parser_parse_expression(parser));
     }
 
     if (token.type == GL_LEX_LPAREN) {
-        __gl_parser_advance(parser); // Skip '('
         return __gl_parser_parse_list(parser);
     }
 
@@ -108,16 +113,9 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
         break;
     case GL_LEX_EOF:
         return NULL;
-    default:
-        fprintf(stderr, "Parser Error at line %zu, column %zu: Unexpected token type %d\n",
-                token.location.line, token.location.column, token.type);
-        exit(1);
+    default: {
+        gl_diagnostic_syntax_error(parser->src, token.location, "unexpected token", parser->name);
     }
-    if (quoted) {
-        return gl_ast_make_quote(res);
-    }
-    if (funquoted) {
-        return gl_ast_make_funquote(res);
     }
     return res;
 }
@@ -125,6 +123,9 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
 static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     gl_ast_node_t *list_head = NULL;
     gl_ast_node_t *current_tail = NULL;
+
+    gl_lex_token_t lparen = __gl_parser_current_token(parser);
+    __gl_parser_advance(parser);
 
     while (1) {
         gl_lex_token_t token = __gl_parser_current_token(parser);
@@ -136,6 +137,12 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
                 return gl_ast_make_nil();
             }
             break;
+        }
+
+        if (token.type == GL_LEX_EOF) { // List is not closed
+            gl_diagnostic_syntax_error(parser->src, lparen.location, "parenthesis is not closed",
+                                       parser->name);
+            return NULL;
         }
 
         gl_ast_node_t *new_node = __gl_parser_parse_expression(parser);

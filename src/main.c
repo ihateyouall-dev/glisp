@@ -1,3 +1,5 @@
+#include "ast.h"
+#include "parser.h"
 #include "runtime/env.h"
 #include "runtime/eval.h"
 #include "runtime/value.h"
@@ -34,7 +36,14 @@ int main(int argc, char **argv) {
         assert(bytesread == filesize);
         buf[bytesread] = '\0';
 
-        gl_parse_and_eval(buf, gl_make_global_env());
+        gl_parser_t parser = gl_make_parser(buf, realpath(filename, NULL));
+
+        if (gl_parse_and_eval(&parser, gl_make_global_env()) == NULL) {
+            exit(-1);
+        }
+
+        gl_parser_destroy(&parser);
+
         fclose(file);
         free(buf);
         return 0;
@@ -50,7 +59,11 @@ int main(int argc, char **argv) {
 
         add_history(input);
 
-        gl_value_t *res = gl_parse_and_eval(input, global_env);
+        gl_parser_t parser = gl_make_parser(input, "<repl>");
+
+        gl_value_t *res = gl_parse_and_eval(&parser, global_env);
+
+        gl_parser_destroy(&parser);
 
         gl_value_print(res);
 

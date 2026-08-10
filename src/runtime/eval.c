@@ -148,19 +148,15 @@ gl_value_t *gl_eval(gl_ast_node_t *node, gl_env_t *env) {
     }
 }
 
-gl_value_t *gl_parse_and_eval(const char *restrict src, gl_env_t *env) {
-    gl_parser_t parser = gl_make_parser(src);
-
-    gl_ast_node_t *current = gl_parser_parse(&parser);
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, gl_env_t *env) {
+    gl_ast_node_t *current = gl_parser_parse(parser);
 
     gl_value_t *res = NULL;
 
     while (current) {
         res = gl_eval(current, env);
-        current = gl_parser_parse(&parser);
+        current = gl_parser_parse(parser);
     }
-
-    gl_parser_destroy(&parser);
 
     return res;
 }

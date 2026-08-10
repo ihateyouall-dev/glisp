@@ -8,7 +8,7 @@ int test_status = 0;
 
 void test_parse_int(void) {
     const char *src = "123";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_INT, "Parse INT");
     TEST(node->value.integral == 123, "Parse INT value");
@@ -18,7 +18,7 @@ void test_parse_int(void) {
 
 void test_parse_float(void) {
     const char *src = "45.67";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_FLOAT, "Parse FLOAT");
     TEST(node->value.floating == 45.67, "Parse FLOAT value");
@@ -28,7 +28,7 @@ void test_parse_float(void) {
 
 void test_parse_symbol(void) {
     const char *src = "my_symbol";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_SYMBOL, "Parse SYMBOL");
     TEST(strcmp(node->value.symbol, "my_symbol") == 0, "Parse SYMBOL value");
@@ -38,7 +38,7 @@ void test_parse_symbol(void) {
 
 void test_parse_simple_list(void) {
     const char *src = "(1 2 3)";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *list = gl_parser_parse(&parser);
     TEST(list->type == GL_AST_CONS, "Parse simple list type");
     TEST(list->value.cons.car->type == GL_AST_INT, "List car 1");
@@ -52,7 +52,7 @@ void test_parse_simple_list(void) {
 
 void test_parse_nested_list(void) {
     const char *src = "(1 (2 3) 4)";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *list = gl_parser_parse(&parser);
     TEST(list->type == GL_AST_CONS, "Parse nested list type");
     TEST(list->value.cons.car->type == GL_AST_INT, "Nested list car 1");
@@ -82,7 +82,7 @@ void test_parse_nested_list(void) {
 
 void test_parse_complex_list(void) {
     const char *src = "((a b) c)";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *list = gl_parser_parse(&parser);
     TEST(list->type == GL_AST_CONS, "Parse complex list type");
     TEST(list->value.cons.car->type == GL_AST_CONS, "Complex list car type");
@@ -109,7 +109,7 @@ void test_parse_complex_list(void) {
 
 void test_parse_empty_list(void) {
     const char *src = "()";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *list = gl_parser_parse(&parser);
     TEST(list->type == GL_AST_NIL, "Empty list type");
     gl_ast_destroy(list);
@@ -118,7 +118,7 @@ void test_parse_empty_list(void) {
 
 void test_parse_quoted_symbol(void) {
     const char *src = "'hello world";
-    gl_parser_t parser = gl_make_parser(src);
+    gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *quoted = gl_parser_parse(&parser);
     gl_ast_node_t *not_quoted = gl_parser_parse(&parser);
 
