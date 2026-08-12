@@ -11,21 +11,22 @@ void gl_lex_token_destroy(gl_lex_token_t *tok) {
         free(tok->value);
 }
 
-void gl_lexer_init(gl_lexer_t *lexer, const char *src) {
-    lexer->src = src;
-
+void gl_lexer_init(gl_lexer_t *lexer, const char *src, char *unit_name) {
     lexer->len = strlen(src);
+
+    lexer->location.src = src; // NOLINT
     lexer->location.pos = 0;
     lexer->location.line = 1;
     lexer->location.column = 1;
+    lexer->location.unit_name = unit_name;
 }
 
-char gl_lexer_current(gl_lexer_t *lexer) { return lexer->src[lexer->location.pos]; }
+char gl_lexer_current(gl_lexer_t *lexer) { return lexer->location.src[lexer->location.pos]; }
 
-char gl_lexer_peek(gl_lexer_t *lexer) { return lexer->src[lexer->location.pos + 1]; }
+char gl_lexer_peek(gl_lexer_t *lexer) { return lexer->location.src[lexer->location.pos + 1]; }
 
 void gl_lexer_advance(gl_lexer_t *lexer) {
-    char ch = lexer->src[++lexer->location.pos];
+    char ch = lexer->location.src[++lexer->location.pos];
 
     if (ch == '\n') {
         ++lexer->location.line;
@@ -98,7 +99,7 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         return res;
     }
 
-    const char *start = lexer->src + lexer->location.pos;
+    const char *start = lexer->location.src + lexer->location.pos;
     const size_t start_pos = lexer->location.pos;
 
     // Detecting possible numeric literal
@@ -160,8 +161,8 @@ gl_lex_token_vector_t gl_lexer_tokenize(gl_lexer_t *lexer) {
     return res;
 }
 
-gl_lexer_t gl_make_lexer(const char *src) {
+gl_lexer_t gl_make_lexer(const char *src, char *unit_name) {
     gl_lexer_t lexer;
-    gl_lexer_init(&lexer, src);
+    gl_lexer_init(&lexer, src, unit_name);
     return lexer;
 }

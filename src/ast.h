@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils/cons.h"
+#include "utils/location.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@ CONS_DECLARE(struct gl_ast_node_t *, gl_ast_cons)
 
 typedef struct gl_ast_node_t {
     gl_ast_node_type_t type;
+    gl_location_t location;
 
     union {
         int64_t integral;
@@ -35,10 +37,10 @@ size_t gl_ast_cons_length(gl_ast_node_t *cons);
 gl_ast_node_t *gl_ast_make_quote(gl_ast_node_t *node);
 gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node);
 
-gl_ast_node_t *gl_ast_make_int(int64_t num);
-gl_ast_node_t *gl_ast_make_float(long double num);
-gl_ast_node_t *gl_ast_make_symbol(const char *sym);
-gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr);
-gl_ast_node_t *gl_ast_make_nil(void);
+gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location);
+gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location);
+gl_ast_node_t *gl_ast_make_symbol(const char *sym, gl_location_t location);
+gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, gl_location_t location);
+gl_ast_node_t *gl_ast_make_nil(gl_location_t location);
 gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node);
 void gl_ast_destroy(gl_ast_node_t *node);

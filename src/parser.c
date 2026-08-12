@@ -9,10 +9,9 @@
 #include <string.h>
 
 void gl_parser_init(gl_parser_t *parser, const char *src, const char *name) {
-    gl_lexer_t lexer = gl_make_lexer(src);
+    gl_lexer_t lexer = gl_make_lexer(src, name); // NOLINT
     parser->tokens = gl_lexer_tokenize(&lexer);
     parser->src = src;
-    parser->name = name;
     parser->pos = 0;
 }
 
@@ -47,13 +46,13 @@ static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_int(val);
+    return gl_ast_make_int(val, token.location);
 }
 
 static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);
-    return gl_ast_make_symbol(token.value);
+    return gl_ast_make_symbol(token.value, token.location);
 }
 
 static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
@@ -70,7 +69,7 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     }
 
     __gl_parser_advance(parser);
-    return gl_ast_make_float(val);
+    return gl_ast_make_float(val, token.location);
 }
 
 static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
@@ -114,7 +113,9 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     case GL_LEX_EOF:
         return NULL;
     default: {
-        gl_diagnostic_syntax_error(parser->src, token.location, "unexpected token", parser->name);
+        gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location,
+
+                                                 "Unexpected token"));
     }
     }
     return res;
@@ -134,24 +135,31 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
             __gl_parser_advance(parser);
             // Empty list is similar to nil
             if (list_head == NULL) {
-                return gl_ast_make_nil();
+                return gl_ast_make_nil(token.location);
             }
             break;
         }
 
         if (token.type == GL_LEX_EOF) { // List is not closed
-            gl_diagnostic_syntax_error(parser->src, lparen.location, "parenthesis is not closed",
-                                       parser->name);
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, lparen.location,
+                                                     "Expected ')' to close expression"));
             return NULL;
         }
 
         gl_ast_node_t *new_node = __gl_parser_parse_expression(parser);
 
+        // Terminating if we got error in node parsing
+        if (new_node == NULL) {
+            return NULL;
+        }
+
         if (list_head == NULL) {
-            list_head = gl_ast_make_cons(new_node, gl_ast_make_nil());
+            list_head =
+                gl_ast_make_cons(new_node, gl_ast_make_nil(token.location), lparen.location);
             current_tail = list_head;
         } else {
-            gl_ast_node_t *next_cons = gl_ast_make_cons(new_node, current_tail->value.cons.cdr);
+            gl_ast_node_t *next_cons =
+                gl_ast_make_cons(new_node, current_tail->value.cons.cdr, token.location);
             current_tail->value.cons.cdr = next_cons;
             current_tail = next_cons;
         }

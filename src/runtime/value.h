@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.h"
+#include "location.h"
 #include "utils/array.h"
 #include "utils/cons.h"
 #include <stdint.h>
@@ -41,9 +42,15 @@ gl_value_t *gl_value_make_bool(int b);
 
 typedef struct gl_env_t gl_env_t;
 
-ARRAY_DECLARE(gl_value_t *, gl_value_array)
+// Used for error handling
+typedef struct {
+    gl_value_t *val;
+    gl_location_t location;
+} gl_function_arg_t;
 
-typedef gl_value_t *(*gl_builtin_t)(gl_value_array_t *);
+ARRAY_DECLARE(gl_function_arg_t *, gl_function_args)
+
+typedef gl_value_t *(*gl_builtin_t)(gl_location_t called_at, gl_function_args_t *);
 
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin);
 

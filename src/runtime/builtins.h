@@ -1,8 +1,10 @@
 #pragma once
 
+#include "location.h"
 #include "value.h"
 
-#define GL_BUILTIN(Name) gl_value_t *gl_builtin_##Name(gl_value_array_t *args)
+#define GL_BUILTIN(Name)                                                                           \
+    gl_value_t *gl_builtin_##Name(gl_location_t called_at, gl_function_args_t *args)
 
 GL_BUILTIN(exit);
 

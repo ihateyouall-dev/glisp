@@ -1,8 +1,10 @@
 #include "eval.h"
 #include "ast.h"
+#include "diagnostics.h"
 #include "parser.h"
 #include "runtime/env.h"
 #include "value.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 static gl_value_t *__gl_eval_int(gl_ast_node_t *node) {
@@ -14,15 +16,32 @@ static gl_value_t *__gl_eval_float(gl_ast_node_t *node) {
 }
 
 static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node, gl_env_t *env) {
-    return gl_env_get_var(env, node->value.symbol);
+    gl_value_t *res = gl_env_get_var(env, node->value.symbol);
+    if (!res) {
+        char buf[1024] = "";
+        const char *fmt = "undefined variable '%s'";
+        snprintf(buf, sizeof(buf), fmt, node->value.symbol);
+        gl_diagnostic_report_error(gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, node->location, buf));
+        return NULL;
+    }
+    return res;
 }
 
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
-static gl_value_array_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
-    // If have no args, return nothing
+static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
+    gl_value_destroy(&(*arg)->val);
+    free(*arg);
+}
+
+static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
+    gl_function_args_t *res = malloc(sizeof(gl_function_args_t));
+
+    // If have no args, return empty array
     if (args->type == GL_AST_NIL) {
-        return NULL;
+        res->size = 0;
+        res->data = NULL;
+        return res;
     }
 
     size_t argc = 0;
@@ -33,21 +52,24 @@ static gl_value_array_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
         ++argc;
     }
 
-    gl_value_array_t *res = malloc(sizeof(gl_value_array_t));
-
-    gl_value_array_init(res, argc, &gl_value_destroy);
+    gl_function_args_init(res, argc, &__gl_function_arg_destroy);
 
     current = args;
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {
-        res->data[i] = gl_eval(current->value.cons.car, env);
+        res->data[i] = malloc(sizeof(gl_function_arg_t));
+        res->data[i]->location = current->location;
+        res->data[i]->val = gl_eval(current->value.cons.car, env);
+        if (res->data[i]->val == NULL) {
+            return NULL;
+        }
     }
     return res;
 }
 
-static void __gl_define_function_args(const gl_function_t *function, gl_value_array_t *args,
+static void __gl_define_function_args(const gl_function_t *function, gl_function_args_t *args,
                                       gl_env_t *env) {
     for (size_t i = 0; i < function->params->size; ++i) {
-        gl_env_set_var(env, function->params->data[i], gl_value_copy(args->data[i]));
+        gl_env_set_var(env, function->params->data[i], gl_value_copy(args->data[i]->val));
     }
 }
 
@@ -61,7 +83,7 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     return res;
 }
 
-static gl_value_t *__gl_eval_function(gl_function_t *function, gl_value_array_t *args) {
+static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
     gl_env_t *local_env = gl_make_env(function->closure);
 
     if (args) {
@@ -96,19 +118,28 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
         if (func_ptr == NULL) {
             func_ptr = gl_env_get_var(env, func_name);
         }
-    }
-
-    if (!func_ptr || !func_ptr->val) {
-        abort();
+        // Emmiting error if function still not found
+        if (!func_ptr || !func_ptr->val) {
+            const char *fmt = "undefined function '%s'";
+            char buf[1024];
+            snprintf(buf, sizeof(buf), fmt, func_name);
+            gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func->location, buf);
+            gl_diagnostic_report_error(err);
+            return NULL;
+        }
     }
 
     // Evaluating function
     switch (func_ptr->type) {
     case GL_VAL_BUILTIN: {
         gl_builtin_t builtin = func_ptr->val;
-        gl_value_array_t *argv = __gl_eval_args(args, env);
+        gl_function_args_t *argv = __gl_eval_args(args, env);
 
-        return builtin(argv);
+        if (argv == NULL) {
+            return NULL;
+        }
+
+        return builtin(node->location, argv);
     }
     case GL_VAL_SPFORM: {
         gl_special_form_t spform = func_ptr->val;
@@ -117,7 +148,11 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_ptr->val;
-        gl_value_array_t *argv = __gl_eval_args(args, env);
+        gl_function_args_t *argv = __gl_eval_args(args, env);
+
+        if (argv == NULL) {
+            return NULL;
+        }
 
         return __gl_eval_function(function, argv);
     }

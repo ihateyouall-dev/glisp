@@ -1,81 +1,170 @@
 #include "builtins.h"
-#include "ast.h"
+#include "diagnostics.h"
+#include "location.h"
 #include "runtime/value.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
-ARRAY_DEFINE(gl_value_t *, gl_value_array)
+ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
+
+#define EXPECT_ARGS(n)                                                                             \
+    do {                                                                                           \
+        if (args->size != n) {                                                                     \
+            __emit_arity_error(called_at, n, args->size);                                          \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+#define EXPECT_VARGS(n)                                                                            \
+    do {                                                                                           \
+        if (args->size < n) {                                                                      \
+            __emit_variadic_arity_error(called_at, n, args->size);                                 \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+static void __emit_arity_error(gl_location_t location, size_t expected, size_t got) {
+    const char *fmt = "Argument count mismatch. Expected %zu, got %zu";
+    char buf[128] = "";
+
+    snprintf(buf, sizeof(buf), fmt, expected, got);
+
+    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+static void __emit_variadic_arity_error(gl_location_t location, size_t expected_at_least,
+                                        size_t got) {
+    const char *fmt = "Argument count mismatch. Expected at least %zu, got %zu";
+    char buf[128] = "";
+
+    snprintf(buf, strlen(fmt) + 1, fmt, expected_at_least, got);
+
+    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+static void __emit_type_error(gl_location_t location, const char *expected, const char *got) {
+    const char *fmt = "Argument type mismatch. Expected %s, got %s";
+    char buf[1024] = "";
+
+    snprintf(buf, sizeof(buf), fmt, expected, got);
+
+    gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+static const char *__gl_value_get_type_name(gl_value_t *val) {
+    switch (val->type) {
+    case GL_VAL_INT:
+        return "int";
+    case GL_VAL_FLOAT:
+        return "float";
+    case GL_VAL_SYMBOL:
+        return "symbol";
+    case GL_VAL_CONS:
+        return "list";
+    case GL_VAL_FUNCTION:
+    case GL_VAL_BUILTIN:
+    case GL_VAL_SPFORM:
+        return "function";
+    case GL_VAL_NIL:
+        return "nil";
+    }
+}
 
 GL_BUILTIN(exit) {
     assert(args);
     assert(args->data[0]->val);
-    exit(gl_value_get_int(args->data[0]));
+
+    EXPECT_ARGS(1);
+
+    if (args->data[0]->val->type != GL_VAL_INT) {
+        __emit_type_error(args->data[0]->location, "int",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    exit(gl_value_get_int(args->data[0]->val));
 }
 
 GL_BUILTIN(print) {
-    assert(args->data);
-    assert(args->size > 0);
+    if (args->size == 0) {
+        return gl_value_make_nil();
+    }
 
     for (size_t i = 0; i < args->size; ++i) {
-        gl_value_print(args->data[i]);
+        gl_value_print(args->data[i]->val);
     }
     return gl_value_make_nil();
 }
 
 GL_BUILTIN(println) {
-    if (!args->data || args->size == 0) {
+    if (args->size == 0) {
         printf("\n");
         return gl_value_make_nil();
     }
-    gl_builtin_print(args);
+    gl_builtin_print(called_at, args);
     printf("\n");
     return gl_value_make_nil();
 }
 
 GL_BUILTIN(car) {
-    assert(args);
-    assert(args->size == 1);
-    assert(args->data[0]->type == GL_VAL_CONS);
+    EXPECT_ARGS(1);
 
-    gl_value_cons_t *cons = gl_value_get_cons(args->data[0]);
+    if (args->data[0]->val->type != GL_VAL_CONS) {
+        __emit_type_error(called_at, "list", __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    gl_value_cons_t *cons = gl_value_get_cons(args->data[0]->val);
 
     return cons->car;
 }
 
 GL_BUILTIN(cdr) {
-    assert(args);
-    assert(args->size == 1);
-    assert(args->data[0]->type == GL_VAL_CONS);
+    EXPECT_ARGS(1);
 
-    gl_value_cons_t *cons = gl_value_get_cons(args->data[0]);
+    if (args->data[0]->val->type != GL_VAL_CONS) {
+        __emit_type_error(called_at, "list", __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    gl_value_cons_t *cons = gl_value_get_cons(args->data[0]->val);
 
     return cons->cdr;
 }
 
 GL_BUILTIN(add) {
-    assert(args->data);
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_INT;
+    gl_value_t *res = gl_value_make_int(0);
+
+    if (args->size == 0) {
+        return res;
+    }
+
     int64_t isum = 0;
     long double fsum = 0;
     for (size_t i = 0; i < args->size; ++i) {
-        gl_value_t *current = *(args->data + i);
-        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        gl_function_arg_t *current = *(args->data + i);
+        if (current->val->type != GL_VAL_INT && current->val->type != GL_VAL_FLOAT) {
+            __emit_type_error(current->location, "number", __gl_value_get_type_name(current->val));
+            return NULL;
+        }
         if (res->type == GL_VAL_INT) {
-            if (current->type == GL_VAL_FLOAT) {
+            if (current->val->type == GL_VAL_FLOAT) {
                 // Transfering integral sum to the float
                 res->type = GL_VAL_FLOAT;
                 fsum = (long double)isum;
             } else {
-                isum += gl_value_get_int(current);
+                isum += gl_value_get_int(current->val);
             }
         }
         if (res->type == GL_VAL_FLOAT) {
-            if (current->type == GL_VAL_INT) {
-                fsum += (long double)gl_value_get_int(current);
+            if (current->val->type == GL_VAL_INT) {
+                fsum += (long double)gl_value_get_int(current->val);
             } else {
-                fsum += gl_value_get_float(current);
+                fsum += gl_value_get_float(current->val);
             }
         }
     }
@@ -91,18 +180,25 @@ GL_BUILTIN(add) {
 }
 
 GL_BUILTIN(sub) {
-    assert(args);
-    assert(args->data);
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_INT;
+    gl_value_t *res = gl_value_make_int(0);
+
+    if (args->size == 0) {
+        return res;
+    }
+
     int64_t isum = 0;
     long double fsum = 0;
     // Substraction goes from first arg
-    if (args->data[0]->type == GL_VAL_INT) {
-        isum = gl_value_get_int(args->data[0]);
+    if (args->data[0]->val->type != GL_VAL_INT && args->data[0]->val->type != GL_VAL_FLOAT) {
+        __emit_type_error(args->data[0]->location, "number",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+    if (args->data[0]->val->type == GL_VAL_INT) {
+        isum = gl_value_get_int(args->data[0]->val);
     } else {
         res->type = GL_VAL_FLOAT;
-        fsum = gl_value_get_float(args->data[0]);
+        fsum = gl_value_get_float(args->data[0]->val);
     }
     // Unary operator handling
     if (args->size == 1) {
@@ -113,22 +209,25 @@ GL_BUILTIN(sub) {
         }
     }
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *current = *(args->data + i);
-        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        gl_function_arg_t *current = *(args->data + i);
+        if (current->val->type != GL_VAL_INT && current->val->type != GL_VAL_FLOAT) {
+            __emit_type_error(current->location, "number", __gl_value_get_type_name(current->val));
+            return NULL;
+        }
         if (res->type == GL_VAL_INT) {
-            if (current->type == GL_VAL_FLOAT) {
+            if (current->val->type == GL_VAL_FLOAT) {
                 // Transfering integral sum to the float
                 res->type = GL_VAL_FLOAT;
                 fsum = (long double)isum;
             } else {
-                isum -= gl_value_get_int(current);
+                isum -= gl_value_get_int(current->val);
             }
         }
         if (res->type == GL_VAL_FLOAT) {
-            if (current->type == GL_VAL_INT) {
-                fsum -= (long double)gl_value_get_int(current);
+            if (current->val->type == GL_VAL_INT) {
+                fsum -= (long double)gl_value_get_int(current->val);
             } else {
-                fsum -= gl_value_get_float(current);
+                fsum -= gl_value_get_float(current->val);
             }
         }
     }
@@ -144,34 +243,45 @@ GL_BUILTIN(sub) {
 }
 
 GL_BUILTIN(mul) {
-    assert(args->data);
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_INT;
+    gl_value_t *res = gl_value_make_int(0);
+
+    if (args->size == 0) {
+        return res;
+    }
+
     int64_t isum = 0;
     long double fsum = 0;
-    if (args->data[0]->type == GL_VAL_INT) {
-        isum = gl_value_get_int(args->data[0]);
+    if (args->data[0]->val->type != GL_VAL_INT && args->data[0]->val->type != GL_VAL_FLOAT) {
+        __emit_type_error(args->data[0]->location, "number",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+    if (args->data[0]->val->type == GL_VAL_INT) {
+        isum = gl_value_get_int(args->data[0]->val);
     } else {
         res->type = GL_VAL_FLOAT;
-        fsum = gl_value_get_float(args->data[0]);
+        fsum = gl_value_get_float(args->data[0]->val);
     }
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *current = *(args->data + i);
-        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        gl_function_arg_t *current = *(args->data + i);
+        if (current->val->type != GL_VAL_INT && current->val->type != GL_VAL_FLOAT) {
+            __emit_type_error(current->location, "number", __gl_value_get_type_name(current->val));
+            return NULL;
+        }
         if (res->type == GL_VAL_INT) {
-            if (current->type == GL_VAL_FLOAT) {
+            if (current->val->type == GL_VAL_FLOAT) {
                 // Transfering integral sum to the float
                 res->type = GL_VAL_FLOAT;
                 fsum = (long double)isum;
             } else {
-                isum *= gl_value_get_int(current);
+                isum *= gl_value_get_int(current->val);
             }
         }
         if (res->type == GL_VAL_FLOAT) {
-            if (current->type == GL_VAL_INT) {
-                fsum *= (long double)gl_value_get_int(current);
+            if (current->val->type == GL_VAL_INT) {
+                fsum *= (long double)gl_value_get_int(current->val);
             } else {
-                fsum *= gl_value_get_float(current);
+                fsum *= gl_value_get_float(current->val);
             }
         }
     }
@@ -187,34 +297,44 @@ GL_BUILTIN(mul) {
 }
 
 GL_BUILTIN(div) {
-    assert(args->data);
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_INT;
     int64_t isum = 0;
     long double fsum = 0;
-    if (args->data[0]->type == GL_VAL_INT) {
-        isum = gl_value_get_int(args->data[0]);
+
+    EXPECT_VARGS(1);
+
+    if (args->data[0]->val->type != GL_VAL_INT && args->data[0]->val->type != GL_VAL_FLOAT) {
+        __emit_type_error(args->data[0]->location, "number",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+    if (args->data[0]->val->type == GL_VAL_INT) {
+        isum = gl_value_get_int(args->data[0]->val);
     } else {
         res->type = GL_VAL_FLOAT;
-        fsum = gl_value_get_float(args->data[0]);
+        fsum = gl_value_get_float(args->data[0]->val);
     }
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *current = *(args->data + i);
-        assert(current->type == GL_VAL_INT || current->type == GL_VAL_FLOAT);
+        gl_function_arg_t *current = *(args->data + i);
+        if (current->val->type != GL_VAL_INT && current->val->type != GL_VAL_FLOAT) {
+            __emit_type_error(current->location, "number", __gl_value_get_type_name(current->val));
+            return NULL;
+        }
         if (res->type == GL_VAL_INT) {
-            if (current->type == GL_VAL_FLOAT) {
+            if (current->val->type == GL_VAL_FLOAT) {
                 // Transfering integral sum to the float
                 res->type = GL_VAL_FLOAT;
                 fsum = (long double)isum;
             } else {
-                isum /= gl_value_get_int(current);
+                isum /= gl_value_get_int(current->val);
             }
         }
         if (res->type == GL_VAL_FLOAT) {
-            if (current->type == GL_VAL_INT) {
-                fsum /= (long double)gl_value_get_int(current);
+            if (current->val->type == GL_VAL_INT) {
+                fsum /= (long double)gl_value_get_int(current->val);
             } else {
-                fsum /= gl_value_get_float(current);
+                fsum /= gl_value_get_float(current->val);
             }
         }
     }
@@ -230,23 +350,35 @@ GL_BUILTIN(div) {
 }
 
 GL_BUILTIN(mod) {
-    assert(args->data);
-    assert(args->size == 2);
+    EXPECT_ARGS(2);
 
-    gl_value_t *lhs = args->data[0];
-    gl_value_t *rhs = args->data[1];
-    assert(lhs->type == GL_VAL_INT);
-    assert(rhs->type == GL_VAL_INT);
+    gl_value_t *lhs = args->data[0]->val;
+    gl_value_t *rhs = args->data[1]->val;
+
+    if (args->data[0]->val->type != GL_VAL_INT) {
+        __emit_type_error(args->data[0]->location, "int",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+    if (args->data[1]->val->type != GL_VAL_INT) {
+        __emit_type_error(args->data[0]->location, "int",
+                          __gl_value_get_type_name(args->data[1]->val));
+        return NULL;
+    }
 
     return gl_value_make_int(gl_value_get_int(lhs) % gl_value_get_int(rhs));
 }
 
 GL_BUILTIN(eq) {
-    assert(args->data);
+    if (args->size == 1) {
+        return gl_value_make_bool(1);
+    }
 
-    gl_value_t *first = args->data[0];
+    EXPECT_VARGS(1);
+
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (gl_value_compare(first, second) != 0) {
             return gl_value_make_bool(0);
@@ -256,11 +388,15 @@ GL_BUILTIN(eq) {
 }
 
 GL_BUILTIN(gt) {
-    assert(args->data);
+    if (args->size == 1) {
+        return gl_value_make_bool(1);
+    }
 
-    gl_value_t *first = args->data[0];
+    EXPECT_VARGS(1);
+
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (gl_value_compare(first, second) <= 0) {
             return gl_value_make_bool(0);
@@ -270,11 +406,15 @@ GL_BUILTIN(gt) {
 }
 
 GL_BUILTIN(lt) {
-    assert(args->data);
+    if (args->size == 1) {
+        return gl_value_make_bool(1);
+    }
 
-    gl_value_t *first = args->data[0];
+    EXPECT_VARGS(1);
+
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (gl_value_compare(first, second) >= 0) {
             return gl_value_make_bool(0);
@@ -284,11 +424,15 @@ GL_BUILTIN(lt) {
 }
 
 GL_BUILTIN(ge) {
-    assert(args->data);
+    if (args->size == 1) {
+        return gl_value_make_bool(1);
+    }
 
-    gl_value_t *first = args->data[0];
+    EXPECT_VARGS(1);
+
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (gl_value_compare(first, second) < 0) {
             return gl_value_make_bool(0);
@@ -298,11 +442,15 @@ GL_BUILTIN(ge) {
 }
 
 GL_BUILTIN(le) {
-    assert(args->data);
+    if (args->size == 1) {
+        return gl_value_make_bool(1);
+    }
 
-    gl_value_t *first = args->data[0];
+    EXPECT_VARGS(1);
+
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (gl_value_compare(first, second) > 0) {
             return gl_value_make_bool(0);
@@ -312,19 +460,19 @@ GL_BUILTIN(le) {
 }
 
 GL_BUILTIN(not ) {
-    assert(args->data);
+    EXPECT_ARGS(1);
 
-    int val = gl_value_get_bool(args->data[0]);
+    int val = gl_value_get_bool(args->data[0]->val);
 
     return gl_value_make_bool(!val);
 }
 
 GL_BUILTIN(and) {
-    assert(args->data);
+    EXPECT_VARGS(2);
 
-    gl_value_t *first = args->data[0];
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (!(gl_value_get_bool(first) && gl_value_get_bool(second))) {
             return gl_value_make_bool(0);
@@ -334,11 +482,11 @@ GL_BUILTIN(and) {
 }
 
 GL_BUILTIN(or) {
-    assert(args->data);
+    EXPECT_VARGS(2);
 
-    gl_value_t *first = args->data[0];
+    gl_value_t *first = args->data[0]->val;
     for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i];
+        gl_value_t *second = args->data[i]->val;
 
         if (!(gl_value_get_bool(first) || gl_value_get_bool(second))) {
             return gl_value_make_bool(0);
@@ -348,36 +496,16 @@ GL_BUILTIN(or) {
 }
 
 GL_BUILTIN(typeof) {
-    assert(args->data);
-    assert(args->size == 1);
+    EXPECT_ARGS(1);
 
-    switch (args->data[0]->type) {
-    case GL_VAL_INT:
-        return gl_value_make_symbol("int");
-    case GL_VAL_FLOAT:
-        return gl_value_make_symbol("float");
-    case GL_VAL_SYMBOL:
-        return gl_value_make_symbol("symbol");
-    case GL_VAL_NIL:
-        return gl_value_make_symbol("nil");
-    case GL_VAL_FUNCTION:
-        return gl_value_make_symbol("function");
-    case GL_VAL_BUILTIN:
-        return gl_value_make_symbol("builtin");
-    case GL_VAL_SPFORM:
-        return gl_value_make_symbol("specform");
-    case GL_VAL_CONS:
-        return gl_value_make_symbol("list");
-    default:
-        return gl_value_make_nil();
-    }
+    return gl_value_make_symbol(__gl_value_get_type_name(args->data[0]->val));
 }
 
 GL_BUILTIN(int_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_INT) {
+        if (args->data[i]->val->type != GL_VAL_INT) {
             return gl_value_make_bool(0);
         }
     }
@@ -385,10 +513,10 @@ GL_BUILTIN(int_p) {
 }
 
 GL_BUILTIN(float_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_FLOAT) {
+        if (args->data[i]->val->type != GL_VAL_FLOAT) {
             return gl_value_make_bool(0);
         }
     }
@@ -396,10 +524,10 @@ GL_BUILTIN(float_p) {
 }
 
 GL_BUILTIN(number_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_INT && args->data[i]->type != GL_VAL_FLOAT) {
+        if (args->data[i]->val->type != GL_VAL_INT && args->data[i]->val->type != GL_VAL_FLOAT) {
             return gl_value_make_bool(0);
         }
     }
@@ -407,10 +535,10 @@ GL_BUILTIN(number_p) {
 }
 
 GL_BUILTIN(symbol_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_SYMBOL) {
+        if (args->data[i]->val->type != GL_VAL_SYMBOL) {
             return gl_value_make_bool(0);
         }
     }
@@ -418,10 +546,10 @@ GL_BUILTIN(symbol_p) {
 }
 
 GL_BUILTIN(nil_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_NIL) {
+        if (args->data[i]->val->type != GL_VAL_NIL) {
             return gl_value_make_bool(0);
         }
     }
@@ -429,11 +557,12 @@ GL_BUILTIN(nil_p) {
 }
 
 GL_BUILTIN(function_p) {
-    assert(args->data);
+    EXPECT_VARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_FUNCTION && args->data[i]->type != GL_VAL_BUILTIN &&
-            args->data[i]->type != GL_VAL_SPFORM) {
+        if (args->data[i]->val->type != GL_VAL_FUNCTION &&
+            args->data[i]->val->type != GL_VAL_BUILTIN &&
+            args->data[i]->val->type != GL_VAL_SPFORM) {
             return gl_value_make_bool(0);
         }
     }
@@ -441,10 +570,10 @@ GL_BUILTIN(function_p) {
 }
 
 GL_BUILTIN(list_p) {
-    assert(args->data);
+    EXPECT_ARGS(1);
 
     for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->type != GL_VAL_CONS) {
+        if (args->data[i]->val->type != GL_VAL_CONS) {
             return gl_value_make_bool(0);
         }
     }
@@ -452,9 +581,13 @@ GL_BUILTIN(list_p) {
 }
 
 GL_BUILTIN(int_con) {
-    assert(args->data);
+    gl_function_arg_t *arg = args->data[0];
+    gl_value_t *val = arg->val;
 
-    gl_value_t *val = args->data[0];
+    if (val->type != GL_VAL_INT && val->type != GL_VAL_FLOAT) {
+        __emit_type_error(arg->location, "number", __gl_value_get_type_name(val));
+        return NULL;
+    }
 
     if (val->type == GL_VAL_INT) {
         return val;
@@ -466,9 +599,13 @@ GL_BUILTIN(int_con) {
 }
 
 GL_BUILTIN(float_con) {
-    assert(args->data);
+    gl_function_arg_t *arg = args->data[0];
+    gl_value_t *val = arg->val;
 
-    gl_value_t *val = args->data[0];
+    if (val->type != GL_VAL_INT && val->type != GL_VAL_FLOAT) {
+        __emit_type_error(arg->location, "number", __gl_value_get_type_name(val));
+        return NULL;
+    }
 
     if (val->type == GL_VAL_INT) {
         return gl_value_make_float((long double)gl_value_get_int(val));
@@ -488,7 +625,7 @@ GL_BUILTIN(list_con) {
 
     gl_value_cons_t *current = list;
     for (size_t i = 0; i < args->size; ++i) {
-        current->car = args->data[i];
+        current->car = args->data[i]->val;
         if (i == args->size - 1) {
             current->cdr = gl_value_make_nil();
         } else {

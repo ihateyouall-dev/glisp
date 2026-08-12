@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "utils/location.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -48,51 +49,59 @@ size_t gl_ast_cons_length(gl_ast_node_t *cons) {
 }
 
 gl_ast_node_t *gl_ast_make_quote(gl_ast_node_t *node) {
-    return gl_ast_make_cons(gl_ast_make_symbol("quote"), gl_ast_make_cons(node, gl_ast_make_nil()));
+    return gl_ast_make_cons(gl_ast_make_symbol("quote", node->location),
+                            gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
+                            node->location);
 }
 
 gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node) {
-    return gl_ast_make_cons(gl_ast_make_symbol("function"),
-                            gl_ast_make_cons(node, gl_ast_make_nil()));
+    return gl_ast_make_cons(gl_ast_make_symbol("function", node->location),
+                            gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
+                            node->location);
 }
 
-gl_ast_node_t *gl_ast_make_int(int64_t num) {
+gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_INT;
     res->value.integral = num;
+    res->location = location;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_float(long double num) {
+gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_FLOAT;
     res->value.floating = num;
+    res->location = location;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_symbol(const char *sym) {
+gl_ast_node_t *gl_ast_make_symbol(const char *sym, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_SYMBOL;
     res->value.symbol = strdup(sym);
+    res->location = location;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr) {
+gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_CONS;
     res->value.cons.car = car;
     res->value.cons.cdr = cdr;
+    res->location = location;
     return res;
 }
 
-gl_ast_node_t *gl_ast_make_nil(void) {
+gl_ast_node_t *gl_ast_make_nil(gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_NIL;
+    res->location = location;
     return res;
 }
 
@@ -109,15 +118,19 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     case GL_AST_INT:
     case GL_AST_FLOAT:
         res->value = node->value;
+        res->location = node->location;
         break;
     case GL_AST_SYMBOL:
         res->value.symbol = strdup(node->value.symbol);
+        res->location = node->location;
         break;
     case GL_AST_CONS:
         res->value.cons.car = gl_ast_copy(node->value.cons.car);
         res->value.cons.cdr = gl_ast_copy(node->value.cons.cdr);
+        res->location = node->location;
         break;
     case GL_AST_NIL:
+        res->location = node->location;
         break;
     }
     return res;

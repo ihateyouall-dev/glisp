@@ -30,7 +30,6 @@ typedef struct gl_lex_token_t {
 void gl_lex_token_destroy(gl_lex_token_t *tok);
 
 typedef struct gl_lexer_t {
-    const char *src;
     size_t len;
 
     gl_location_t location;
@@ -38,8 +37,8 @@ typedef struct gl_lexer_t {
 
 VECTOR_DECLARE(gl_lex_token_t, gl_lex_token_vector)
 
-void gl_lexer_init(gl_lexer_t *lexer, const char *src);
-gl_lexer_t gl_make_lexer(const char *src);
+void gl_lexer_init(gl_lexer_t *lexer, const char *src, char *unit_name);
+gl_lexer_t gl_make_lexer(const char *src, char *unit_name);
 char gl_lexer_current(gl_lexer_t *lexer);
 char gl_lexer_peek(gl_lexer_t *lexer);
 void gl_lexer_advance(gl_lexer_t *lexer);

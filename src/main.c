@@ -38,9 +38,7 @@ int main(int argc, char **argv) {
 
         gl_parser_t parser = gl_make_parser(buf, realpath(filename, NULL));
 
-        if (gl_parse_and_eval(&parser, gl_make_global_env()) == NULL) {
-            exit(-1);
-        }
+        gl_parse_and_eval(&parser, gl_make_global_env());
 
         gl_parser_destroy(&parser);
 
