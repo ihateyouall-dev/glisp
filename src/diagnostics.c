@@ -97,3 +97,24 @@ void gl_diagnostic_report_error(gl_error_t *err) {
     gl_diagnostic_show_frame(err->location);
     free(err);
 }
+
+void gl_diagnostic_report_arity_error(gl_location_t location, size_t expected, size_t got) {
+    const char *fmt = "Argument count mismatch. Expected %zu, got %zu";
+    char buf[128] = "";
+
+    snprintf(buf, sizeof(buf), fmt, expected, got);
+
+    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+void gl_diagnostic_report_variadic_arity_error(gl_location_t location, size_t expected_at_least,
+                                               size_t got) {
+    const char *fmt = "Argument count mismatch. Expected at least %zu, got %zu";
+    char buf[128] = "";
+
+    snprintf(buf, strlen(fmt) + 1, fmt, expected_at_least, got);
+
+    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}

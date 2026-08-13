@@ -11,7 +11,7 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 #define EXPECT_ARGS(n)                                                                             \
     do {                                                                                           \
         if (args->size != n) {                                                                     \
-            __emit_arity_error(called_at, n, args->size);                                          \
+            gl_diagnostic_report_arity_error(called_at, n, args->size);                            \
             return NULL;                                                                           \
         }                                                                                          \
     } while (0)
@@ -19,31 +19,10 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 #define EXPECT_VARGS(n)                                                                            \
     do {                                                                                           \
         if (args->size < n) {                                                                      \
-            __emit_variadic_arity_error(called_at, n, args->size);                                 \
+            gl_diagnostic_report_variadic_arity_error(called_at, n, args->size);                   \
             return NULL;                                                                           \
         }                                                                                          \
     } while (0)
-
-static void __emit_arity_error(gl_location_t location, size_t expected, size_t got) {
-    const char *fmt = "Argument count mismatch. Expected %zu, got %zu";
-    char buf[128] = "";
-
-    snprintf(buf, sizeof(buf), fmt, expected, got);
-
-    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
-    gl_diagnostic_report_error(err);
-}
-
-static void __emit_variadic_arity_error(gl_location_t location, size_t expected_at_least,
-                                        size_t got) {
-    const char *fmt = "Argument count mismatch. Expected at least %zu, got %zu";
-    char buf[128] = "";
-
-    snprintf(buf, strlen(fmt) + 1, fmt, expected_at_least, got);
-
-    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
-    gl_diagnostic_report_error(err);
-}
 
 static void __emit_type_error(gl_location_t location, const char *expected, const char *got) {
     const char *fmt = "Argument type mismatch. Expected %s, got %s";

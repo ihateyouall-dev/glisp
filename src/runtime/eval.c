@@ -91,6 +91,9 @@ static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_
     }
 
     gl_value_t *res = __gl_eval_function_tree(function->tree, local_env);
+    if (!res) {
+        return NULL;
+    }
     // Copying value to avoid use after free if desctruction of local_env affected result
     res = gl_value_copy(res);
 
@@ -100,65 +103,75 @@ static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_
 }
 
 static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
-    gl_ast_node_t *func = node->value.cons.car;
+    gl_ast_node_t *func_node = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
 
-    gl_value_t *func_ptr = NULL;
+    gl_value_t *func_val = NULL;
 
     // Trying to evaluate expression given instead of function name
-    if (func->type != GL_AST_SYMBOL) {
-        func_ptr = gl_eval(func, env);
-        assert(func_ptr->type == GL_VAL_FUNCTION || func_ptr->type == GL_VAL_BUILTIN ||
-               func_ptr->type == GL_VAL_SPFORM);
+    if (func_node->type != GL_AST_SYMBOL) {
+        func_val = gl_eval(func_node, env);
+        if (func_val->type != GL_VAL_FUNCTION && func_val->type != GL_VAL_BUILTIN &&
+            func_val->type != GL_VAL_SPFORM) {
+            gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, func_node->location,
+                                                     "Expression result cannot be called"));
+            return NULL;
+        }
     } else {
-        const char *func_name = func->value.symbol;
-        func_ptr = gl_env_get_fun(env, func_name);
+        const char *func_name = func_node->value.symbol;
+        func_val = gl_env_get_fun(env, func_name);
         // Evaluating variable value if function is undefined. We trying it because variables can
         // also store functions
-        if (func_ptr == NULL) {
-            func_ptr = gl_env_get_var(env, func_name);
+        if (func_val == NULL) {
+            func_val = gl_env_get_var(env, func_name);
         }
         // Emmiting error if function still not found
-        if (!func_ptr || !func_ptr->val) {
+        if (!func_val || !func_val->val) {
             const char *fmt = "undefined function '%s'";
             char buf[1024];
             snprintf(buf, sizeof(buf), fmt, func_name);
-            gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func->location, buf);
+            gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func_node->location, buf);
             gl_diagnostic_report_error(err);
             return NULL;
         }
     }
 
     // Evaluating function
-    switch (func_ptr->type) {
+    switch (func_val->type) {
     case GL_VAL_BUILTIN: {
-        gl_builtin_t builtin = func_ptr->val;
+        gl_builtin_t builtin = func_val->val;
         gl_function_args_t *argv = __gl_eval_args(args, env);
 
         if (argv == NULL) {
             return NULL;
         }
 
-        return builtin(node->location, argv);
+        return builtin(func_node->location, argv);
     }
     case GL_VAL_SPFORM: {
-        gl_special_form_t spform = func_ptr->val;
+        gl_special_form_t spform = func_val->val;
 
         return spform(env, args);
     }
     case GL_VAL_FUNCTION: {
-        gl_function_t *function = func_ptr->val;
+        gl_function_t *function = func_val->val;
         gl_function_args_t *argv = __gl_eval_args(args, env);
 
         if (argv == NULL) {
+            return NULL;
+        }
+
+        if (argv->size != function->params->size) {
+            gl_diagnostic_report_arity_error(func_node->location, function->params->size,
+                                             argv->size);
             return NULL;
         }
 
         return __gl_eval_function(function, argv);
     }
     default:
-        assert(0 && "Function type must be one of these: GL_VAL_FUNCTION, GL_VALUE_BUILTIN, "
-                    "GL_VALUE_SPFORM");
+        assert(0 && "Function type must be one of these: GL_VAL_FUNCTION, GL_VAL_BUILTIN, "
+                    "GL_VAL_SPFORM");
     }
     return NULL;
 }
