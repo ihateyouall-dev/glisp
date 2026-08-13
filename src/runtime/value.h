@@ -62,9 +62,10 @@ typedef struct {
     gl_ast_node_t *tree;
     gl_function_params_t *params;
     gl_env_t *closure;
+    char *name;
 } gl_function_t;
 
-gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *params,
+gl_value_t *gl_value_make_function(char *name, gl_ast_node_t *tree, gl_function_params_t *params,
                                    gl_env_t *closure);
 
 typedef gl_value_t *(*gl_special_form_t)(gl_env_t *, gl_ast_node_t *);

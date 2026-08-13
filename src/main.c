@@ -1,4 +1,3 @@
-#include "ast.h"
 #include "parser.h"
 #include "runtime/env.h"
 #include "runtime/eval.h"
@@ -8,6 +7,10 @@
 #include <readline/readline.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef MSC_VER
+#include "utils/strdup.h"
+#endif
 
 int main(int argc, char **argv) {
     // Evaluating a file if given
@@ -38,7 +41,11 @@ int main(int argc, char **argv) {
 
         gl_parser_t parser = gl_make_parser(buf, realpath(filename, NULL));
 
-        gl_parse_and_eval(&parser, gl_make_global_env());
+        gl_env_t *global_env = gl_make_global_env();
+
+        gl_parse_and_eval(&parser, global_env);
+
+        gl_env_destroy(global_env);
 
         gl_parser_destroy(&parser);
 
@@ -57,15 +64,13 @@ int main(int argc, char **argv) {
 
         add_history(input);
 
-        gl_parser_t parser = gl_make_parser(input, "<repl>");
+        gl_parser_t parser = gl_make_parser(strdup(input), "<repl>");
 
         gl_value_t *res = gl_parse_and_eval(&parser, global_env);
 
         gl_parser_destroy(&parser);
 
         gl_value_print(res);
-
-        gl_value_destroy(&res);
 
         free(input);
     }

@@ -95,11 +95,12 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
 
 ARRAY_DEFINE(char *, gl_function_params)
 
-gl_value_t *gl_value_make_function(gl_ast_node_t *tree, gl_function_params_t *params,
+gl_value_t *gl_value_make_function(char *name, gl_ast_node_t *tree, gl_function_params_t *params,
                                    gl_env_t *closure) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_FUNCTION;
     gl_function_t *func = malloc(sizeof(gl_function_t));
+    func->name = name;
     func->tree = tree;
     func->params = params;
     func->closure = closure;

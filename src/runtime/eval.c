@@ -1,6 +1,8 @@
 #include "eval.h"
 #include "ast.h"
+#include "callstack.h"
 #include "diagnostics.h"
+#include "location.h"
 #include "parser.h"
 #include "runtime/env.h"
 #include "value.h"
@@ -78,6 +80,9 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     gl_value_t *res = gl_value_make_nil();
     while (current->type != GL_AST_NIL) {
         res = gl_eval(current->value.cons.car, env);
+        if (!res) {
+            return NULL;
+        }
         current = current->value.cons.cdr;
     }
     return res;
@@ -157,17 +162,16 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
         gl_function_t *function = func_val->val;
         gl_function_args_t *argv = __gl_eval_args(args, env);
 
-        if (argv == NULL) {
+        gl_init_call_stack();
+        gl_call_stack_push_call(function, func_node);
+
+        gl_value_t *res = __gl_eval_function(function, argv);
+
+        if (!res) {
+            gl_call_stack_print_stacktrace();
             return NULL;
         }
-
-        if (argv->size != function->params->size) {
-            gl_diagnostic_report_arity_error(func_node->location, function->params->size,
-                                             argv->size);
-            return NULL;
-        }
-
-        return __gl_eval_function(function, argv);
+        return res;
     }
     default:
         assert(0 && "Function type must be one of these: GL_VAL_FUNCTION, GL_VAL_BUILTIN, "

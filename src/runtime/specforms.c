@@ -54,9 +54,9 @@ GL_SPECIAL_FORM(defun) {
     }
 
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 1);
-    gl_value_t *res = gl_value_make_function(gl_ast_copy(tree), func_params, env);
-
     const char *name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+
+    gl_value_t *res = gl_value_make_function(name, gl_ast_copy(tree), func_params, env); // NOLINT
     gl_env_set_fun(env, name, res);
 
     return res;
@@ -82,7 +82,8 @@ GL_SPECIAL_FORM(lambda) {
     }
 
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 0);
-    gl_value_t *res = gl_value_make_function(gl_ast_copy(tree), func_params, env);
+    gl_value_t *res =
+        gl_value_make_function("anonymous function", gl_ast_copy(tree), func_params, env);
 
     return res;
 }
