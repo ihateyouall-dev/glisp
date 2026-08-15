@@ -17,8 +17,10 @@ static gl_value_t *__gl_eval_float(gl_ast_node_t *node) {
     return gl_value_make_float(node->value.floating);
 }
 
-static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node, gl_env_t *env) {
+static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node) {
+    gl_env_t *env = gl_current_env();
     gl_value_t *res = gl_env_get_var(env, node->value.symbol);
+
     if (!res) {
         char buf[1024] = "";
         const char *fmt = "undefined variable '%s'";
@@ -60,7 +62,7 @@ static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {
         res->data[i] = malloc(sizeof(gl_function_arg_t));
         res->data[i]->location = current->location;
-        res->data[i]->val = gl_eval(current->value.cons.car, env);
+        res->data[i]->val = gl_eval(current->value.cons.car);
         if (res->data[i]->val == NULL) {
             return NULL;
         }
@@ -79,7 +81,7 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     gl_ast_node_t *current = func_tree;
     gl_value_t *res = gl_value_make_nil();
     while (current->type != GL_AST_NIL) {
-        res = gl_eval(current->value.cons.car, env);
+        res = gl_eval(current->value.cons.car);
         if (!res) {
             return NULL;
         }
@@ -89,33 +91,32 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
 }
 
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
-    gl_env_t *local_env = gl_make_env(function->closure);
-
+    gl_env_t *env = gl_current_env();
     if (args) {
-        __gl_define_function_args(function, args, local_env);
+        __gl_define_function_args(function, args, env);
     }
 
-    gl_value_t *res = __gl_eval_function_tree(function->tree, local_env);
+    gl_value_t *res = __gl_eval_function_tree(function->tree, env);
     if (!res) {
         return NULL;
     }
-    // Copying value to avoid use after free if desctruction of local_env affected result
+    // Copying value to avoid use after free if desctruction of env affected result
     res = gl_value_copy(res);
-
-    gl_env_destroy(local_env);
 
     return res;
 }
 
-static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
+static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     gl_ast_node_t *func_node = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
 
     gl_value_t *func_val = NULL;
 
+    gl_env_t *env = gl_current_env();
+
     // Trying to evaluate expression given instead of function name
     if (func_node->type != GL_AST_SYMBOL) {
-        func_val = gl_eval(func_node, env);
+        func_val = gl_eval(func_node);
         if (func_val->type != GL_VAL_FUNCTION && func_val->type != GL_VAL_BUILTIN &&
             func_val->type != GL_VAL_SPFORM) {
             gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, func_node->location,
@@ -171,6 +172,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
             gl_call_stack_print_stacktrace();
             return NULL;
         }
+        gl_call_stack_pop_call();
         return res;
     }
     default:
@@ -180,9 +182,17 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node, gl_env_t *env) {
     return NULL;
 }
 
-gl_value_t *gl_eval(gl_ast_node_t *node, gl_env_t *env) {
+gl_value_t *gl_eval(gl_ast_node_t *node) {
     if (node == NULL)
         return NULL;
+
+    gl_env_t *env = gl_global_env;
+
+    // If got recent calls, using environment of last call
+    if (gl_call_stack.size != 0) {
+        gl_call_frame_t current_frame = gl_call_stack_current_frame();
+        env = current_frame.env;
+    }
 
     switch (node->type) {
     case GL_AST_INT:
@@ -190,23 +200,23 @@ gl_value_t *gl_eval(gl_ast_node_t *node, gl_env_t *env) {
     case GL_AST_FLOAT:
         return __gl_eval_float(node);
     case GL_AST_SYMBOL:
-        return __gl_eval_symbol(node, env);
+        return __gl_eval_symbol(node);
     case GL_AST_NIL:
         return __gl_eval_nil();
     case GL_AST_CONS:
-        return __gl_eval_list(node, env);
+        return __gl_eval_list(node);
     default:
         return NULL;
     }
 }
 
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, gl_env_t *env) {
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
     gl_ast_node_t *current = gl_parser_parse(parser);
 
     gl_value_t *res = NULL;
 
     while (current) {
-        res = gl_eval(current, env);
+        res = gl_eval(current);
         current = gl_parser_parse(parser);
     }
 

@@ -17,9 +17,13 @@ typedef struct gl_env_t {
     struct gl_env_t *parent;
 } gl_env_t;
 
+extern gl_env_t *gl_global_env;
+
 gl_env_t *gl_make_env(gl_env_t *parent);
 
-gl_env_t *gl_make_global_env();
+gl_env_t *gl_make_global_env(void);
+
+void gl_init_global_env(void);
 
 void gl_env_destroy(gl_env_t *env);
 

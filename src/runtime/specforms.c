@@ -13,7 +13,7 @@ GL_SPECIAL_FORM(if) {
     assert(args);
     assert(args->type == GL_AST_CONS);
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
-    gl_value_t *condition_val = gl_eval(condition, env);
+    gl_value_t *condition_val = gl_eval(condition);
 
     // If have no actions, return boolean
     if (args->value.cons.cdr->type == GL_AST_NIL) {
@@ -23,11 +23,11 @@ GL_SPECIAL_FORM(if) {
     gl_ast_node_t *if_false = gl_ast_cons_nth_cdr(args, 1);
 
     if (gl_value_get_bool(condition_val)) {
-        return gl_eval(if_true, env);
+        return gl_eval(if_true);
     } else {
         gl_value_t *res;
         while (if_false->type != GL_AST_NIL) {
-            res = gl_eval(gl_ast_cons_nth_car(if_false, 0), env);
+            res = gl_eval(gl_ast_cons_nth_car(if_false, 0));
             if_false = gl_ast_cons_nth_cdr(if_false, 0);
         }
         return res;
@@ -93,7 +93,7 @@ GL_SPECIAL_FORM(set) {
     assert(args->type == GL_AST_CONS);
 
     const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
-    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0), env);
+    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
     gl_env_set_var(env, var_name, var_value);
 
@@ -105,7 +105,7 @@ GL_SPECIAL_FORM(set_global) {
     assert(args->type == GL_AST_CONS);
 
     const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
-    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0), env);
+    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
     // Getting the global environment
     gl_env_t *global_env = env->parent;
@@ -127,7 +127,7 @@ GL_SPECIAL_FORM(progn) {
     gl_value_t *res = NULL;
 
     while (current->type != GL_AST_NIL) {
-        res = gl_eval(current->value.cons.car, env);
+        res = gl_eval(current->value.cons.car);
         current = current->value.cons.cdr;
     }
     return res;
@@ -137,13 +137,13 @@ GL_SPECIAL_FORM(while) {
     assert(args);
     assert(args->type == GL_AST_CONS);
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
-    gl_value_t *condition_val = gl_eval(condition, env);
+    gl_value_t *condition_val = gl_eval(condition);
 
     gl_ast_node_t *body = gl_ast_cons_nth_cdr(args, 0);
 
     while (gl_value_get_bool(condition_val)) {
         gl_specform_progn(env, body);
-        condition_val = gl_eval(condition, env);
+        condition_val = gl_eval(condition);
     }
     return gl_value_make_nil();
 }
@@ -163,7 +163,7 @@ GL_SPECIAL_FORM(quote) {
         return gl_value_make_cons(node->value.cons);
     }
 
-    return gl_eval(node, env);
+    return gl_eval(node);
 }
 
 GL_SPECIAL_FORM(function) {
@@ -184,7 +184,7 @@ GL_SPECIAL_FORM(function) {
         return res;
     }
 
-    gl_value_t *res = gl_eval(func, env);
+    gl_value_t *res = gl_eval(func);
 
     if (res->type != GL_VAL_FUNCTION && res->type != GL_VAL_BUILTIN && res->type != GL_VAL_SPFORM) {
         return NULL;

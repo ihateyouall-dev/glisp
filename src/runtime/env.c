@@ -10,6 +10,8 @@
 
 HASHMAP_DEFINE(gl_value_t *, gl_value_table)
 
+gl_env_t *gl_global_env = NULL;
+
 gl_env_t *gl_make_env(gl_env_t *parent) {
     gl_env_t *res = malloc(sizeof(gl_env_t));
     res->parent = parent;
@@ -79,7 +81,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "function", gl_value_make_specform(&gl_specform_function));
 }
 
-gl_env_t *gl_make_global_env() {
+gl_env_t *gl_make_global_env(void) {
     gl_env_t *res = gl_make_env(NULL);
 
     gl_env_set_var(res, "t", gl_value_make_symbol("t"));
@@ -90,6 +92,8 @@ gl_env_t *gl_make_global_env() {
 
     return res;
 }
+
+void gl_init_global_env(void) { gl_global_env = gl_make_global_env(); }
 
 void gl_env_destroy(gl_env_t *env) {
     if (!env)
