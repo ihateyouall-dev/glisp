@@ -9,11 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-HASHMAP_DECLARE(gl_value_t *, gl_value_table)
+typedef struct gl_object_t gl_object_t;
+
+HASHMAP_DECLARE(gl_object_t *, gl_object_table)
 
 typedef struct gl_env_t {
-    gl_value_table_t *variables;
-    gl_value_table_t *functions;
+    gl_object_table_t *variables;
+    gl_object_table_t *functions;
     struct gl_env_t *parent;
 } gl_env_t;
 
