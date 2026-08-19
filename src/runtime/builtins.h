@@ -78,3 +78,7 @@ GL_BUILTIN(int_con);
 GL_BUILTIN(float_con);
 
 GL_BUILTIN(list_con);
+
+GL_BUILTIN(gc_collect);
+
+GL_BUILTIN(gc_allocated);

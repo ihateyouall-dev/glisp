@@ -1,5 +1,4 @@
 #include "env.h"
-#include "memory.h"
 #include "runtime/builtins.h"
 #include "runtime/specforms.h"
 #include "runtime/value.h"
@@ -8,23 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-HASHMAP_DEFINE(gl_object_t *, gl_object_table)
+HASHMAP_DEFINE(gl_value_t *, gl_value_table)
 
-gl_env_t *gl_global_env = NULL;
+gl_value_t *gl_global_env = NULL;
 
-gl_env_t *gl_make_env(gl_env_t *parent) {
+gl_env_t *gl_make_env(gl_value_t *parent) {
     gl_env_t *res = malloc(sizeof(gl_env_t));
     res->parent = parent;
 
-    gl_object_table_t *values = malloc(sizeof(gl_object_table_t));
-    gl_object_table_init(values, gl_object_destroy, gl_object_copy);
+    gl_value_table_t *values = malloc(sizeof(gl_value_table_t));
+    gl_value_table_init(values, gl_value_destroy, gl_value_copy);
     res->variables = values;
 
-    gl_object_table_t *functions = malloc(sizeof(gl_object_table_t));
-    gl_object_table_init(functions, gl_object_destroy, gl_object_copy);
+    gl_value_table_t *functions = malloc(sizeof(gl_value_table_t));
+    gl_value_table_init(functions, gl_value_destroy, gl_value_copy);
     res->functions = functions;
-
-    gl_register_env(res);
 
     return res;
 }
@@ -69,6 +66,9 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "int", gl_value_make_builtin(gl_builtin_int_con));
     gl_env_set_fun(env, "float", gl_value_make_builtin(gl_builtin_float_con));
     gl_env_set_fun(env, "list", gl_value_make_builtin(gl_builtin_list_con));
+
+    gl_env_set_fun(env, "gc-collect", gl_value_make_builtin(gl_builtin_gc_collect));
+    gl_env_set_fun(env, "gc-allocated", gl_value_make_builtin(gl_builtin_gc_allocated));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
@@ -95,36 +95,37 @@ gl_env_t *gl_make_global_env(void) {
     return res;
 }
 
-void gl_init_global_env(void) { gl_global_env = gl_make_global_env(); }
+void gl_init_global_env(void) { gl_global_env = gl_value_make_env(gl_make_global_env()); }
 
 void gl_env_destroy(gl_env_t *env) {
     if (!env)
         return;
-    gl_object_table_destroy(env->variables);
+    gl_value_table_destroy(env->variables);
     free(env->variables);
-    gl_object_table_destroy(env->functions);
+    gl_value_table_destroy(env->functions);
     free(env->functions);
     free(env);
+    env = NULL;
 }
 
 void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val) {
-    gl_object_table_insert(env->variables, sym, gl_register_value(val));
+    gl_value_table_insert(env->variables, sym, val);
 }
 
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
     assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION ||
            val->type == GL_VAL_SPFORM);
-    gl_object_table_insert(env->functions, sym, gl_register_value(val));
+    gl_value_table_insert(env->functions, sym, val);
 }
 
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
-    gl_object_t **obj = gl_object_table_get(env->variables, sym);
+    gl_value_t **obj = gl_value_table_get(env->variables, sym);
 
-    gl_value_t *res = (obj != NULL ? (*obj)->ptr.value : NULL);
+    gl_value_t *res = (obj != NULL ? *obj : NULL);
 
     // Checking for variable in parent environment if not found in current
     if (res == NULL && env->parent != NULL) {
-        return gl_env_get_var(env->parent, sym);
+        return gl_env_get_var((gl_env_t *)env->parent->val, sym);
     }
     // If have not found in parent environments, return NULL
     if (res == NULL) {
@@ -134,13 +135,13 @@ gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
 }
 
 gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
-    gl_object_t **obj = gl_object_table_get(env->functions, sym);
+    gl_value_t **obj = gl_value_table_get(env->functions, sym);
 
-    gl_value_t *res = (obj != NULL ? (*obj)->ptr.value : NULL);
+    gl_value_t *res = (obj != NULL ? *obj : NULL);
 
     // Checking for function in parent environment if not found in current
     if (res == NULL && env->parent != NULL) {
-        return gl_env_get_fun(env->parent, sym);
+        return gl_env_get_fun((gl_env_t *)env->parent->val, sym);
     }
     // If have not found in parent environments, return NULL
     if (res == NULL) {

@@ -1,6 +1,8 @@
 #include "value.h"
 
 #include "ast.h"
+#include "env.h"
+#include "memory.h"
 
 #ifdef _WIN32
 #include "utils/strdup.h"
@@ -16,6 +18,7 @@ gl_value_t *gl_value_make_int(int64_t num) {
     res->type = GL_VAL_INT;
     res->val = malloc(sizeof(int64_t));
     *(int64_t *)res->val = num;
+    gl_register_value(res);
     return res;
 }
 
@@ -24,6 +27,7 @@ gl_value_t *gl_value_make_float(long double num) {
     res->type = GL_VAL_FLOAT;
     res->val = malloc(sizeof(long double));
     *(long double *)res->val = num;
+    gl_register_value(res);
     return res;
 }
 
@@ -31,6 +35,7 @@ gl_value_t *gl_value_make_symbol(const char *sym) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_SYMBOL;
     res->val = strdup(sym);
+    gl_register_value(res);
     return res;
 }
 
@@ -68,6 +73,7 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
         assert(0 && "CDR of CONS can be only other CONS or NIL");
     }
 
+    gl_register_value(res);
     return res;
 }
 
@@ -75,6 +81,7 @@ gl_value_t *gl_value_make_nil(void) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_NIL;
     res->val = NULL;
+    gl_register_value(res);
     return res;
 }
 
@@ -90,6 +97,7 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_BUILTIN;
     res->val = builtin;
+    gl_register_value(res);
     return res;
 }
 
@@ -105,6 +113,7 @@ gl_value_t *gl_value_make_function(char *name, gl_ast_node_t *tree, gl_function_
     func->params = params;
     func->closure = closure;
     res->val = func;
+    gl_register_value(res);
     return res;
 }
 
@@ -115,6 +124,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
     assert(val);
     assert(val->type == GL_VAL_NIL || val->val);
     res->type = val->type;
+    res->gc_marked = val->gc_marked;
 
     switch (val->type) {
     case GL_VAL_INT:
@@ -136,20 +146,24 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
     case GL_VAL_FUNCTION:
         res->val = malloc(sizeof(gl_function_t));
         gl_function_t *func = res->val;
+        gl_function_t *orig = val->val;
 
-        func->tree = gl_ast_copy(((gl_function_t *)val->val)->tree);
-        func->closure = ((gl_function_t *)val->val)->closure;
-        gl_function_params_init(func->params, ((gl_function_t *)val->val)->params->size,
-                                &gl_function_param_free);
-        for (size_t i = 0; i < func->params->size; ++i) {
-            func->params->data[i] = strdup(((gl_function_t *)val->val)->params->data[i]);
+        func->name = orig->name ? strdup(orig->name) : NULL;
+        func->tree = orig->tree ? gl_ast_copy(orig->tree) : NULL;
+        func->closure = orig->closure;
+        if (orig->params) {
+            func->params = malloc(sizeof(gl_function_params_t));
+            gl_function_params_init(func->params, orig->params->size, &gl_function_param_free);
+            for (size_t i = 0; i < func->params->size; ++i) {
+                func->params->data[i] = strdup(orig->params->data[i]);
+            }
+        } else {
+            func->params = NULL;
         }
         return res;
     case GL_VAL_BUILTIN:
-        // Builtins and special forms are just pointers to functions
-        res->val = val->val;
-        break;
     case GL_VAL_SPFORM:
+    case GL_VAL_ENV:
         res->val = val->val;
         break;
     case GL_VAL_NIL:
@@ -164,19 +178,51 @@ void gl_value_destroy(gl_value_t **val) {
         return;
 
     switch ((*val)->type) {
-    case GL_VAL_NIL:
-        break;
     case GL_VAL_INT:
     case GL_VAL_FLOAT:
     case GL_VAL_SYMBOL:
-    case GL_VAL_FUNCTION:
+        if ((*val)->val == NULL) {
+            break;
+        }
         free((*val)->val);
+        (*val)->val = NULL;
+        break;
+    case GL_VAL_FUNCTION:
+        if ((*val)->val != NULL) {
+            gl_function_t *func = (*val)->val;
+            if (func->name) {
+                free(func->name);
+            }
+            if (func->tree) {
+                gl_ast_destroy(func->tree);
+            }
+            if (func->params) {
+                gl_function_params_destroy(func->params);
+                free(func->params);
+            }
+            free(func);
+            (*val)->val = NULL;
+        }
         break;
     case GL_VAL_CONS:
+        if ((*val)->val == NULL) {
+            break;
+        }
         gl_value_destroy(&((gl_value_cons_t *)((*val)->val))->car);
         gl_value_destroy(&((gl_value_cons_t *)((*val)->val))->cdr);
         free((*val)->val);
-    default:
+        (*val)->val = NULL;
+        break;
+    case GL_VAL_ENV:
+        if ((*val)->val == NULL) {
+            break;
+        }
+        gl_env_destroy((*val)->val);
+        (*val)->val = NULL;
+        break;
+    case GL_VAL_BUILTIN:
+    case GL_VAL_SPFORM:
+    case GL_VAL_NIL:
         break;
     }
     free(*val);
@@ -187,6 +233,15 @@ gl_value_t *gl_value_make_specform(gl_special_form_t spform) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_SPFORM;
     res->val = spform;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_env(gl_env_t *env) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_ENV;
+    res->val = env;
+    gl_register_value(res);
     return res;
 }
 
@@ -210,6 +265,7 @@ void gl_value_print(gl_value_t *val) {
     case GL_VAL_BUILTIN:
     case GL_VAL_FUNCTION:
     case GL_VAL_SPFORM:
+    case GL_VAL_ENV:
         // Nothing to print now
         break;
     case GL_VAL_CONS:

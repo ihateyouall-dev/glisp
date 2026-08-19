@@ -18,7 +18,7 @@ void test_value_copy(void) {
 
 void test_derived_envs(void) {
     gl_env_t *global = gl_make_global_env();
-    gl_env_t *derived = gl_make_env(global);
+    gl_env_t *derived = gl_make_env(gl_value_make_env(global));
 
     TEST(gl_env_get_var(global, "t"), "Global variable access");
     TEST(gl_env_get_fun(global, "defun"), "Global function access");

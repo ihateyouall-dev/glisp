@@ -20,7 +20,7 @@ void gl_init_call_stack() {
 }
 
 void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_node) {
-    gl_env_t *local_env = gl_make_env(gl_current_env());
+    gl_value_t *local_env = gl_value_make_env(gl_make_env(gl_current_env()));
     __gl_call_stack_push_back(&gl_call_stack, (gl_call_frame_t){.call_node = function_node,
                                                                 .func_name = function->name,
                                                                 .env = local_env});
@@ -47,8 +47,8 @@ gl_call_frame_t gl_call_stack_current_frame() {
     return *__gl_call_stack_at(&gl_call_stack, gl_call_stack.size - 1);
 }
 
-gl_env_t *gl_current_env(void) {
-    gl_env_t *res = gl_global_env;
+gl_value_t *gl_current_env(void) {
+    gl_value_t *res = gl_global_env;
     if (gl_call_stack.size > 0) {
         res = gl_call_stack_current_frame().env;
     }

@@ -18,8 +18,8 @@ static gl_value_t *__gl_eval_float(gl_ast_node_t *node) {
 }
 
 static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node) {
-    gl_env_t *env = gl_current_env();
-    gl_value_t *res = gl_env_get_var(env, node->value.symbol);
+    gl_value_t *env = gl_current_env();
+    gl_value_t *res = gl_env_get_var((gl_env_t *)env->val, node->value.symbol);
 
     if (!res) {
         char buf[1024] = "";
@@ -91,17 +91,15 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
 }
 
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
-    gl_env_t *env = gl_current_env();
+    gl_value_t *env = gl_current_env();
     if (args) {
-        __gl_define_function_args(function, args, env);
+        __gl_define_function_args(function, args, (gl_env_t *)env->val);
     }
 
-    gl_value_t *res = __gl_eval_function_tree(function->tree, env);
+    gl_value_t *res = __gl_eval_function_tree(function->tree, (gl_env_t *)env->val);
     if (!res) {
         return NULL;
     }
-    // Copying value to avoid use after free if desctruction of env affected result
-    res = gl_value_copy(res);
 
     return res;
 }
@@ -112,7 +110,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
 
     gl_value_t *func_val = NULL;
 
-    gl_env_t *env = gl_current_env();
+    gl_value_t *env = gl_current_env();
 
     // Trying to evaluate expression given instead of function name
     if (func_node->type != GL_AST_SYMBOL) {
@@ -125,11 +123,11 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         }
     } else {
         const char *func_name = func_node->value.symbol;
-        func_val = gl_env_get_fun(env, func_name);
+        func_val = gl_env_get_fun((gl_env_t *)env->val, func_name);
         // Evaluating variable value if function is undefined. We trying it because variables can
         // also store functions
         if (func_val == NULL) {
-            func_val = gl_env_get_var(env, func_name);
+            func_val = gl_env_get_var((gl_env_t *)env->val, func_name);
         }
         // Emmiting error if function still not found
         if (!func_val || !func_val->val) {
@@ -146,7 +144,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     switch (func_val->type) {
     case GL_VAL_BUILTIN: {
         gl_builtin_t builtin = func_val->val;
-        gl_function_args_t *argv = __gl_eval_args(args, env);
+        gl_function_args_t *argv = __gl_eval_args(args, (gl_env_t *)env->val);
 
         if (argv == NULL) {
             return NULL;
@@ -157,11 +155,11 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     case GL_VAL_SPFORM: {
         gl_special_form_t spform = func_val->val;
 
-        return spform(env, args);
+        return spform((gl_env_t *)env->val, args);
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
-        gl_function_args_t *argv = __gl_eval_args(args, env);
+        gl_function_args_t *argv = __gl_eval_args(args, (gl_env_t *)env->val);
 
         gl_init_call_stack();
         gl_call_stack_push_call(function, func_node);
@@ -186,7 +184,7 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
     if (node == NULL)
         return NULL;
 
-    gl_env_t *env = gl_global_env;
+    gl_value_t *env = gl_global_env;
 
     // If got recent calls, using environment of last call
     if (gl_call_stack.size != 0) {

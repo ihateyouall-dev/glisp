@@ -14,12 +14,15 @@ typedef enum {
     GL_VAL_FUNCTION,
     GL_VAL_BUILTIN,
     GL_VAL_SPFORM,
-    GL_VAL_CONS
+    GL_VAL_CONS,
+    GL_VAL_ENV
 } gl_value_type_t;
 
-typedef struct {
+typedef struct gl_value_t {
     gl_value_type_t type;
     void *val;
+    int gc_marked;
+    struct gl_value_t *next_in_heap;
 } gl_value_t;
 
 CONS_DECLARE(gl_value_t *, gl_value_cons)
@@ -71,6 +74,8 @@ gl_value_t *gl_value_make_function(char *name, gl_ast_node_t *tree, gl_function_
 typedef gl_value_t *(*gl_special_form_t)(gl_env_t *, gl_ast_node_t *);
 
 gl_value_t *gl_value_make_specform(gl_special_form_t spform);
+
+gl_value_t *gl_value_make_env(gl_env_t *env);
 
 void gl_value_print(gl_value_t *val);
 

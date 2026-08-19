@@ -62,7 +62,6 @@
                 size_t idx = __##Name##_fnv1a(copy.key) % new_buckets_count;                       \
                 Name##Bucket_push_back(&new[idx], copy);                                           \
             }                                                                                      \
-            Name##Bucket_destroy(bucket);                                                          \
         }                                                                                          \
         free(map->buckets);                                                                        \
         map->buckets = new;                                                                        \

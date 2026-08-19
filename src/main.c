@@ -43,8 +43,6 @@ int main(int argc, char **argv) {
 
         gl_parse_and_eval(&parser);
 
-        gl_env_destroy(gl_global_env);
-
         gl_parser_destroy(&parser);
 
         fclose(file);
@@ -70,6 +68,5 @@ int main(int argc, char **argv) {
 
         free(input);
     }
-    gl_env_destroy(gl_global_env);
     return 0;
 }

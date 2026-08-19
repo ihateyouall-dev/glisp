@@ -1,6 +1,7 @@
 #include "builtins.h"
 #include "diagnostics.h"
 #include "location.h"
+#include "memory.h"
 #include "runtime/value.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -50,6 +51,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "function";
     case GL_VAL_NIL:
         return "nil";
+    case GL_VAL_ENV:
+        assert(0 && "UNREACHABLE");
     }
 }
 
@@ -618,4 +621,18 @@ GL_BUILTIN(list_con) {
     res->type = GL_VAL_CONS;
     res->val = list;
     return res;
+}
+
+GL_BUILTIN(gc_collect) {
+    EXPECT_ARGS(0);
+
+    gl_gc_collect();
+
+    return gl_value_make_nil();
+}
+
+GL_BUILTIN(gc_allocated) {
+    EXPECT_ARGS(0);
+
+    return gl_value_make_int(gl_memory_heap->allocated);
 }

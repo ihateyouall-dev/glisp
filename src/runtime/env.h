@@ -9,19 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct gl_object_t gl_object_t;
-
-HASHMAP_DECLARE(gl_object_t *, gl_object_table)
+HASHMAP_DECLARE(gl_value_t *, gl_value_table)
 
 typedef struct gl_env_t {
-    gl_object_table_t *variables;
-    gl_object_table_t *functions;
-    struct gl_env_t *parent;
+    gl_value_table_t *variables;
+    gl_value_table_t *functions;
+    gl_value_t *parent;
 } gl_env_t;
 
-extern gl_env_t *gl_global_env;
+extern gl_value_t *gl_global_env;
 
-gl_env_t *gl_make_env(gl_env_t *parent);
+gl_env_t *gl_make_env(gl_value_t *parent);
 
 gl_env_t *gl_make_global_env(void);
 
