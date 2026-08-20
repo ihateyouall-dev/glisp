@@ -1,5 +1,6 @@
 #pragma once
 
+#include "array.h"
 #include "utils/cons.h"
 #include "utils/location.h"
 #include <stddef.h>
@@ -11,6 +12,8 @@ typedef enum {
     GL_AST_SYMBOL,
     GL_AST_CONS,
     GL_AST_STRING,
+    GL_AST_ARRAY,
+    GL_AST_VECTOR,
     GL_AST_NIL
 } gl_ast_node_type_t;
 
