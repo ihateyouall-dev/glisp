@@ -59,6 +59,9 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
     case GL_AST_SYMBOL:
         car = gl_value_make_symbol(cons.car->value.symbol);
         break;
+    case GL_AST_STRING:
+        car = gl_value_make_string(cons.car->value.string);
+        break;
     case GL_AST_CONS:
         car = gl_value_make_cons(cons.car->value.cons);
         break;
@@ -73,6 +76,14 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
         assert(0 && "CDR of CONS can be only other CONS or NIL");
     }
 
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_string(char *str) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_STRING;
+    res->val = strdup(str);
     gl_register_value(res);
     return res;
 }
@@ -140,6 +151,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         ((gl_value_cons_t *)res->val)->car = gl_value_copy(((gl_value_cons_t *)val->val)->car);
         ((gl_value_cons_t *)res->val)->cdr = gl_value_copy(((gl_value_cons_t *)val->val)->cdr);
         return res;
+    case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         res->val = strdup((char *)val->val);
         return res;
@@ -180,6 +192,7 @@ void gl_value_destroy(gl_value_t **val) {
     switch ((*val)->type) {
     case GL_VAL_INT:
     case GL_VAL_FLOAT:
+    case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         if ((*val)->val == NULL) {
             break;
@@ -256,6 +269,7 @@ void gl_value_print(gl_value_t *val) {
     case GL_VAL_FLOAT:
         printf("%Lf", (*(long double *)val->val));
         break;
+    case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         printf("%s", (char *)val->val);
         break;

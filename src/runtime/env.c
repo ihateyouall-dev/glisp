@@ -56,6 +56,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "float?", gl_value_make_builtin(gl_builtin_float_p));
     gl_env_set_fun(env, "number?", gl_value_make_builtin(gl_builtin_number_p));
     gl_env_set_fun(env, "symbol?", gl_value_make_builtin(gl_builtin_symbol_p));
+    gl_env_set_fun(env, "string?", gl_value_make_builtin(gl_builtin_string_p));
     gl_env_set_fun(env, "nil?", gl_value_make_builtin(gl_builtin_nil_p));
     gl_env_set_fun(env, "function?", gl_value_make_builtin(gl_builtin_function_p));
     gl_env_set_fun(env, "list?", gl_value_make_builtin(gl_builtin_list_p));

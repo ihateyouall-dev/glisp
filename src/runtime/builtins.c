@@ -43,6 +43,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "float";
     case GL_VAL_SYMBOL:
         return "symbol";
+    case GL_VAL_STRING:
+        return "string";
     case GL_VAL_CONS:
         return "list";
     case GL_VAL_FUNCTION:
@@ -521,6 +523,17 @@ GL_BUILTIN(symbol_p) {
 
     for (size_t i = 0; i < args->size; ++i) {
         if (args->data[i]->val->type != GL_VAL_SYMBOL) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(string_p) {
+    EXPECT_VARGS(1);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->val->type != GL_VAL_STRING) {
             return gl_value_make_bool(0);
         }
     }

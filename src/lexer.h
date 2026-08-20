@@ -14,7 +14,8 @@ typedef enum {
     GL_LEX_INTLITERAL,
     GL_LEX_FLOATLITERAL,
     GL_LEX_SYMBOL,
-    GL_LEX_UNKNOWN
+    GL_LEX_UNKNOWN,
+    GL_LEX_STRLITERAL
 } gl_lex_token_type_t;
 
 typedef enum { LEX_OK, LEX_ERROR } gl_lex_token_status_t;

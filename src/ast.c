@@ -97,6 +97,15 @@ gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, gl_locat
     return res;
 }
 
+gl_ast_node_t *gl_ast_make_string(char *str, gl_location_t location) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
+    assert(res);
+    res->type = GL_AST_STRING;
+    res->value.string = strdup(str);
+    res->location = location;
+    return res;
+}
+
 gl_ast_node_t *gl_ast_make_nil(gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
@@ -113,24 +122,24 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     assert(res);
 
     res->type = node->type;
+    res->location = node->location;
 
     switch (node->type) {
     case GL_AST_INT:
     case GL_AST_FLOAT:
         res->value = node->value;
-        res->location = node->location;
         break;
     case GL_AST_SYMBOL:
         res->value.symbol = strdup(node->value.symbol);
-        res->location = node->location;
+        break;
+    case GL_AST_STRING:
+        res->value.string = strdup(node->value.string);
         break;
     case GL_AST_CONS:
         res->value.cons.car = gl_ast_copy(node->value.cons.car);
         res->value.cons.cdr = gl_ast_copy(node->value.cons.cdr);
-        res->location = node->location;
         break;
     case GL_AST_NIL:
-        res->location = node->location;
         break;
     }
     return res;

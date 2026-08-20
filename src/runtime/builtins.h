@@ -65,6 +65,8 @@ GL_BUILTIN(number_p);
 
 GL_BUILTIN(symbol_p);
 
+GL_BUILTIN(string_p);
+
 GL_BUILTIN(nil_p);
 
 GL_BUILTIN(function_p);

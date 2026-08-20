@@ -6,9 +6,16 @@
 #include <string.h>
 
 void gl_lex_token_destroy(gl_lex_token_t *tok) {
+    if (tok == NULL) {
+        return;
+    }
     if (tok->type != GL_LEX_EOF && tok->type != GL_LEX_LPAREN && tok->type != GL_LEX_RPAREN &&
-        tok->type != GL_LEX_QUOTE && tok->type != GL_LEX_FUNQUOTE && tok->type != GL_LEX_UNKNOWN)
-        free(tok->value);
+        tok->type != GL_LEX_QUOTE && tok->type != GL_LEX_FUNQUOTE && tok->type != GL_LEX_UNKNOWN) {
+        if (tok->status != LEX_ERROR) {
+            free(tok->value);
+        }
+    }
+    tok = NULL;
 }
 
 void gl_lexer_init(gl_lexer_t *lexer, const char *src, char *unit_name) {
@@ -83,6 +90,25 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         return res;
     case '\'':
         res.type = GL_LEX_QUOTE;
+        gl_lexer_advance(lexer);
+        return res;
+    case '"':
+        res.type = GL_LEX_STRLITERAL;
+        gl_lexer_advance(lexer);
+        size_t start_pos = lexer->location.pos;
+        while (gl_lexer_current(lexer) != '"') {   // Searching for the end of string
+            if (gl_lexer_current(lexer) == '\0') { // Handling unterminated strings
+                res.status = LEX_ERROR;
+                return res;
+            }
+            gl_lexer_advance(lexer);
+        }
+        size_t length = lexer->location.pos - start_pos;
+        res.value = malloc(length + 1);
+        const char *start = lexer->location.src + start_pos;
+        memcpy(res.value, start, length);
+        res.value[length] = '\0';
+
         gl_lexer_advance(lexer);
         return res;
     case '#':

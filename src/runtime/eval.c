@@ -31,6 +31,10 @@ static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node) {
     return res;
 }
 
+static gl_value_t *__gl_eval_string(gl_ast_node_t *node) {
+    return gl_value_make_string(node->value.string);
+}
+
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
 static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
@@ -199,6 +203,8 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
         return __gl_eval_float(node);
     case GL_AST_SYMBOL:
         return __gl_eval_symbol(node);
+    case GL_AST_STRING:
+        return __gl_eval_string(node);
     case GL_AST_NIL:
         return __gl_eval_nil();
     case GL_AST_CONS:
@@ -215,6 +221,7 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
 
     while (current) {
         res = gl_eval(current);
+        gl_ast_destroy(current);
         current = gl_parser_parse(parser);
     }
 

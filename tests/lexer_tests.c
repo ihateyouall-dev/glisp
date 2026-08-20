@@ -6,7 +6,7 @@
 int test_status = 0;
 
 void lexer_test(void) {
-    const char *src = "(1 3.14 abc ; comment\n\" 42.a$%+-><)";
+    const char *src = "(1 3.14 abc ; comment\n 42.a$%+-><)";
 
     gl_lexer_t lexer = gl_make_lexer(src, "");
 
@@ -45,51 +45,81 @@ void lexer_test(void) {
 
     token = gl_lexer_next(&lexer);
 
-    TEST(token.type == GL_LEX_UNKNOWN, "UNKNOWN");
-    TEST(token.status == LEX_ERROR, "UNKNOWN status");
-    TEST(token.location.pos == 22, "UNKNOWN pos");
-    TEST(token.location.line == 2, "UNKNOWN line");
-    TEST(token.location.column == 1, "UNKNOWN column");
-
-    token = gl_lexer_next(&lexer);
-
     TEST(token.type == GL_LEX_SYMBOL, "Complex SYMBOL");
     TEST(strcmp(token.value, "42.a$%+-><") == 0, "Complex SYMBOL value");
-    TEST(token.location.pos == 24, "Complex SYMBOL pos");
+    TEST(token.location.pos == 23, "Complex SYMBOL pos");
     TEST(token.location.line == 2, "Complex SYMBOL line");
-    TEST(token.location.column == 3, "Complex SYMBOL column");
+    TEST(token.location.column == 2, "Complex SYMBOL column");
 
     token = gl_lexer_next(&lexer);
 
     TEST(token.type == GL_LEX_RPAREN, "RPAREN");
-    TEST(token.location.pos == 34, "RPAREN pos");
+    TEST(token.location.pos == 33, "RPAREN pos");
     TEST(token.location.line == 2, "RPAREN line");
-    TEST(token.location.column == 13, "RPAREN column");
+    TEST(token.location.column == 12, "RPAREN column");
 
     token = gl_lexer_next(&lexer);
 
     TEST(token.type == GL_LEX_EOF, "EOF");
-    TEST(token.location.pos == 35, "EOF pos");
+    TEST(token.location.pos == 34, "EOF pos");
     TEST(token.location.line == 2, "EOF line");
-    TEST(token.location.column == 14, "EOF column");
+    TEST(token.location.column == 13, "EOF column");
 }
 
 void lexer_tokenize_test(void) {
-    gl_lexer_t lexer = gl_make_lexer("(1 3.14 abc ; comment\n\" '42.a$%+-><)", "");
+    gl_lexer_t lexer = gl_make_lexer("(1 3.14 abc ; comment\n '42.a$%+-><)", "");
 
     gl_lex_token_vector_t tokens = gl_lexer_tokenize(&lexer);
 
-    TEST(tokens.size == 9, "Tokens amount");
+    TEST(tokens.size == 8, "Tokens amount");
 
     TEST(gl_lex_token_vector_at(&tokens, 0)->type == GL_LEX_LPAREN, "Token access");
     TEST(gl_lex_token_vector_at(&tokens, 1)->type == GL_LEX_INTLITERAL, "Token access");
     TEST(gl_lex_token_vector_at(&tokens, 2)->type == GL_LEX_FLOATLITERAL, "Token access");
     TEST(gl_lex_token_vector_at(&tokens, 3)->type == GL_LEX_SYMBOL, "Token access");
-    TEST(gl_lex_token_vector_at(&tokens, 4)->type == GL_LEX_UNKNOWN, "Token access");
-    TEST(gl_lex_token_vector_at(&tokens, 5)->type == GL_LEX_QUOTE, "Token access");
-    TEST(gl_lex_token_vector_at(&tokens, 6)->type == GL_LEX_SYMBOL, "Token access");
-    TEST(gl_lex_token_vector_at(&tokens, 7)->type == GL_LEX_RPAREN, "Token access");
-    TEST(gl_lex_token_vector_at(&tokens, 8)->type == GL_LEX_EOF, "Token access");
+    TEST(gl_lex_token_vector_at(&tokens, 4)->type == GL_LEX_QUOTE, "Token access");
+    TEST(gl_lex_token_vector_at(&tokens, 5)->type == GL_LEX_SYMBOL, "Token access");
+    TEST(gl_lex_token_vector_at(&tokens, 6)->type == GL_LEX_RPAREN, "Token access");
+    TEST(gl_lex_token_vector_at(&tokens, 7)->type == GL_LEX_EOF, "Token access");
+
+    gl_lex_token_vector_destroy(&tokens);
+}
+
+void lexer_strliteral_test(void) {
+    gl_lexer_t lexer = gl_make_lexer("\"string\"", "");
+
+    gl_lex_token_vector_t tokens = gl_lexer_tokenize(&lexer);
+
+    TEST(tokens.size == 2, "Tokens amount");
+
+    gl_lex_token_t *str = gl_lex_token_vector_at(&tokens, 0);
+
+    TEST(str->type, "STRLITERAL type");
+    TEST(strcmp(str->value, "string") == 0, "STRLITERAL value");
+    TEST(str->location.pos == 0, "STRLITERAL pos");
+
+    gl_lex_token_t *eof = gl_lex_token_vector_at(&tokens, 1);
+
+    TEST(eof->type == GL_LEX_EOF, "EOF");
+
+    gl_lex_token_vector_destroy(&tokens);
+}
+
+void lexer_unterminated_strliteral_test(void) {
+    gl_lexer_t lexer = gl_make_lexer("\"string", "");
+
+    gl_lex_token_vector_t tokens = gl_lexer_tokenize(&lexer);
+
+    TEST(tokens.size == 2, "Tokens amount");
+
+    gl_lex_token_t *str = gl_lex_token_vector_at(&tokens, 0);
+
+    TEST(str->type, "Unterminated STRLITERAL type");
+    TEST(str->location.pos == 0, "Unterminated STRLITERAL pos");
+
+    gl_lex_token_t *eof = gl_lex_token_vector_at(&tokens, 1);
+
+    TEST(eof->type == GL_LEX_EOF, "EOF");
 
     gl_lex_token_vector_destroy(&tokens);
 }
@@ -97,6 +127,7 @@ void lexer_tokenize_test(void) {
 int main(void) {
     lexer_test();
     lexer_tokenize_test();
+    lexer_strliteral_test();
 
     return test_status;
 }

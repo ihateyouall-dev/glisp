@@ -55,6 +55,12 @@ static gl_ast_node_t *__gl_parser_parse_symbol(gl_parser_t *parser) {
     return gl_ast_make_symbol(token.value, token.location);
 }
 
+static gl_ast_node_t *__gl_parser_parse_string(gl_parser_t *parser) {
+    gl_lex_token_t token = __gl_parser_current_token(parser);
+    __gl_parser_advance(parser);
+    return gl_ast_make_string(token.value, token.location);
+}
+
 static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
@@ -109,6 +115,16 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
         break;
     case GL_LEX_SYMBOL:
         res = __gl_parser_parse_symbol(parser);
+        break;
+    case GL_LEX_STRLITERAL:
+        if (token.status == LEX_ERROR) { // Unterminated string literal
+            gl_diagnostic_report_error(
+                gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location,
+
+                              "Unterminated string, expected '\"' to close"));
+            break;
+        }
+        res = __gl_parser_parse_string(parser);
         break;
     case GL_LEX_EOF:
         return NULL;

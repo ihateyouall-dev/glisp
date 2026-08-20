@@ -15,6 +15,7 @@ typedef enum {
     GL_VAL_BUILTIN,
     GL_VAL_SPFORM,
     GL_VAL_CONS,
+    GL_VAL_STRING,
     GL_VAL_ENV
 } gl_value_type_t;
 
@@ -38,6 +39,8 @@ gl_value_t *gl_value_make_float(long double num);
 gl_value_t *gl_value_make_symbol(const char *sym);
 
 gl_value_t *gl_value_make_cons(gl_ast_cons_t cons);
+
+gl_value_t *gl_value_make_string(char *str);
 
 gl_value_t *gl_value_make_nil(void);
 
