@@ -2,9 +2,11 @@
 #include "runtime/env.h"
 #include "runtime/eval.h"
 #include "runtime/value.h"
-#include <assert.h>
 
-#include "utils/rl_wrapper.h"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <utils/rl_wrapper.h>
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -39,12 +41,14 @@ int main(int argc, char **argv) {
         assert(bytesread == filesize);
         buf[bytesread] = '\0';
 
-        gl_parser_t parser = gl_make_parser(buf, realpath(filename, NULL));
+        char *real_path = realpath(filename, NULL);
+        gl_parser_t parser = gl_make_parser(buf, real_path);
 
         gl_parse_and_eval(&parser);
 
         gl_parser_destroy(&parser);
 
+        free(real_path);
         fclose(file);
         free(buf);
         return 0;

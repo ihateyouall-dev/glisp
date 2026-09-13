@@ -65,6 +65,10 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
     case GL_AST_CONS:
         car = gl_value_make_cons(cons.car->value.cons);
         break;
+    case GL_AST_ARRAY:
+        break;
+    case GL_AST_VECTOR:
+        break;
     }
     ((gl_value_cons_t *)res->val)->car = car;
 
@@ -182,6 +186,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = NULL;
         return res;
     }
+    gl_register_value(res);
     return res;
 }
 

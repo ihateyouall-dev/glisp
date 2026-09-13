@@ -34,6 +34,15 @@
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
             }
+        },
+        {
+            "name": "leaks",
+            "displayName": "Configuration for profiling with macOS Leaks tool",
+            "binaryDir": "build",
+            "toolchainFile": "${sourceDir}/build/conan_toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
         }
     ],
     "buildPresets": [
@@ -53,6 +62,12 @@
             "name": "test",
             "displayName": "Test build",
             "configurePreset": "test",
+            "jobs": 8
+        },
+        {
+            "name": "leaks",
+            "displayName": "Leaks build",
+            "configurePreset": "leaks",
             "jobs": 8
         }
     ],
@@ -111,6 +126,20 @@
                 {
                     "type": "test",
                     "name": "test"
+                }
+            ]
+        },
+        {
+            "name": "leaks",
+            "displayName": "Leaks workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "leaks"
+                },
+                {
+                    "type": "build",
+                    "name": "leaks"
                 }
             ]
         }

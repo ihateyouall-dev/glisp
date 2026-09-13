@@ -1,4 +1,5 @@
 #include "ast.h"
+
 #include "utils/location.h"
 
 #include <assert.h>
@@ -156,6 +157,7 @@ void gl_ast_destroy(gl_ast_node_t *node) {
         gl_ast_destroy(node->value.cons.cdr);
         break;
     case GL_AST_SYMBOL:
+    case GL_AST_STRING:
         free(node->value.symbol);
         break;
     default:

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "array.h"
+#include "utils/array.h"
 #include "utils/cons.h"
 #include "utils/location.h"
+
 #include <stddef.h>
 #include <stdint.h>
 

@@ -1,4 +1,5 @@
 #include "eval.h"
+
 #include "ast.h"
 #include "callstack.h"
 #include "diagnostics.h"
@@ -6,6 +7,7 @@
 #include "parser.h"
 #include "runtime/env.h"
 #include "value.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -154,7 +156,9 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             return NULL;
         }
 
-        return builtin(func_node->location, argv);
+        gl_value_t *res = builtin(func_node->location, argv);
+        gl_function_args_destroy(argv);
+        return res;
     }
     case GL_VAL_SPFORM: {
         gl_special_form_t spform = func_val->val;
@@ -219,10 +223,11 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
 
     gl_value_t *res = NULL;
 
-    while (current) {
-        res = gl_eval(current);
-        gl_ast_destroy(current);
-        current = gl_parser_parse(parser);
+    gl_ast_node_t *it = current;
+
+    while (it) {
+        res = gl_eval(it);
+        it = gl_parser_parse(parser);
     }
 
     return res;

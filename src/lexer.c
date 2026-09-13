@@ -1,4 +1,5 @@
 #include "lexer.h"
+
 #include "vector.h"
 
 #include <ctype.h>
@@ -24,6 +25,8 @@ void gl_lex_token_destroy(gl_lex_token_t *tok) {
     tok = NULL;
 }
 
+static void __lexer_skip_line(gl_lexer_t *lexer);
+
 void gl_lexer_init(gl_lexer_t *lexer, const char *src, char *unit_name) {
     lexer->len = strlen(src);
 
@@ -32,6 +35,11 @@ void gl_lexer_init(gl_lexer_t *lexer, const char *src, char *unit_name) {
     lexer->location.line = 1;
     lexer->location.column = 1;
     lexer->location.unit_name = unit_name;
+
+    // Detecting UNIX shebang
+    if (lexer->len > 2 && src[0] == '#' && src[1] == '!') {
+        __lexer_skip_line(lexer);
+    }
 }
 
 char gl_lexer_current(gl_lexer_t *lexer) { return lexer->location.src[lexer->location.pos]; }

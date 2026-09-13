@@ -14,8 +14,8 @@ CONAN_BUILD_TYPE := Debug
 else ifeq ($(BUILD_TYPE),Test)
 CMAKE_PRESET := test
 CONAN_BUILD_TYPE := Debug
-else ifeq ($(BUILD_TYPE),Coverage)
-CMAKE_PRESET := coverage
+else ifeq ($(BUILD_TYPE),Leaks)
+CMAKE_PRESET := leaks
 CONAN_BUILD_TYPE := Debug
 endif
 
