@@ -107,6 +107,18 @@ gl_env_t *gl_make_global_env(void) {
     gl_env_set_var(res, "t", gl_value_make_symbol("t"));
     gl_env_set_var(res, "nil", gl_value_make_nil());
 
+    // Basic type identifiers
+    gl_env_set_var(res, "nil-t", gl_value_make_typeid(GL_VAL_NIL));
+    gl_env_set_var(res, "int-t", gl_value_make_typeid(GL_VAL_INT));
+    gl_env_set_var(res, "float-t", gl_value_make_typeid(GL_VAL_FLOAT));
+    gl_env_set_var(res, "symbol-t", gl_value_make_typeid(GL_VAL_SYMBOL));
+    gl_env_set_var(res, "string-t", gl_value_make_typeid(GL_VAL_STRING));
+    gl_env_set_var(res, "function-t", gl_value_make_typeid(GL_VAL_FUNCTION));
+    gl_env_set_var(res, "list-t", gl_value_make_typeid(GL_VAL_CONS));
+    gl_env_set_var(res, "array-t", gl_value_make_typeid(GL_VAL_ARRAY));
+    gl_env_set_var(res, "vector-t", gl_value_make_typeid(GL_VAL_VECTOR));
+    gl_env_set_var(res, "typeid-t", gl_value_make_typeid(GL_VAL_TYPEID));
+
     __gl_global_env_define_builtins(res);
     __gl_global_env_define_specforms(res);
 

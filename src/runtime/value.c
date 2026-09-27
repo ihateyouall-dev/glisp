@@ -108,6 +108,17 @@ gl_value_t *gl_value_make_bool(int b) {
     }
 }
 
+gl_value_t *gl_value_make_typeid(gl_value_type_t type) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_TYPEID;
+    res->val = malloc(sizeof(gl_value_type_t));
+    if (type == GL_VAL_BUILTIN || type == GL_VAL_SPFORM) {
+        type = GL_VAL_FUNCTION;
+    }
+    *(gl_value_type_t *)res->val = type;
+    return res;
+}
+
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_BUILTIN;
@@ -116,9 +127,9 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     return res;
 }
 
-ARRAY_DEFINE(char *, gl_function_params)
-ARRAY_DEFINE(gl_value_t *, gl_value_array)
-VECTOR_DEFINE(gl_value_t *, gl_value_vector)
+ARRAY_DEFINE(char *, gl_function_params);
+ARRAY_DEFINE(gl_value_t *, gl_value_array);
+VECTOR_DEFINE(gl_value_t *, gl_value_vector);
 
 gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
                                    gl_function_params_t *params, gl_value_t *closure) {
@@ -151,6 +162,10 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
     case GL_VAL_FLOAT:
         res->val = malloc(sizeof(long double));
         *(long double *)res->val = *(long double *)val->val;
+        break;
+    case GL_VAL_TYPEID:
+        res->val = malloc(sizeof(gl_value_type_t));
+        *(gl_value_type_t *)res->val = *(gl_value_type_t *)val->val;
         break;
     case GL_VAL_CONS:
         res->val = malloc(sizeof(gl_value_cons_t));
@@ -219,6 +234,7 @@ void gl_value_destroy(gl_value_t **val) {
     switch ((*val)->type) {
     case GL_VAL_INT:
     case GL_VAL_FLOAT:
+    case GL_VAL_TYPEID:
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         if ((*val)->val == NULL) {
@@ -337,6 +353,35 @@ gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec) {
     return res;
 }
 
+static const char *__gl_typeid_str(gl_value_type_t type) {
+    switch (type) {
+    case GL_VAL_INT:
+        return "int";
+    case GL_VAL_FLOAT:
+        return "float";
+    case GL_VAL_TYPEID:
+        return "typeid";
+    case GL_VAL_SYMBOL:
+        return "symbol";
+    case GL_VAL_STRING:
+        return "string";
+    case GL_VAL_CONS:
+        return "list";
+    case GL_VAL_FUNCTION:
+    case GL_VAL_BUILTIN:
+    case GL_VAL_SPFORM:
+        return "function";
+    case GL_VAL_NIL:
+        return "nil";
+    case GL_VAL_ARRAY:
+        return "array";
+    case GL_VAL_VECTOR:
+        return "vector";
+    case GL_VAL_ENV:
+        assert(0 && "UNREACHABLE");
+    }
+}
+
 void gl_value_print(gl_value_t *val) {
     if (!val) {
         return;
@@ -347,6 +392,9 @@ void gl_value_print(gl_value_t *val) {
         break;
     case GL_VAL_FLOAT:
         printf("%Lf", (*(long double *)val->val));
+        break;
+    case GL_VAL_TYPEID:
+        printf("%s", __gl_typeid_str(*(gl_value_type_t *)val->val));
         break;
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
@@ -545,6 +593,18 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
     if (__gl_value_is_number(lhs)) {
         if (__gl_value_is_number(rhs)) {
             return __gl_value_compare_numbers(lhs, rhs);
+        } else {
+            abort();
+        }
+    }
+
+    if (lhs->type == GL_VAL_TYPEID) {
+        if (rhs->type == GL_VAL_TYPEID) {
+            if (*(gl_value_type_t *)lhs->val == *(gl_value_type_t *)rhs->val) {
+                return 0;
+            } else {
+                return -1;
+            }
         } else {
             abort();
         }

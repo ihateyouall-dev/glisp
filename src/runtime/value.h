@@ -20,7 +20,8 @@ typedef enum {
     GL_VAL_STRING,
     GL_VAL_ENV,
     GL_VAL_ARRAY,
-    GL_VAL_VECTOR
+    GL_VAL_VECTOR,
+    GL_VAL_TYPEID
 } gl_value_type_t;
 
 typedef struct gl_value_t {
@@ -30,9 +31,9 @@ typedef struct gl_value_t {
     struct gl_value_t *next_in_heap;
 } gl_value_t;
 
-CONS_DECLARE(gl_value_t *, gl_value_cons)
-ARRAY_DECLARE(gl_value_t *, gl_value_array)
-VECTOR_DECLARE(gl_value_t *, gl_value_vector)
+CONS_DECLARE(gl_value_t *, gl_value_cons);
+ARRAY_DECLARE(gl_value_t *, gl_value_array);
+VECTOR_DECLARE(gl_value_t *, gl_value_vector);
 
 void gl_value_destroy(gl_value_t **val);
 
@@ -51,6 +52,8 @@ gl_value_t *gl_value_make_string(char *str);
 gl_value_t *gl_value_make_nil(void);
 
 gl_value_t *gl_value_make_bool(int b);
+
+gl_value_t *gl_value_make_typeid(gl_value_type_t type);
 
 typedef struct gl_env_t gl_env_t;
 

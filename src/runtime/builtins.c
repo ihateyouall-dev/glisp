@@ -60,6 +60,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "int";
     case GL_VAL_FLOAT:
         return "float";
+    case GL_VAL_TYPEID:
+        return "typeid";
     case GL_VAL_SYMBOL:
         return "symbol";
     case GL_VAL_STRING:
@@ -473,7 +475,7 @@ GL_BUILTIN(or) {
 GL_BUILTIN(typeof) {
     EXPECT_ARGS(1);
 
-    return gl_value_make_symbol(__gl_value_get_type_name(args->data[0]->val));
+    return gl_value_make_typeid(args->data[0]->val->type);
 }
 
 GL_BUILTIN(int_p) {

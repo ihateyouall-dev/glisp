@@ -261,7 +261,7 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
 
     while (current) {
         res = gl_eval(current);
-        // Aborting if got error
+        // Aborting if got error during parsing
         if (!res) {
             exit(-1);
         }
