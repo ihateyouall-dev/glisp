@@ -1,8 +1,10 @@
 #include "builtins.h"
+
 #include "diagnostics.h"
 #include "location.h"
 #include "memory.h"
 #include "runtime/value.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -281,8 +283,7 @@ GL_BUILTIN(mul) {
 }
 
 GL_BUILTIN(div) {
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_INT;
+    gl_value_t *res = gl_value_make_int(0);
     int64_t isum = 0;
     long double fsum = 0;
 
@@ -633,6 +634,7 @@ GL_BUILTIN(list_con) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_CONS;
     res->val = list;
+    gl_register_value(res);
     return res;
 }
 

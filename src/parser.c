@@ -25,7 +25,6 @@ gl_parser_t gl_make_parser(const char *src, const char *name) {
 void gl_parser_destroy(gl_parser_t *parser) {
     gl_lex_token_vector_destroy(&parser->tokens);
     parser->pos = 0;
-    free(parser->src); // NOLINT
 }
 
 static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {

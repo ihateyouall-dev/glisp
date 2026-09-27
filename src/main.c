@@ -2,11 +2,11 @@
 #include "runtime/env.h"
 #include "runtime/eval.h"
 #include "runtime/value.h"
+#include "utils/rl_wrapper.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <utils/rl_wrapper.h>
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
 
         add_history(input);
 
-        gl_parser_t parser = gl_make_parser(strdup(input), "<repl>");
+        gl_parser_t parser = gl_make_parser(input, "<repl>");
 
         gl_value_t *res = gl_parse_and_eval(&parser);
 

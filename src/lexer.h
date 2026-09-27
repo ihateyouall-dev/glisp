@@ -1,7 +1,7 @@
 #pragma once
 
-#include "location.h"
-#include "vector.h"
+#include "utils/location.h"
+#include "utils/vector.h"
 
 #include <stddef.h>
 

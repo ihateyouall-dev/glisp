@@ -1,9 +1,10 @@
 #pragma once
 
 #include "ast.h"
-#include "location.h"
 #include "utils/array.h"
 #include "utils/cons.h"
+#include "utils/location.h"
+
 #include <stdint.h>
 
 typedef enum {

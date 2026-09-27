@@ -1,5 +1,6 @@
 #include "ast.h"
 
+#include "utils/ansi.h"
 #include "utils/location.h"
 
 #include <assert.h>
@@ -102,7 +103,7 @@ gl_ast_node_t *gl_ast_make_string(char *str, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
     res->type = GL_AST_STRING;
-    res->value.string = strdup(str);
+    res->value.string = gl_process_ansi_str(strdup(str));
     res->location = location;
     return res;
 }
