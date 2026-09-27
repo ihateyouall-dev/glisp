@@ -168,6 +168,72 @@ void test_parse_quoted_symbol(void) {
 /*     gl_parser_destroy(&parser); */
 /* } */
 
+void test_parse_array(void) {
+    const char *src = "[1 2 3]";
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node->type == GL_AST_ARRAY, "Parse ARRAY type");
+    TEST(node->value.array.size == 3, "Parse ARRAY size");
+    TEST(node->value.array.data[0]->type == GL_AST_INT, "ARRAY elem 0 type");
+    TEST(node->value.array.data[0]->value.integral == 1, "ARRAY elem 0 val");
+    TEST(node->value.array.data[1]->type == GL_AST_INT, "ARRAY elem 1 type");
+    TEST(node->value.array.data[1]->value.integral == 2, "ARRAY elem 1 val");
+    TEST(node->value.array.data[2]->type == GL_AST_INT, "ARRAY elem 2 type");
+    TEST(node->value.array.data[2]->value.integral == 3, "ARRAY elem 2 val");
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_empty_array(void) {
+    const char *src = "[]";
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node->type == GL_AST_ARRAY, "Parse empty ARRAY type");
+    TEST(node->value.array.size == 0, "Parse empty ARRAY size");
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_vector(void) {
+    const char *src = "{1 2 3}";
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node->type == GL_AST_VECTOR, "Parse VECTOR type");
+    TEST(node->value.vector.size == 3, "Parse VECTOR size");
+    TEST((*gl_ast_vector_at(&node->value.vector, 0))->type == GL_AST_INT, "VECTOR elem 0 type");
+    TEST((*gl_ast_vector_at(&node->value.vector, 0))->value.integral == 1, "VECTOR elem 0 val");
+    TEST((*gl_ast_vector_at(&node->value.vector, 1))->type == GL_AST_INT, "VECTOR elem 1 type");
+    TEST((*gl_ast_vector_at(&node->value.vector, 1))->value.integral == 2, "VECTOR elem 1 val");
+    TEST((*gl_ast_vector_at(&node->value.vector, 2))->type == GL_AST_INT, "VECTOR elem 2 type");
+    TEST((*gl_ast_vector_at(&node->value.vector, 2))->value.integral == 3, "VECTOR elem 2 val");
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_empty_vector(void) {
+    const char *src = "{}";
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node->type == GL_AST_VECTOR, "Parse empty VECTOR type");
+    TEST(node->value.vector.size == 0, "Parse empty VECTOR size");
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
+void test_parse_nested_array_vector(void) {
+    const char *src = "[[1 2] {3 4}]";
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node->type == GL_AST_ARRAY, "Parse nested ARRAY type");
+    TEST(node->value.array.size == 2, "Parse nested ARRAY size");
+    TEST(node->value.array.data[0]->type == GL_AST_ARRAY, "Nested elem 0 is ARRAY");
+    TEST(node->value.array.data[0]->value.array.size == 2, "Nested inner ARRAY size");
+    TEST(node->value.array.data[1]->type == GL_AST_VECTOR, "Nested elem 1 is VECTOR");
+    TEST(node->value.array.data[1]->value.vector.size == 2, "Nested inner VECTOR size");
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
 void parser_test(void) {
     test_parse_int();
     test_parse_float();
@@ -178,6 +244,11 @@ void parser_test(void) {
     test_parse_empty_list();
     test_parse_quoted_symbol();
     /* test_parse_quoted_complex_list(); */
+    test_parse_array();
+    test_parse_empty_array();
+    test_parse_vector();
+    test_parse_empty_vector();
+    test_parse_nested_array_vector();
 }
 
 int main(void) {

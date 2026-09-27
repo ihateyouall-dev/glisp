@@ -80,6 +80,8 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
 }
 
 static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
+static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser);
+static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser);
 
 // Decides what parser functions will need to call next.
 static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
@@ -103,6 +105,14 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
 
     if (token.type == GL_LEX_LPAREN) {
         return __gl_parser_parse_list(parser);
+    }
+
+    if (token.type == GL_LEX_LSPAREN) {
+        return __gl_parser_parse_array(parser);
+    }
+
+    if (token.type == GL_LEX_LFPAREN) {
+        return __gl_parser_parse_vector(parser);
     }
 
     gl_ast_node_t *res = NULL;
@@ -183,6 +193,81 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     }
 
     return list_head;
+}
+
+static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser) {
+    gl_lex_token_t lsparen = __gl_parser_current_token(parser);
+    __gl_parser_advance(parser);
+
+    gl_ast_vector_t temp;
+    gl_ast_vector_init(&temp, gl_ast_node_destroy_helper);
+
+    while (1) {
+        gl_lex_token_t token = __gl_parser_current_token(parser);
+
+        if (token.type == GL_LEX_RSPAREN) {
+            __gl_parser_advance(parser);
+            break;
+        }
+
+        if (token.type == GL_LEX_EOF) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, lsparen.location,
+                                                     "Expected ']' to close array"));
+            gl_ast_vector_destroy(&temp);
+            return NULL;
+        }
+
+        gl_ast_node_t *elem = __gl_parser_parse_expression(parser);
+        if (elem == NULL) {
+            gl_ast_vector_destroy(&temp);
+            return NULL;
+        }
+
+        gl_ast_vector_push_back(&temp, elem);
+    }
+
+    gl_ast_array_t arr;
+    gl_ast_array_init(&arr, temp.size, gl_ast_node_destroy_helper);
+    for (size_t i = 0; i < temp.size; ++i) {
+        arr.data[i] = temp.data[i];
+    }
+    free(temp.data);
+
+    return gl_ast_make_array(arr, lsparen.location);
+}
+
+static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser) {
+    gl_lex_token_t lfparen = __gl_parser_current_token(parser);
+    __gl_parser_advance(parser);
+
+    gl_ast_vector_t vec;
+    gl_ast_vector_init(&vec, gl_ast_node_destroy_helper);
+
+    while (1) {
+        gl_lex_token_t token = __gl_parser_current_token(parser);
+
+        if (token.type == GL_LEX_RFPAREN) {
+            __gl_parser_advance(parser);
+            break;
+        }
+
+        if (token.type == GL_LEX_EOF) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, lfparen.location,
+                                                     "Expected '}' to close vector"));
+            gl_ast_vector_destroy(&vec);
+            return NULL;
+        }
+
+        gl_ast_node_t *elem = __gl_parser_parse_expression(parser);
+        if (elem == NULL) {
+            gl_ast_vector_destroy(&vec);
+            return NULL;
+        }
+
+        gl_ast_vector_push_back(&vec, elem);
+    }
+
+    return gl_ast_make_vector(vec, lfparen.location);
 }
 
 gl_ast_node_t *gl_parser_parse(gl_parser_t *parser) { return __gl_parser_parse_expression(parser); }

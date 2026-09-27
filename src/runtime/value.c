@@ -117,6 +117,8 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
 }
 
 ARRAY_DEFINE(char *, gl_function_params)
+ARRAY_DEFINE(gl_value_t *, gl_value_array)
+VECTOR_DEFINE(gl_value_t *, gl_value_vector)
 
 gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
                                    gl_function_params_t *params, gl_value_t *closure) {
@@ -185,6 +187,26 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
     case GL_VAL_NIL:
         res->val = NULL;
         break;
+    case GL_VAL_ARRAY: {
+        gl_value_array_t *orig = val->val;
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, orig->size, NULL);
+        for (size_t i = 0; i < orig->size; ++i) {
+            arr->data[i] = gl_value_copy(orig->data[i]);
+        }
+        res->val = arr;
+        break;
+    }
+    case GL_VAL_VECTOR: {
+        gl_value_vector_t *orig = val->val;
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+        for (size_t i = 0; i < orig->size; ++i) {
+            gl_value_vector_push_back(vec, gl_value_copy(*gl_value_vector_at(orig, i)));
+        }
+        res->val = vec;
+        break;
+    }
     }
     gl_register_value(res);
     return res;
@@ -228,6 +250,22 @@ void gl_value_destroy(gl_value_t **val) {
             (*val)->val = NULL;
         }
         break;
+    case GL_VAL_ARRAY:
+        if ((*val)->val != NULL) {
+            gl_value_array_t *arr = (*val)->val;
+            free(arr->data);
+            free(arr);
+            (*val)->val = NULL;
+        }
+        break;
+    case GL_VAL_VECTOR:
+        if ((*val)->val != NULL) {
+            gl_value_vector_t *vec = (*val)->val;
+            free(vec->data);
+            free(vec);
+            (*val)->val = NULL;
+        }
+        break;
     case GL_VAL_ENV:
         if ((*val)->val == NULL) {
             break;
@@ -256,6 +294,45 @@ gl_value_t *gl_value_make_env(gl_env_t *env) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_ENV;
     res->val = env;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_array(size_t size) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_ARRAY;
+    gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+    gl_value_array_init(arr, size, NULL);
+    for (size_t i = 0; i < size; ++i) {
+        arr->data[i] = gl_value_make_nil();
+    }
+    res->val = arr;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_array_from(gl_value_array_t *arr) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_ARRAY;
+    res->val = arr;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_vector(void) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_VECTOR;
+    gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+    gl_value_vector_init(vec, NULL);
+    res->val = vec;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_VECTOR;
+    res->val = vec;
     gl_register_value(res);
     return res;
 }
@@ -299,6 +376,35 @@ void gl_value_print(gl_value_t *val) {
             }
         }
         printf(")");
+        break;
+    case GL_VAL_ARRAY: {
+        printf("[");
+        gl_value_array_t *arr = val->val;
+        if (arr && arr->size > 0) {
+            for (size_t i = 0; i < arr->size; ++i) {
+                gl_value_print(arr->data[i]);
+                if (i + 1 < arr->size) {
+                    printf(" ");
+                }
+            }
+        }
+        printf("]");
+        break;
+    }
+    case GL_VAL_VECTOR: {
+        printf("{");
+        gl_value_vector_t *vec = val->val;
+        if (vec && vec->size > 0) {
+            for (size_t i = 0; i < vec->size; ++i) {
+                gl_value_print(*gl_value_vector_at(vec, i));
+                if (i + 1 < vec->size) {
+                    printf(" ");
+                }
+            }
+        }
+        printf("}");
+        break;
+    }
     }
 }
 int64_t gl_value_get_int(gl_value_t *val) {
@@ -315,6 +421,14 @@ char *gl_value_get_symbol(gl_value_t *val) {
 }
 gl_value_cons_t *gl_value_get_cons(gl_value_t *val) {
     assert(val->type == GL_VAL_CONS);
+    return val->val;
+}
+gl_value_array_t *gl_value_get_array(gl_value_t *val) {
+    assert(val->type == GL_VAL_ARRAY);
+    return val->val;
+}
+gl_value_vector_t *gl_value_get_vector(gl_value_t *val) {
+    assert(val->type == GL_VAL_VECTOR);
     return val->val;
 }
 gl_builtin_t gl_value_get_builtin(gl_value_t *val) {
@@ -446,6 +560,50 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
 
     if (lhs->type == GL_VAL_NIL || rhs->type == GL_VAL_NIL) {
         if (lhs->type == rhs->type) {
+            return 0;
+        } else {
+            return -1;
+        }
+    }
+
+    if (lhs->type == GL_VAL_STRING) {
+        if (rhs->type == GL_VAL_STRING) {
+            return strcmp((char *)lhs->val, (char *)rhs->val);
+        } else {
+            return -1;
+        }
+    }
+
+    if (lhs->type == GL_VAL_ARRAY) {
+        if (rhs->type == GL_VAL_ARRAY) {
+            gl_value_array_t *a = lhs->val;
+            gl_value_array_t *b = rhs->val;
+            if (a->size != b->size) {
+                return (a->size > b->size) ? 1 : -1;
+            }
+            for (size_t i = 0; i < a->size; ++i) {
+                int cmp = gl_value_compare(a->data[i], b->data[i]);
+                if (cmp != 0)
+                    return cmp;
+            }
+            return 0;
+        } else {
+            return -1;
+        }
+    }
+
+    if (lhs->type == GL_VAL_VECTOR) {
+        if (rhs->type == GL_VAL_VECTOR) {
+            gl_value_vector_t *a = lhs->val;
+            gl_value_vector_t *b = rhs->val;
+            if (a->size != b->size) {
+                return (a->size > b->size) ? 1 : -1;
+            }
+            for (size_t i = 0; i < a->size; ++i) {
+                int cmp = gl_value_compare(*gl_value_vector_at(a, i), *gl_value_vector_at(b, i));
+                if (cmp != 0)
+                    return cmp;
+            }
             return 0;
         } else {
             return -1;

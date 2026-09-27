@@ -11,6 +11,16 @@
 #include "utils/strdup.h"
 #endif
 
+void gl_ast_node_destroy_helper(gl_ast_node_t **node) {
+    if (node && *node) {
+        gl_ast_destroy(*node);
+        *node = NULL;
+    }
+}
+
+ARRAY_DEFINE(struct gl_ast_node_t *, gl_ast_array)
+VECTOR_DEFINE(struct gl_ast_node_t *, gl_ast_vector)
+
 gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n) {
     if (cons->type != GL_AST_CONS) {
         return NULL;
@@ -116,6 +126,24 @@ gl_ast_node_t *gl_ast_make_nil(gl_location_t location) {
     return res;
 }
 
+gl_ast_node_t *gl_ast_make_array(gl_ast_array_t array, gl_location_t location) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
+    assert(res);
+    res->type = GL_AST_ARRAY;
+    res->value.array = array;
+    res->location = location;
+    return res;
+}
+
+gl_ast_node_t *gl_ast_make_vector(gl_ast_vector_t vector, gl_location_t location) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
+    assert(res);
+    res->type = GL_AST_VECTOR;
+    res->value.vector = vector;
+    res->location = location;
+    return res;
+}
+
 gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     if (!node)
         return NULL;
@@ -141,6 +169,22 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
         res->value.cons.car = gl_ast_copy(node->value.cons.car);
         res->value.cons.cdr = gl_ast_copy(node->value.cons.cdr);
         break;
+    case GL_AST_ARRAY: {
+        gl_ast_array_init(&res->value.array, node->value.array.size, gl_ast_node_destroy_helper);
+        for (size_t i = 0; i < node->value.array.size; ++i) {
+            res->value.array.data[i] = gl_ast_copy(node->value.array.data[i]);
+        }
+        break;
+    }
+    case GL_AST_VECTOR: {
+        gl_ast_vector_init(&res->value.vector, gl_ast_node_destroy_helper);
+        for (size_t i = 0; i < node->value.vector.size; ++i) {
+            gl_ast_vector_push_back(
+                &res->value.vector,
+                gl_ast_copy(*gl_ast_vector_at((gl_ast_vector_t *)&node->value.vector, i)));
+        }
+        break;
+    }
     case GL_AST_NIL:
         break;
     }
@@ -156,6 +200,12 @@ void gl_ast_destroy(gl_ast_node_t *node) {
     case GL_AST_CONS:
         gl_ast_destroy(node->value.cons.car);
         gl_ast_destroy(node->value.cons.cdr);
+        break;
+    case GL_AST_ARRAY:
+        gl_ast_array_destroy(&node->value.array);
+        break;
+    case GL_AST_VECTOR:
+        gl_ast_vector_destroy(&node->value.vector);
         break;
     case GL_AST_SYMBOL:
     case GL_AST_STRING:

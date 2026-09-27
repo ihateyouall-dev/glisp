@@ -73,6 +73,10 @@ GL_BUILTIN(function_p);
 
 GL_BUILTIN(list_p);
 
+GL_BUILTIN(array_p);
+
+GL_BUILTIN(vector_p);
+
 // Type constructors
 
 GL_BUILTIN(int_con);
@@ -80,6 +84,24 @@ GL_BUILTIN(int_con);
 GL_BUILTIN(float_con);
 
 GL_BUILTIN(list_con);
+
+GL_BUILTIN(array_con);
+
+GL_BUILTIN(vector_con);
+
+// Array and vector operations
+
+GL_BUILTIN(len);
+
+GL_BUILTIN(get);
+
+GL_BUILTIN(set_at);
+
+// Dynamic vector operations
+
+GL_BUILTIN(vector_push);
+
+GL_BUILTIN(vector_pop);
 
 GL_BUILTIN(gc_collect);
 

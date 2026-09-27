@@ -68,6 +68,24 @@ static void __gl_trace_value(gl_value_t *val) {
         }
         break;
     }
+    case GL_VAL_ARRAY: {
+        gl_value_array_t *arr = val->val;
+        if (arr && arr->data) {
+            for (size_t i = 0; i < arr->size; ++i) {
+                __gl_trace_value(arr->data[i]);
+            }
+        }
+        break;
+    }
+    case GL_VAL_VECTOR: {
+        gl_value_vector_t *vec = val->val;
+        if (vec && vec->data) {
+            for (size_t i = 0; i < vec->size; ++i) {
+                __gl_trace_value(*gl_value_vector_at(vec, i));
+            }
+        }
+        break;
+    }
     default:
         break;
     }

@@ -4,6 +4,7 @@
 #include "utils/array.h"
 #include "utils/cons.h"
 #include "utils/location.h"
+#include "utils/vector.h"
 
 #include <stdint.h>
 
@@ -17,7 +18,9 @@ typedef enum {
     GL_VAL_SPFORM,
     GL_VAL_CONS,
     GL_VAL_STRING,
-    GL_VAL_ENV
+    GL_VAL_ENV,
+    GL_VAL_ARRAY,
+    GL_VAL_VECTOR
 } gl_value_type_t;
 
 typedef struct gl_value_t {
@@ -28,6 +31,8 @@ typedef struct gl_value_t {
 } gl_value_t;
 
 CONS_DECLARE(gl_value_t *, gl_value_cons)
+ARRAY_DECLARE(gl_value_t *, gl_value_array)
+VECTOR_DECLARE(gl_value_t *, gl_value_vector)
 
 void gl_value_destroy(gl_value_t **val);
 
@@ -81,6 +86,12 @@ gl_value_t *gl_value_make_specform(gl_special_form_t spform);
 
 gl_value_t *gl_value_make_env(gl_env_t *env);
 
+gl_value_t *gl_value_make_array(size_t size);
+gl_value_t *gl_value_make_array_from(gl_value_array_t *arr);
+
+gl_value_t *gl_value_make_vector(void);
+gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec);
+
 void gl_value_print(gl_value_t *val);
 
 int64_t gl_value_get_int(gl_value_t *val);
@@ -90,6 +101,10 @@ long double gl_value_get_float(gl_value_t *val);
 char *gl_value_get_symbol(gl_value_t *val);
 
 gl_value_cons_t *gl_value_get_cons(gl_value_t *val);
+
+gl_value_array_t *gl_value_get_array(gl_value_t *val);
+
+gl_value_vector_t *gl_value_get_vector(gl_value_t *val);
 
 gl_builtin_t gl_value_get_builtin(gl_value_t *val);
 

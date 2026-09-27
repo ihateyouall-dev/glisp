@@ -104,15 +104,19 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         return res;
     case '[':
         res.type = GL_LEX_LSPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case ']':
         res.type = GL_LEX_RSPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case '{':
         res.type = GL_LEX_LFPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case '}':
         res.type = GL_LEX_RFPAREN;
+        gl_lexer_advance(lexer);
         return res;
     case '\'':
         res.type = GL_LEX_QUOTE;

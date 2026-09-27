@@ -18,7 +18,7 @@
 
 #define ARRAY_DEFINE(T, Name)                                                                      \
     void Name##_init(Name##_t *arr, size_t size, void (*destroy_fn)(T *)) {                        \
-        arr->data = malloc(sizeof(T) * size);                                                      \
+        arr->data = size > 0 ? malloc(sizeof(T) * size) : NULL;                                    \
         arr->size = size;                                                                          \
         arr->destroy_fn = destroy_fn;                                                              \
     }                                                                                              \
@@ -29,14 +29,18 @@
     Name##_t *Name##_copy(Name##_t *arr) {                                                         \
         Name##_t *res = malloc(sizeof(Name##_t));                                                  \
         Name##_init(res, arr->size, arr->destroy_fn);                                              \
-        memcpy(res->data, arr->data, sizeof(T) * res->size);                                       \
+        if (arr->size > 0 && arr->data) {                                                          \
+            memcpy(res->data, arr->data, sizeof(T) * res->size);                                   \
+        }                                                                                          \
         return res;                                                                                \
     }                                                                                              \
     void Name##_destroy(Name##_t *arr) {                                                           \
         if (!arr || !arr->data)                                                                    \
             return;                                                                                \
         for (size_t i = 0; i < arr->size; ++i) {                                                   \
-            arr->destroy_fn(arr->data + i);                                                        \
+            if (arr->destroy_fn) {                                                                 \
+                arr->destroy_fn(arr->data + i);                                                    \
+            }                                                                                      \
         }                                                                                          \
         free(arr->data);                                                                           \
         arr->size = 0;                                                                             \

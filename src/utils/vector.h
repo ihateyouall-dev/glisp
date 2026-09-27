@@ -40,7 +40,7 @@
     }                                                                                              \
     void Name##_push_back(Name##_t *vec, T val) {                                                  \
         if (vec->size == vec->capacity) {                                                          \
-            __##Name##_realloc(vec, vec->capacity * 2);                                            \
+            __##Name##_realloc(vec, vec->capacity ? vec->capacity * 2 : 8);                        \
         }                                                                                          \
         vec->data[vec->size++] = val;                                                              \
     }                                                                                              \
@@ -50,10 +50,8 @@
     }                                                                                              \
     T Name##_pop_back(Name##_t *vec) {                                                             \
         assert(vec->size > 0);                                                                     \
-        T res = vec->data[vec->size - 1];                                                          \
-        if (vec->destroy_fn)                                                                       \
-            vec->destroy_fn(&vec->data[--vec->size]);                                              \
-        return res;                                                                                \
+        vec->size--;                                                                               \
+        return vec->data[vec->size];                                                               \
     }                                                                                              \
     void Name##_destroy(Name##_t *vec) {                                                           \
         for (size_t i = 0; i < vec->size; ++i) {                                                   \
@@ -90,7 +88,7 @@
         Name##_reserve(&res, vec->capacity);                                                       \
         res.size = vec->size;                                                                      \
         for (size_t i = 0; i < vec->size; ++i) {                                                   \
-            res.data[i] = copy_fn(vec->data[i]);                                                   \
+            res.data[i] = copy_fn ? copy_fn(vec->data[i]) : vec->data[i];                          \
         }                                                                                          \
         return res;                                                                                \
     }

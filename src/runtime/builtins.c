@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
@@ -37,6 +38,22 @@ static void __emit_type_error(gl_location_t location, const char *expected, cons
     gl_diagnostic_report_error(err);
 }
 
+static void __emit_index_error(gl_location_t location, int64_t index, size_t size) {
+    const char *fmt = "Index out of bounds: %lld (size %zu)";
+    char buf[256] = "";
+
+    snprintf(buf, sizeof(buf), fmt, (long long)index, size);
+
+    gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+static void __emit_empty_vector_error(gl_location_t location) {
+    char buf[128] = "Cannot pop from empty vector";
+    gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
 static const char *__gl_value_get_type_name(gl_value_t *val) {
     switch (val->type) {
     case GL_VAL_INT:
@@ -55,6 +72,10 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "function";
     case GL_VAL_NIL:
         return "nil";
+    case GL_VAL_ARRAY:
+        return "array";
+    case GL_VAL_VECTOR:
+        return "vector";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
@@ -545,6 +566,28 @@ GL_BUILTIN(list_p) {
     return gl_value_make_bool(1);
 }
 
+GL_BUILTIN(array_p) {
+    EXPECT_VARGS(1);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->val->type != GL_VAL_ARRAY) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(vector_p) {
+    EXPECT_VARGS(1);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->val->type != GL_VAL_VECTOR) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
 GL_BUILTIN(int_con) {
     gl_function_arg_t *arg = args->data[0];
     gl_value_t *val = arg->val;
@@ -606,6 +649,195 @@ GL_BUILTIN(list_con) {
     res->val = list;
     gl_register_value(res);
     return res;
+}
+
+GL_BUILTIN(array_con) {
+    gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+    gl_value_array_init(arr, args->size, NULL);
+    for (size_t i = 0; i < args->size; ++i) {
+        arr->data[i] = args->data[i]->val;
+    }
+    return gl_value_make_array_from(arr);
+}
+
+GL_BUILTIN(vector_con) {
+    gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+    gl_value_vector_init(vec, NULL);
+    for (size_t i = 0; i < args->size; ++i) {
+        gl_value_vector_push_back(vec, args->data[i]->val);
+    }
+    return gl_value_make_vector_from(vec);
+}
+
+GL_BUILTIN(len) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+    if (val->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = val->val;
+        return gl_value_make_int((int64_t)arr->size);
+    } else if (val->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = val->val;
+        return gl_value_make_int((int64_t)vec->size);
+    } else if (val->type == GL_VAL_STRING) {
+        return gl_value_make_int((int64_t)strlen((char *)val->val));
+    } else if (val->type == GL_VAL_CONS) {
+        int64_t count = 0;
+        gl_value_t *cur = val;
+        while (cur && cur->type == GL_VAL_CONS) {
+            count++;
+            gl_value_cons_t *cons = gl_value_get_cons(cur);
+            cur = cons->cdr;
+        }
+        return gl_value_make_int(count);
+    } else if (val->type == GL_VAL_NIL) {
+        return gl_value_make_int(0);
+    } else {
+        __emit_type_error(args->data[0]->location, "sequence", __gl_value_get_type_name(val));
+        return NULL;
+    }
+}
+
+GL_BUILTIN(get) {
+    EXPECT_ARGS(2);
+
+    gl_function_arg_t *arg_coll = args->data[0];
+    gl_function_arg_t *arg_idx = args->data[1];
+    if (arg_coll->val->type == GL_VAL_INT &&
+        (arg_idx->val->type == GL_VAL_ARRAY || arg_idx->val->type == GL_VAL_VECTOR ||
+         arg_idx->val->type == GL_VAL_STRING || arg_idx->val->type == GL_VAL_CONS)) {
+        arg_coll = args->data[1];
+        arg_idx = args->data[0];
+    }
+
+    if (arg_idx->val->type != GL_VAL_INT) {
+        __emit_type_error(arg_idx->location, "int", __gl_value_get_type_name(arg_idx->val));
+        return NULL;
+    }
+
+    int64_t idx = gl_value_get_int(arg_idx->val);
+    gl_value_t *coll = arg_coll->val;
+
+    if (idx < 0) {
+        __emit_index_error(arg_idx->location, idx, 0);
+        return NULL;
+    }
+
+    if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = coll->val;
+        if ((size_t)idx >= arr->size) {
+            __emit_index_error(arg_idx->location, idx, arr->size);
+            return NULL;
+        }
+        return arr->data[idx];
+    } else if (coll->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = coll->val;
+        if ((size_t)idx >= vec->size) {
+            __emit_index_error(arg_idx->location, idx, vec->size);
+            return NULL;
+        }
+        return *gl_value_vector_at(vec, (size_t)idx);
+    } else if (coll->type == GL_VAL_STRING) {
+        char *str = coll->val;
+        size_t slen = strlen(str);
+        if ((size_t)idx >= slen) {
+            __emit_index_error(arg_idx->location, idx, slen);
+            return NULL;
+        }
+        char ch_buf[2] = {str[idx], '\0'};
+        return gl_value_make_string(ch_buf);
+    } else if (coll->type == GL_VAL_CONS) {
+        gl_value_t *cur = coll;
+        for (int64_t i = 0; i < idx; ++i) {
+            if (cur == NULL || cur->type != GL_VAL_CONS) {
+                __emit_index_error(arg_idx->location, idx, (size_t)i);
+                return NULL;
+            }
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+        if (cur == NULL || cur->type != GL_VAL_CONS) {
+            __emit_index_error(arg_idx->location, idx, (size_t)idx);
+            return NULL;
+        }
+        return gl_value_get_cons(cur)->car;
+    } else {
+        __emit_type_error(arg_coll->location, "sequence", __gl_value_get_type_name(coll));
+        return NULL;
+    }
+}
+
+GL_BUILTIN(set_at) {
+    EXPECT_ARGS(3);
+
+    gl_value_t *coll = args->data[0]->val;
+    if (args->data[1]->val->type != GL_VAL_INT) {
+        __emit_type_error(args->data[1]->location, "int",
+                          __gl_value_get_type_name(args->data[1]->val));
+        return NULL;
+    }
+    int64_t idx = gl_value_get_int(args->data[1]->val);
+    gl_value_t *new_val = args->data[2]->val;
+
+    if (idx < 0) {
+        __emit_index_error(args->data[1]->location, idx, 0);
+        return NULL;
+    }
+
+    if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = coll->val;
+        if ((size_t)idx >= arr->size) {
+            __emit_index_error(args->data[1]->location, idx, arr->size);
+            return NULL;
+        }
+        arr->data[idx] = new_val;
+        return new_val;
+    } else if (coll->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = coll->val;
+        if ((size_t)idx >= vec->size) {
+            __emit_index_error(args->data[1]->location, idx, vec->size);
+            return NULL;
+        }
+        *gl_value_vector_at(vec, (size_t)idx) = new_val;
+        return new_val;
+    } else {
+        __emit_type_error(args->data[0]->location, "array or vector",
+                          __gl_value_get_type_name(coll));
+        return NULL;
+    }
+}
+
+GL_BUILTIN(vector_push) {
+    EXPECT_VARGS(2);
+
+    if (args->data[0]->val->type != GL_VAL_VECTOR) {
+        __emit_type_error(args->data[0]->location, "vector",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    gl_value_vector_t *vec = args->data[0]->val->val;
+    for (size_t i = 1; i < args->size; ++i) {
+        gl_value_vector_push_back(vec, args->data[i]->val);
+    }
+    return args->data[0]->val;
+}
+
+GL_BUILTIN(vector_pop) {
+    EXPECT_ARGS(1);
+
+    if (args->data[0]->val->type != GL_VAL_VECTOR) {
+        __emit_type_error(args->data[0]->location, "vector",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    gl_value_vector_t *vec = args->data[0]->val->val;
+    if (vec->size == 0) {
+        __emit_empty_vector_error(args->data[0]->location);
+        return NULL;
+    }
+
+    return gl_value_vector_pop_back(vec);
 }
 
 GL_BUILTIN(gc_collect) {

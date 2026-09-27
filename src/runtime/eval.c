@@ -39,6 +39,25 @@ static gl_value_t *__gl_eval_string(gl_ast_node_t *node) {
 
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
+static gl_value_t *__gl_eval_array(gl_ast_node_t *node) {
+    size_t size = node->value.array.size;
+    gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+    gl_value_array_init(arr, size, NULL);
+    for (size_t i = 0; i < size; ++i) {
+        arr->data[i] = gl_eval(node->value.array.data[i]);
+    }
+    return gl_value_make_array_from(arr);
+}
+
+static gl_value_t *__gl_eval_vector(gl_ast_node_t *node) {
+    gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+    gl_value_vector_init(vec, NULL);
+    for (size_t i = 0; i < node->value.vector.size; ++i) {
+        gl_value_vector_push_back(vec, gl_eval(*gl_ast_vector_at(&node->value.vector, i)));
+    }
+    return gl_value_make_vector_from(vec);
+}
+
 static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
     if (arg && *arg) {
         free(*arg);
@@ -226,6 +245,10 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
         return __gl_eval_nil();
     case GL_AST_CONS:
         return __gl_eval_list(node);
+    case GL_AST_ARRAY:
+        return __gl_eval_array(node);
+    case GL_AST_VECTOR:
+        return __gl_eval_vector(node);
     default:
         return NULL;
     }
@@ -238,6 +261,10 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
 
     while (current) {
         res = gl_eval(current);
+        // Aborting if got error
+        if (!res) {
+            exit(-1);
+        }
         gl_ast_node_t *next = gl_parser_parse(parser);
         gl_ast_destroy(current);
         current = next;

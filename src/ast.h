@@ -3,6 +3,7 @@
 #include "utils/array.h"
 #include "utils/cons.h"
 #include "utils/location.h"
+#include "utils/vector.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -20,7 +21,10 @@ typedef enum {
 
 struct gl_ast_node_t;
 
-CONS_DECLARE(struct gl_ast_node_t *, gl_ast_cons)
+CONS_DECLARE(struct gl_ast_node_t *, gl_ast_cons);
+
+ARRAY_DECLARE(struct gl_ast_node_t *, gl_ast_array);
+VECTOR_DECLARE(struct gl_ast_node_t *, gl_ast_vector);
 
 typedef struct gl_ast_node_t {
     gl_ast_node_type_t type;
@@ -33,8 +37,12 @@ typedef struct gl_ast_node_t {
         char *string;
 
         gl_ast_cons_t cons;
+        gl_ast_array_t array;
+        gl_ast_vector_t vector;
     } value;
 } gl_ast_node_t;
+
+void gl_ast_node_destroy_helper(gl_ast_node_t **node);
 
 gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n);
 gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n);
@@ -48,6 +56,8 @@ gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location);
 gl_ast_node_t *gl_ast_make_symbol(const char *sym, gl_location_t location);
 gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, gl_location_t location);
 gl_ast_node_t *gl_ast_make_string(char *str, gl_location_t location);
+gl_ast_node_t *gl_ast_make_array(gl_ast_array_t array, gl_location_t location);
+gl_ast_node_t *gl_ast_make_vector(gl_ast_vector_t vector, gl_location_t location);
 gl_ast_node_t *gl_ast_make_nil(gl_location_t location);
 gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node);
 void gl_ast_destroy(gl_ast_node_t *node);
