@@ -29,7 +29,9 @@
 
 #define HASHMAP_DEFINE(T, Name)                                                                    \
     static void Name##Entry_destroy(Name##Entry_t *entry) {                                        \
-        Name##_destroy_fn(&entry->value);                                                          \
+        if (Name##_destroy_fn) {                                                                   \
+            Name##_destroy_fn(&entry->value);                                                      \
+        }                                                                                          \
         free(entry->key);                                                                          \
     }                                                                                              \
     VECTOR_DEFINE(Name##Entry_t, Name##Bucket)                                                     \
@@ -45,7 +47,7 @@
     static Name##Entry_t Name##Entry_copy(Name##Entry_t *entry) {                                  \
         Name##Entry_t res;                                                                         \
         res.key = strdup(entry->key);                                                              \
-        res.value = Name##_copy_fn(entry->value);                                                  \
+        res.value = Name##_copy_fn ? Name##_copy_fn(entry->value) : entry->value;                  \
         return res;                                                                                \
     }                                                                                              \
     static void __##Name##_rehash(Name##_t *map, size_t new_buckets_count) {                       \
@@ -57,11 +59,10 @@
             Name##Bucket_t *bucket = &map->buckets[i];                                             \
             for (size_t j = 0; j < bucket->size; ++j) {                                            \
                 Name##Entry_t *entry = Name##Bucket_at(bucket, j);                                 \
-                Name##Entry_t copy = Name##Entry_copy(entry);                                      \
-                assert(&copy != entry);                                                            \
-                size_t idx = __##Name##_fnv1a(copy.key) % new_buckets_count;                       \
-                Name##Bucket_push_back(&new[idx], copy);                                           \
+                size_t idx = __##Name##_fnv1a(entry->key) % new_buckets_count;                     \
+                Name##Bucket_push_back(&new[idx], *entry);                                         \
             }                                                                                      \
+            free(bucket->data);                                                                    \
         }                                                                                          \
         free(map->buckets);                                                                        \
         map->buckets = new;                                                                        \
@@ -83,7 +84,9 @@
         for (size_t i = 0; i < bucket->size; ++i) {                                                \
             Name##Entry_t *prev = Name##Bucket_at(bucket, i);                                      \
             if (strcmp(key, prev->key) == 0) {                                                     \
-                map->destroy_fn(&prev->value);                                                     \
+                if (map->destroy_fn) {                                                             \
+                    map->destroy_fn(&prev->value);                                                 \
+                }                                                                                  \
                 prev->value = value;                                                               \
                 return;                                                                            \
             }                                                                                      \

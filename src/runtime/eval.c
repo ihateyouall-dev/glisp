@@ -40,8 +40,10 @@ static gl_value_t *__gl_eval_string(gl_ast_node_t *node) {
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
 static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
-    gl_value_destroy(&(*arg)->val);
-    free(*arg);
+    if (arg && *arg) {
+        free(*arg);
+        *arg = NULL;
+    }
 }
 
 static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
@@ -70,6 +72,8 @@ static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
         res->data[i]->location = current->location;
         res->data[i]->val = gl_eval(current->value.cons.car);
         if (res->data[i]->val == NULL) {
+            gl_function_args_destroy(res);
+            free(res);
             return NULL;
         }
     }
@@ -158,6 +162,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
 
         gl_value_t *res = builtin(func_node->location, argv);
         gl_function_args_destroy(argv);
+        free(argv);
         return res;
     }
     case GL_VAL_SPFORM: {
@@ -169,6 +174,10 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         gl_function_t *function = func_val->val;
         gl_function_args_t *argv = __gl_eval_args(args, (gl_env_t *)env->val);
 
+        if (argv == NULL) {
+            return NULL;
+        }
+
         gl_init_call_stack();
         gl_call_stack_push_call(function, func_node);
 
@@ -176,9 +185,13 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
 
         if (!res) {
             gl_call_stack_print_stacktrace();
+            gl_function_args_destroy(argv);
+            free(argv);
             return NULL;
         }
         gl_call_stack_pop_call();
+        gl_function_args_destroy(argv);
+        free(argv);
         return res;
     }
     default:
@@ -223,11 +236,11 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
 
     gl_value_t *res = NULL;
 
-    gl_ast_node_t *it = current;
-
-    while (it) {
-        res = gl_eval(it);
-        it = gl_parser_parse(parser);
+    while (current) {
+        res = gl_eval(current);
+        gl_ast_node_t *next = gl_parser_parse(parser);
+        gl_ast_destroy(current);
+        current = next;
     }
 
     return res;

@@ -1,6 +1,8 @@
 #include "parser.h"
+#include "runtime/callstack.h"
 #include "runtime/env.h"
 #include "runtime/eval.h"
+#include "runtime/memory.h"
 #include "runtime/value.h"
 #include "utils/rl_wrapper.h"
 
@@ -51,6 +53,8 @@ int main(int argc, char **argv) {
         free(real_path);
         fclose(file);
         free(buf);
+        gl_call_stack_cleanup();
+        gl_destroy_memory_heap();
         return 0;
     }
 
@@ -72,5 +76,7 @@ int main(int argc, char **argv) {
 
         free(input);
     }
+    gl_call_stack_cleanup();
+    gl_destroy_memory_heap();
     return 0;
 }

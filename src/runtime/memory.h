@@ -14,3 +14,5 @@ void gl_init_memory_heap(void);
 void gl_register_value(gl_value_t *val);
 
 void gl_gc_collect(void);
+
+void gl_destroy_memory_heap(void);

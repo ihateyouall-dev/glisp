@@ -55,6 +55,7 @@ int main(void) {
     TEST(vec.capacity == 120, "Capacity after resizing");
 
     vector_destroy(&vec);
+    vector_destroy(&copy);
 
     TEST(vec.data == NULL, "Data after destroy");
     TEST(vec.size == 0, "Size after destroy");

@@ -26,3 +26,5 @@ void gl_call_stack_pop_call(void);
 void gl_call_stack_print_stacktrace();
 
 gl_call_frame_t gl_call_stack_current_frame();
+
+void gl_call_stack_cleanup(void);

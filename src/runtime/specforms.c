@@ -1,6 +1,7 @@
 #include "specforms.h"
 
 #include "ast.h"
+#include "callstack.h"
 #include "eval.h"
 #include "runtime/env.h"
 #include "runtime/value.h"
@@ -56,7 +57,8 @@ GL_SPECIAL_FORM(defun) {
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 1);
     const char *name = gl_ast_cons_nth_car(args, 0)->value.symbol;
 
-    gl_value_t *res = gl_value_make_function(name, gl_ast_copy(tree), func_params, env); // NOLINT
+    gl_value_t *res =
+        gl_value_make_function(name, gl_ast_copy(tree), func_params, gl_current_env());
     gl_env_set_fun(env, name, res);
 
     return res;
@@ -82,8 +84,8 @@ GL_SPECIAL_FORM(lambda) {
     }
 
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 0);
-    gl_value_t *res =
-        gl_value_make_function("anonymous function", gl_ast_copy(tree), func_params, env);
+    gl_value_t *res = gl_value_make_function("anonymous function", gl_ast_copy(tree), func_params,
+                                             gl_current_env());
 
     return res;
 }
@@ -108,10 +110,10 @@ GL_SPECIAL_FORM(set_global) {
     gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
     // Getting the global environment
-    gl_env_t *global_env = env->parent;
+    gl_env_t *global_env = env;
 
     while (global_env->parent != NULL) {
-        global_env = global_env->parent;
+        global_env = (gl_env_t *)global_env->parent->val;
     }
 
     gl_env_set_var(global_env, var_name, var_value);

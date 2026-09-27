@@ -18,6 +18,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 0, "LPAREN pos");
     TEST(token.location.line == 1, "LPAREN line");
     TEST(token.location.column == 1, "LPAREN column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -26,6 +27,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 1, "INTLITERAL pos");
     TEST(token.location.line == 1, "INTLITERAL line");
     TEST(token.location.column == 2, "INTLITERAL column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -34,6 +36,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 3, "FLOATLITERAL pos");
     TEST(token.location.line == 1, "FLOATLITERAL line");
     TEST(token.location.column == 4, "FLOATLITERAL column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -42,6 +45,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 8, "SYMBOL pos");
     TEST(token.location.line == 1, "SYMBOL line");
     TEST(token.location.column == 9, "SYMBOL column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -50,6 +54,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 23, "Complex SYMBOL pos");
     TEST(token.location.line == 2, "Complex SYMBOL line");
     TEST(token.location.column == 2, "Complex SYMBOL column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -57,6 +62,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 33, "RPAREN pos");
     TEST(token.location.line == 2, "RPAREN line");
     TEST(token.location.column == 12, "RPAREN column");
+    gl_lex_token_destroy(&token);
 
     token = gl_lexer_next(&lexer);
 
@@ -64,6 +70,7 @@ void lexer_test(void) {
     TEST(token.location.pos == 34, "EOF pos");
     TEST(token.location.line == 2, "EOF line");
     TEST(token.location.column == 13, "EOF column");
+    gl_lex_token_destroy(&token);
 }
 
 void lexer_tokenize_test(void) {

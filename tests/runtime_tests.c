@@ -1,6 +1,6 @@
-#include "test.h"
-
 #include "env.h"
+#include "memory.h"
+#include "test.h"
 #include "value.h"
 
 int test_status = 0;
@@ -28,10 +28,13 @@ void test_derived_envs(void) {
     TEST(gl_env_get_fun(global, "defun")->val, "Global function value access");
     TEST(gl_env_get_var(derived, "t")->val, "Derived variable value access");
     TEST(gl_env_get_fun(derived, "defun")->val, "Derived function value access");
+
+    gl_env_destroy(derived);
 }
 
 int main(void) {
     test_derived_envs();
     test_value_copy();
+    gl_destroy_memory_heap();
     return test_status;
 }

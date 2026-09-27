@@ -1,7 +1,9 @@
 #include "memory.h"
+
 #include "callstack.h"
 #include "env.h"
 #include "value.h"
+
 #include <stddef.h>
 
 gl_memory_heap_t *gl_memory_heap = NULL;
@@ -35,6 +37,7 @@ void gl_register_value(gl_value_t *val) {
     }
 }
 
+static void __gl_trace_env_raw(gl_env_t *raw);
 static void __gl_trace_environment(gl_value_t *env);
 
 static void __gl_trace_value(gl_value_t *val) {
@@ -55,7 +58,7 @@ static void __gl_trace_value(gl_value_t *val) {
     case GL_VAL_FUNCTION: {
         gl_function_t *func = val->val;
         if (func && func->closure) {
-            __gl_trace_environment(func->closure);
+            __gl_trace_value(func->closure);
         }
         break;
     }
@@ -91,12 +94,7 @@ static void __gl_trace_value_table(gl_value_table_t *table) {
     }
 }
 
-static void __gl_trace_environment(gl_value_t *env) {
-    if (env == NULL || env->gc_marked) {
-        return;
-    }
-    env->gc_marked = 1;
-    gl_env_t *raw = env->val;
+static void __gl_trace_env_raw(gl_env_t *raw) {
     if (raw == NULL) {
         return;
     }
@@ -110,6 +108,14 @@ static void __gl_trace_environment(gl_value_t *env) {
     if (raw->parent != NULL) {
         __gl_trace_environment(raw->parent);
     }
+}
+
+static void __gl_trace_environment(gl_value_t *env) {
+    if (env == NULL || env->gc_marked) {
+        return;
+    }
+    env->gc_marked = 1;
+    __gl_trace_env_raw(env->val);
 }
 
 void gl_gc_collect(void) {
@@ -156,4 +162,21 @@ void gl_gc_collect(void) {
             current = current->next_in_heap;
         }
     }
+}
+
+void gl_destroy_memory_heap(void) {
+    if (gl_memory_heap == NULL) {
+        return;
+    }
+
+    gl_value_t *current = gl_memory_heap->head;
+    while (current != NULL) {
+        gl_value_t *next = current->next_in_heap;
+        gl_value_destroy(&current);
+        current = next;
+    }
+
+    free(gl_memory_heap);
+    gl_memory_heap = NULL;
+    gl_global_env = NULL;
 }

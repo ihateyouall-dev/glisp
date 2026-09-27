@@ -118,12 +118,12 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
 
 ARRAY_DEFINE(char *, gl_function_params)
 
-gl_value_t *gl_value_make_function(char *name, gl_ast_node_t *tree, gl_function_params_t *params,
-                                   gl_env_t *closure) {
+gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
+                                   gl_function_params_t *params, gl_value_t *closure) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_FUNCTION;
     gl_function_t *func = malloc(sizeof(gl_function_t));
-    func->name = name;
+    func->name = name ? strdup(name) : NULL;
     func->tree = tree;
     func->params = params;
     func->closure = closure;
@@ -154,11 +154,11 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = malloc(sizeof(gl_value_cons_t));
         ((gl_value_cons_t *)res->val)->car = gl_value_copy(((gl_value_cons_t *)val->val)->car);
         ((gl_value_cons_t *)res->val)->cdr = gl_value_copy(((gl_value_cons_t *)val->val)->cdr);
-        return res;
+        break;
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         res->val = strdup((char *)val->val);
-        return res;
+        break;
     case GL_VAL_FUNCTION:
         res->val = malloc(sizeof(gl_function_t));
         gl_function_t *func = res->val;
@@ -176,7 +176,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         } else {
             func->params = NULL;
         }
-        return res;
+        break;
     case GL_VAL_BUILTIN:
     case GL_VAL_SPFORM:
     case GL_VAL_ENV:
@@ -184,7 +184,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         break;
     case GL_VAL_NIL:
         res->val = NULL;
-        return res;
+        break;
     }
     gl_register_value(res);
     return res;
@@ -223,13 +223,10 @@ void gl_value_destroy(gl_value_t **val) {
         }
         break;
     case GL_VAL_CONS:
-        if ((*val)->val == NULL) {
-            break;
+        if ((*val)->val != NULL) {
+            free((*val)->val);
+            (*val)->val = NULL;
         }
-        gl_value_destroy(&((gl_value_cons_t *)((*val)->val))->car);
-        gl_value_destroy(&((gl_value_cons_t *)((*val)->val))->cdr);
-        free((*val)->val);
-        (*val)->val = NULL;
         break;
     case GL_VAL_ENV:
         if ((*val)->val == NULL) {

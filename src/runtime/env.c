@@ -1,4 +1,5 @@
 #include "env.h"
+
 #include "runtime/builtins.h"
 #include "runtime/specforms.h"
 #include "runtime/value.h"
@@ -16,11 +17,11 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
     res->parent = parent;
 
     gl_value_table_t *values = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(values, gl_value_destroy, gl_value_copy);
+    gl_value_table_init(values, NULL, gl_value_copy);
     res->variables = values;
 
     gl_value_table_t *functions = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(functions, gl_value_destroy, gl_value_copy);
+    gl_value_table_init(functions, NULL, gl_value_copy);
     res->functions = functions;
 
     return res;
