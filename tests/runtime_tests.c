@@ -262,8 +262,8 @@ void test_load_relative(void) {
 }
 
 void test_stdlib(void) {
-    gl_value_t *r = eval_str("(load \"std/prelude.lisp\")");
-    TEST(r != NULL, "load std/prelude.lisp succeeds");
+    gl_value_t *r = eval_str("(load \"std/std.lisp\")");
+    TEST(r != NULL, "load std/std.lisp succeeds");
 
     // Core predicates
     TEST(gl_value_get_bool(eval_str("(null? nil)")) == 1, "null? on nil");
@@ -362,6 +362,45 @@ void test_pragma(void) {
     TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 1, "pragma gc-enabled? after t");
 }
 
+void test_cond(void) {
+    // Empty cond returns nil
+    gl_value_t *v_empty = eval_str("(cond)");
+    TEST(v_empty != NULL && v_empty->type == GL_VAL_NIL, "cond empty");
+
+    // Single matching clause
+    gl_value_t *v1 = eval_str("(cond (t 42))");
+    TEST(v1 != NULL && gl_value_get_int(v1) == 42, "cond (t 42)");
+
+    // First matching clause chosen
+    gl_value_t *v2 = eval_str("(cond ((= 1 1) \"first\") ((= 2 2) \"second\"))");
+    TEST(v2 != NULL && strcmp(v2->val, "first") == 0, "cond first match");
+
+    // Second matching clause chosen
+    gl_value_t *v3 = eval_str("(cond ((= 1 2) \"first\") ((= 2 2) \"second\"))");
+    TEST(v3 != NULL && strcmp(v3->val, "second") == 0, "cond second match");
+
+    // No matching clause returns nil
+    gl_value_t *v_nomatch = eval_str("(cond ((= 1 2) 10) ((= 3 4) 20))");
+    TEST(v_nomatch != NULL && v_nomatch->type == GL_VAL_NIL, "cond no match returns nil");
+
+    // 'else' clause
+    gl_value_t *v_else = eval_str("(cond ((= 1 2) \"no\") (else \"yes\"))");
+    TEST(v_else != NULL && strcmp(v_else->val, "yes") == 0, "cond else clause");
+
+    // Single-expression clause returns condition value
+    gl_value_t *v_single = eval_str("(cond (nil) (55))");
+    TEST(v_single != NULL && gl_value_get_int(v_single) == 55, "cond single-expression clause");
+
+    // Multi-expression clause body (evaluated in sequence)
+    gl_value_t *v_multi = eval_str("(let ((x 1)) (cond (t (set x (+ x 10)) (set x (* x 2)) x)))");
+    TEST(v_multi != NULL && gl_value_get_int(v_multi) == 22, "cond multi-expression body");
+
+    // Short-circuit: false branch expressions are not evaluated
+    eval_str("(set test_flag 0)");
+    eval_str("(cond (nil (set test_flag 99)) (t (set test_flag 1)))");
+    TEST(gl_value_get_int(eval_str("test_flag")) == 1, "cond short-circuit");
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     chdir(GLISP_SOURCE_DIR);
@@ -370,7 +409,7 @@ int main(void) {
     test_value_copy();
 
     gl_init_global_env();
-    eval_str("(load \"std/prelude.lisp\")");
+    eval_str("(load \"std/std.lisp\")");
     test_array_and_vector_eval();
     test_array_vector_predicates();
     test_array_vector_constructors();
@@ -385,6 +424,7 @@ int main(void) {
     test_load_relative();
     test_stdlib();
     test_pragma();
+    test_cond();
 
     gl_destroy_memory_heap();
     return test_status;

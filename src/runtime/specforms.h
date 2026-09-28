@@ -30,3 +30,5 @@ GL_SPECIAL_FORM(let);
 GL_SPECIAL_FORM(let_star);
 
 GL_SPECIAL_FORM(pragma);
+
+GL_SPECIAL_FORM(cond);

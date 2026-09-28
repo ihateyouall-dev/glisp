@@ -92,12 +92,14 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "let", gl_value_make_specform(&gl_specform_let));
     gl_env_set_fun(env, "let*", gl_value_make_specform(&gl_specform_let_star));
     gl_env_set_fun(env, "pragma", gl_value_make_specform(&gl_specform_pragma));
+    gl_env_set_fun(env, "cond", gl_value_make_specform(&gl_specform_cond));
 }
 
 gl_env_t *gl_make_global_env(void) {
     gl_env_t *res = gl_make_env(NULL);
 
     gl_env_set_var(res, "t", gl_value_make_symbol("t"));
+    gl_env_set_var(res, "else", gl_value_make_symbol("t"));
     gl_env_set_var(res, "nil", gl_value_make_nil());
 
     // Basic type identifiers

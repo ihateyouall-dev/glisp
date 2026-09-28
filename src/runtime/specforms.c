@@ -9,6 +9,7 @@
 #include "runtime/value.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -420,4 +421,55 @@ GL_SPECIAL_FORM(pragma) {
     gl_function_args_destroy(pragma_args);
     free(pragma_args);
     return res;
+}
+
+GL_SPECIAL_FORM(cond) {
+    if (!args || args->type == GL_AST_NIL) {
+        return gl_value_make_nil();
+    }
+    if (args->type != GL_AST_CONS) {
+        __emit_syntax_error(args->location, "Malformed cond form: expected a list of clauses");
+        return NULL;
+    }
+
+    gl_ast_node_t *clause_node = args;
+    while (clause_node && clause_node->type == GL_AST_CONS) {
+        gl_ast_node_t *clause = clause_node->value.cons.car;
+        if (!clause || clause->type != GL_AST_CONS) {
+            __emit_syntax_error(clause ? clause->location : args->location,
+                                "cond clause must be a non-empty list");
+            return NULL;
+        }
+
+        gl_ast_node_t *test_node = clause->value.cons.car;
+        int is_else =
+            (test_node->type == GL_AST_SYMBOL && strcmp(test_node->value.symbol, "else") == 0);
+
+        gl_value_t *test_val = NULL;
+        if (is_else) {
+            test_val = gl_value_make_bool(1);
+        } else {
+            test_val = gl_eval(test_node);
+            if (!test_val) {
+                return NULL;
+            }
+        }
+
+        if (gl_value_get_bool(test_val)) {
+            gl_ast_node_t *body = clause->value.cons.cdr;
+            if (body->type == GL_AST_NIL) {
+                return test_val;
+            }
+            return __gl_eval_body(body);
+        }
+
+        clause_node = clause_node->value.cons.cdr;
+    }
+
+    if (clause_node && clause_node->type != GL_AST_NIL) {
+        __emit_syntax_error(clause_node->location, "Malformed cond clauses list");
+        return NULL;
+    }
+
+    return gl_value_make_nil();
 }
