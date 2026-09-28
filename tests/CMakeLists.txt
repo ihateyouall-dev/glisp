@@ -10,6 +10,8 @@ target_link_libraries(vector_tests PRIVATE vector)
 target_link_libraries(hashmap_tests PRIVATE hashmap)
 target_link_libraries(parser_tests PRIVATE parser)
 target_link_libraries(runtime_tests PRIVATE runtime)
+target_compile_definitions(runtime_tests
+                           PRIVATE GLISP_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(ansi_tests PRIVATE vector)
 
 add_test(NAME lexer_tests COMMAND lexer_tests)
@@ -17,4 +19,6 @@ add_test(NAME vector_tests COMMAND vector_tests)
 add_test(NAME hashmap_tests COMMAND hashmap_tests)
 add_test(NAME parser_tests COMMAND parser_tests)
 add_test(NAME runtime_tests COMMAND runtime_tests)
+set_tests_properties(runtime_tests PROPERTIES WORKING_DIRECTORY
+                                              "${CMAKE_SOURCE_DIR}")
 add_test(NAME ansi_tests COMMAND ansi_tests)

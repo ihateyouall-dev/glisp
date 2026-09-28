@@ -53,20 +53,9 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "|", gl_value_make_builtin(gl_builtin_or));
     gl_env_set_fun(env, "or", gl_value_make_builtin(gl_builtin_or));
 
-    gl_env_set_fun(env, "int?", gl_value_make_builtin(gl_builtin_int_p));
-    gl_env_set_fun(env, "float?", gl_value_make_builtin(gl_builtin_float_p));
-    gl_env_set_fun(env, "number?", gl_value_make_builtin(gl_builtin_number_p));
-    gl_env_set_fun(env, "symbol?", gl_value_make_builtin(gl_builtin_symbol_p));
-    gl_env_set_fun(env, "string?", gl_value_make_builtin(gl_builtin_string_p));
-    gl_env_set_fun(env, "nil?", gl_value_make_builtin(gl_builtin_nil_p));
-    gl_env_set_fun(env, "function?", gl_value_make_builtin(gl_builtin_function_p));
-    gl_env_set_fun(env, "list?", gl_value_make_builtin(gl_builtin_list_p));
-    gl_env_set_fun(env, "array?", gl_value_make_builtin(gl_builtin_array_p));
-    gl_env_set_fun(env, "vector?", gl_value_make_builtin(gl_builtin_vector_p));
-    gl_env_set_fun(env, "typeid?", gl_value_make_builtin(gl_builtin_typeid_p));
-
     gl_env_set_fun(env, "car", gl_value_make_builtin(gl_builtin_car));
     gl_env_set_fun(env, "cdr", gl_value_make_builtin(gl_builtin_cdr));
+    gl_env_set_fun(env, "cons", gl_value_make_builtin(gl_builtin_cons));
 
     gl_env_set_fun(env, "int", gl_value_make_builtin(gl_builtin_int_con));
     gl_env_set_fun(env, "float", gl_value_make_builtin(gl_builtin_float_con));
@@ -88,6 +77,9 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
     gl_env_set_fun(env, "gc-collect", gl_value_make_builtin(gl_builtin_gc_collect));
     gl_env_set_fun(env, "gc-allocated", gl_value_make_builtin(gl_builtin_gc_allocated));
+
+    gl_env_set_fun(env, "apply", gl_value_make_builtin(gl_builtin_apply));
+    gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {

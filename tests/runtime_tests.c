@@ -5,6 +5,10 @@
 #include "test.h"
 #include "value.h"
 
+#ifdef GLISP_SOURCE_DIR
+#include <unistd.h>
+#endif
+
 int test_status = 0;
 
 static gl_value_t *eval_str(const char *src) {
@@ -221,7 +225,119 @@ void test_let_star(void) {
          "let* chained bindings");
 }
 
+void test_cons(void) {
+    gl_value_t *c1 = eval_str("(cons 1 2)");
+    TEST(c1->type == GL_VAL_CONS, "cons creates cons cell");
+    TEST(gl_value_get_int(eval_str("(car (cons 1 2))")) == 1, "car of cons");
+    TEST(gl_value_get_int(eval_str("(cdr (cons 1 2))")) == 2, "cdr of cons");
+
+    gl_value_t *c2 = eval_str("(cons 42 nil)");
+    TEST(gl_value_get_int(eval_str("(car (cons 42 nil))")) == 42, "car of cons with nil");
+    TEST(eval_str("(cdr (cons 42 nil))")->type == GL_VAL_NIL, "cdr of cons with nil is nil");
+}
+
+void test_apply(void) {
+    TEST(gl_value_get_int(eval_str("(apply + [1 2 3])")) == 6, "apply + on array");
+    TEST(gl_value_get_int(eval_str("(apply * {2 3 4})")) == 24, "apply * on vector");
+    TEST(gl_value_get_int(eval_str("(apply + 10 20 [1 2 3])")) == 36, "apply + with prefix args");
+    TEST(gl_value_get_int(eval_str("(apply + 5 {10 20})")) == 35, "apply + with vector and prefix");
+
+    eval_str("(defun test-sub (a b) (- a b))");
+    TEST(gl_value_get_int(eval_str("(apply test-sub [10 3])")) == 7,
+         "apply user function on array");
+    TEST(gl_value_get_int(eval_str("(apply test-sub (list 10 3))")) == 7,
+         "apply user function on list");
+}
+
+void test_load_relative(void) {
+    gl_value_t *r1 = eval_str("(load \"tests/load_test/top.lisp\")");
+    TEST(r1 != NULL, "load top.lisp succeeds");
+    TEST(gl_value_get_int(eval_str("(top-marker)")) == 12346,
+         "top.lisp successfully loaded nested/sub.lisp relatively");
+
+    gl_value_t *r2 = eval_str("(load \"tests/load_test/nested/relative_up.lisp\")");
+    TEST(r2 != NULL, "load relative_up.lisp succeeds");
+    TEST(gl_value_get_int(eval_str("(sibling-marker)")) == 999,
+         "relative_up.lisp successfully loaded ../sibling.lisp relatively");
+}
+
+void test_stdlib(void) {
+    gl_value_t *r = eval_str("(load \"std/prelude.lisp\")");
+    TEST(r != NULL, "load std/prelude.lisp succeeds");
+
+    // Core predicates
+    TEST(gl_value_get_bool(eval_str("(null? nil)")) == 1, "null? on nil");
+    TEST(gl_value_get_bool(eval_str("(null? 1)")) == 0, "null? on non-nil");
+    TEST(gl_value_get_bool(eval_str("(not t)")) == 0, "not t");
+    TEST(gl_value_get_bool(eval_str("(not nil)")) == 1, "not nil");
+    TEST(gl_value_get_bool(eval_str("(zero? 0)")) == 1, "zero? on 0");
+    TEST(gl_value_get_bool(eval_str("(zero? 5)")) == 0, "zero? on 5");
+    TEST(gl_value_get_bool(eval_str("(pos? 5)")) == 1, "pos? on 5");
+    TEST(gl_value_get_bool(eval_str("(pos? -5)")) == 0, "pos? on -5");
+    TEST(gl_value_get_bool(eval_str("(neg? -5)")) == 1, "neg? on -5");
+    TEST(gl_value_get_bool(eval_str("(neg? 5)")) == 0, "neg? on 5");
+    TEST(gl_value_get_bool(eval_str("(even? 4)")) == 1, "even? on 4");
+    TEST(gl_value_get_bool(eval_str("(even? 5)")) == 0, "even? on 5");
+    TEST(gl_value_get_bool(eval_str("(odd? 5)")) == 1, "odd? on 5");
+    TEST(gl_value_get_bool(eval_str("(odd? 4)")) == 0, "odd? on 4");
+    TEST(gl_value_get_int(eval_str("(id 42)")) == 42, "id function");
+
+    // Math
+    TEST(gl_value_get_int(eval_str("(inc 5)")) == 6, "inc");
+    TEST(gl_value_get_int(eval_str("(dec 5)")) == 4, "dec");
+    TEST(gl_value_get_int(eval_str("(abs -10)")) == 10, "abs negative");
+    TEST(gl_value_get_int(eval_str("(abs 10)")) == 10, "abs positive");
+    TEST(gl_value_get_int(eval_str("(min 3 7)")) == 3, "min");
+    TEST(gl_value_get_int(eval_str("(max 3 7)")) == 7, "max");
+    TEST(gl_value_get_int(eval_str("(clamp 5 10 20)")) == 10, "clamp lower");
+    TEST(gl_value_get_int(eval_str("(clamp 15 10 20)")) == 15, "clamp middle");
+    TEST(gl_value_get_int(eval_str("(clamp 25 10 20)")) == 20, "clamp upper");
+
+    // List
+    TEST(gl_value_get_int(eval_str("(cadr (list 1 2 3))")) == 2, "cadr");
+    TEST(gl_value_get_int(eval_str("(caddr (list 1 2 3))")) == 3, "caddr");
+    TEST(gl_value_get_bool(eval_str("(= (reverse (list 1 2 3)) (list 3 2 1))")) == 1, "reverse");
+    TEST(gl_value_get_bool(eval_str("(= (append (list 1 2) (list 3 4)) (list 1 2 3 4))")) == 1,
+         "append");
+    TEST(gl_value_get_int(eval_str("(car (member 2 (list 1 2 3)))")) == 2, "member found");
+    TEST(eval_str("(member 5 (list 1 2 3))")->type == GL_VAL_NIL, "member not found");
+
+    // Conversions
+    TEST(gl_value_get_bool(eval_str("(= (to-array (list 1 2 3)) [1 2 3])")) == 1, "to-array");
+    TEST(gl_value_get_bool(eval_str("(= (to-vector [1 2 3]) {1 2 3})")) == 1, "to-vector");
+    TEST(gl_value_get_bool(eval_str("(= (to-list [1 2 3]) (list 1 2 3))")) == 1, "to-list");
+
+    // Higher-order functions
+    // map
+    TEST(gl_value_get_bool(eval_str("(= (map inc (list 1 2 3)) (list 2 3 4))")) == 1,
+         "map on list");
+    TEST(gl_value_get_bool(eval_str("(= (map inc [1 2 3]) [2 3 4])")) == 1, "map on array");
+    TEST(gl_value_get_bool(eval_str("(= (map inc {1 2 3}) {2 3 4})")) == 1, "map on vector");
+
+    // filter
+    TEST(gl_value_get_bool(eval_str("(= (filter even? (list 1 2 3 4 5 6)) (list 2 4 6))")) == 1,
+         "filter on list");
+    TEST(gl_value_get_bool(eval_str("(= (filter even? [1 2 3 4 5 6]) [2 4 6])")) == 1,
+         "filter on array");
+    TEST(gl_value_get_bool(eval_str("(= (filter odd? {1 2 3 4 5 6}) {1 3 5})")) == 1,
+         "filter on vector");
+
+    // reduce
+    TEST(gl_value_get_int(eval_str("(reduce + (list 1 2 3 4) 0)")) == 10, "reduce + on list");
+    TEST(gl_value_get_int(eval_str("(reduce * [1 2 3 4] 1)")) == 24, "reduce * on array");
+    TEST(gl_value_get_int(eval_str("(reduce min {5 2 8 1 9} 999)")) == 1, "reduce min on vector");
+
+    // any? / all?
+    TEST(gl_value_get_bool(eval_str("(any? even? [1 3 5 6])")) == 1, "any? true");
+    TEST(gl_value_get_bool(eval_str("(any? even? [1 3 5 7])")) == 0, "any? false");
+    TEST(gl_value_get_bool(eval_str("(all? even? [2 4 6 8])")) == 1, "all? true");
+    TEST(gl_value_get_bool(eval_str("(all? even? [2 4 5 8])")) == 0, "all? false");
+}
+
 int main(void) {
+#ifdef GLISP_SOURCE_DIR
+    chdir(GLISP_SOURCE_DIR);
+#endif
     test_derived_envs();
     test_value_copy();
 
@@ -235,6 +351,10 @@ int main(void) {
     test_typeid();
     test_let();
     test_let_star();
+    test_cons();
+    test_apply();
+    test_load_relative();
+    test_stdlib();
 
     gl_destroy_memory_heap();
     return test_status;

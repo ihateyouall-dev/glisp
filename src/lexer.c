@@ -159,8 +159,12 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
     const size_t start_pos = lexer->location.pos;
 
     // Detecting possible numeric literal
-    if (isdigit(gl_lexer_current(lexer))) {
+    if (isdigit(gl_lexer_current(lexer)) ||
+        (gl_lexer_current(lexer) == '-' && isdigit(gl_lexer_peek(lexer)))) {
         res.type = GL_LEX_INTLITERAL;
+        if (gl_lexer_current(lexer) == '-') {
+            gl_lexer_advance(lexer);
+        }
         while (isdigit(gl_lexer_current(lexer))) {
             gl_lexer_advance(lexer);
         }

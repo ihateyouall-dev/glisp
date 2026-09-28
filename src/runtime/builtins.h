@@ -16,6 +16,8 @@ GL_BUILTIN(car);
 
 GL_BUILTIN(cdr);
 
+GL_BUILTIN(cons);
+
 // Arithmetic operator +
 GL_BUILTIN(add);
 
@@ -52,32 +54,8 @@ GL_BUILTIN(and);
 
 GL_BUILTIN(or);
 
-// Utilities for types
-
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
-
-GL_BUILTIN(int_p);
-
-GL_BUILTIN(float_p);
-
-GL_BUILTIN(number_p);
-
-GL_BUILTIN(symbol_p);
-
-GL_BUILTIN(string_p);
-
-GL_BUILTIN(nil_p);
-
-GL_BUILTIN(function_p);
-
-GL_BUILTIN(list_p);
-
-GL_BUILTIN(array_p);
-
-GL_BUILTIN(vector_p);
-
-GL_BUILTIN(typeid_p);
 
 // Type constructors
 
@@ -108,3 +86,7 @@ GL_BUILTIN(vector_pop);
 GL_BUILTIN(gc_collect);
 
 GL_BUILTIN(gc_allocated);
+
+GL_BUILTIN(apply);
+
+GL_BUILTIN(load);

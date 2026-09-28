@@ -84,6 +84,17 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
     return res;
 }
 
+gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr) {
+    gl_value_cons_t *cons = malloc(sizeof(gl_value_cons_t));
+    cons->car = car;
+    cons->cdr = cdr;
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_CONS;
+    res->val = cons;
+    gl_register_value(res);
+    return res;
+}
+
 gl_value_t *gl_value_make_string(char *str) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_STRING;
@@ -147,6 +158,13 @@ gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
 }
 
 void gl_function_param_free(char **param) { free(*param); }
+
+void gl_function_arg_free(gl_function_arg_t **arg) {
+    if (arg && *arg) {
+        free(*arg);
+        *arg = NULL;
+    }
+}
 
 gl_value_t *gl_value_copy(gl_value_t *val) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
@@ -410,22 +428,26 @@ void gl_value_print(gl_value_t *val) {
     case GL_VAL_ENV:
         // Nothing to print now
         break;
-    case GL_VAL_CONS:
+    case GL_VAL_CONS: {
         printf("(");
-        gl_value_cons_t *cons = val->val;
-
-        while (1) {
-            gl_value_print(cons->car);
-
-            printf(" ");
-            cons = cons->cdr->val;
-            if (cons->cdr->type == GL_VAL_NIL) {
-                gl_value_print(cons->car);
-                break;
+        gl_value_t *cur = val;
+        int first = 1;
+        while (cur && cur->type == GL_VAL_CONS) {
+            if (!first) {
+                printf(" ");
             }
+            first = 0;
+            gl_value_cons_t *cons = cur->val;
+            gl_value_print(cons->car);
+            cur = cons->cdr;
+        }
+        if (cur && cur->type != GL_VAL_NIL) {
+            printf(" . ");
+            gl_value_print(cur);
         }
         printf(")");
         break;
+    }
     case GL_VAL_ARRAY: {
         printf("[");
         gl_value_array_t *arr = val->val;
@@ -676,14 +698,33 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
         }
     }
 
-    if (lhs->type == GL_VAL_BUILTIN || GL_VAL_SPFORM) {
+    if (lhs->type == GL_VAL_CONS) {
+        if (rhs->type == GL_VAL_CONS) {
+            gl_value_t *cur_l = lhs;
+            gl_value_t *cur_r = rhs;
+            while (cur_l && cur_l->type == GL_VAL_CONS && cur_r && cur_r->type == GL_VAL_CONS) {
+                gl_value_cons_t *cons_l = cur_l->val;
+                gl_value_cons_t *cons_r = cur_r->val;
+                int cmp = gl_value_compare(cons_l->car, cons_r->car);
+                if (cmp != 0) {
+                    return cmp;
+                }
+                cur_l = cons_l->cdr;
+                cur_r = cons_r->cdr;
+            }
+            return gl_value_compare(cur_l, cur_r);
+        } else {
+            return -1;
+        }
+    }
+
+    if (lhs->type == GL_VAL_BUILTIN || lhs->type == GL_VAL_SPFORM || lhs->type == GL_VAL_FUNCTION) {
         if (lhs->type == rhs->type) {
             if (lhs->val == rhs->val) {
                 return 0;
             }
-        } else {
-            return -1;
         }
+        return -1;
     }
     return -1;
 }

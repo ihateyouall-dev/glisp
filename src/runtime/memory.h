@@ -13,6 +13,10 @@ void gl_init_memory_heap(void);
 
 void gl_register_value(gl_value_t *val);
 
+void gl_register_source(char *buf, char *unit_name);
+
+void gl_destroy_sources(void);
+
 void gl_gc_collect(void);
 
 void gl_destroy_memory_heap(void);

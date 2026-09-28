@@ -197,4 +197,34 @@ void gl_destroy_memory_heap(void) {
     free(gl_memory_heap);
     gl_memory_heap = NULL;
     gl_global_env = NULL;
+
+    gl_destroy_sources();
+}
+
+typedef struct gl_source_entry_t {
+    char *buf;
+    char *unit_name;
+    struct gl_source_entry_t *next;
+} gl_source_entry_t;
+
+static gl_source_entry_t *gl_source_list = NULL;
+
+void gl_register_source(char *buf, char *unit_name) {
+    gl_source_entry_t *entry = malloc(sizeof(gl_source_entry_t));
+    entry->buf = buf;
+    entry->unit_name = unit_name;
+    entry->next = gl_source_list;
+    gl_source_list = entry;
+}
+
+void gl_destroy_sources(void) {
+    gl_source_entry_t *curr = gl_source_list;
+    while (curr) {
+        gl_source_entry_t *next = curr->next;
+        free(curr->buf);
+        free(curr->unit_name);
+        free(curr);
+        curr = next;
+    }
+    gl_source_list = NULL;
 }

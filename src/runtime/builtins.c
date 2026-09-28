@@ -1,14 +1,24 @@
 #include "builtins.h"
 
+#include "callstack.h"
 #include "diagnostics.h"
+#include "env.h"
+#include "eval.h"
 #include "location.h"
 #include "memory.h"
+#include "parser.h"
 #include "runtime/value.h"
 
+#include <ctype.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#ifdef MSC_VER
+#include "utils/strdup.h"
+#endif
 
 ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
@@ -143,6 +153,12 @@ GL_BUILTIN(cdr) {
     gl_value_cons_t *cons = gl_value_get_cons(args->data[0]->val);
 
     return cons->cdr;
+}
+
+GL_BUILTIN(cons) {
+    EXPECT_ARGS(2);
+
+    return gl_value_make_cons_raw(args->data[0]->val, args->data[1]->val);
 }
 
 GL_BUILTIN(add) {
@@ -478,129 +494,6 @@ GL_BUILTIN(typeof) {
     return gl_value_make_typeid(args->data[0]->val->type);
 }
 
-GL_BUILTIN(int_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_INT) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(float_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_FLOAT) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(number_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_INT && args->data[i]->val->type != GL_VAL_FLOAT) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(symbol_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_SYMBOL) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(string_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_STRING) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(nil_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_NIL) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(function_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_FUNCTION &&
-            args->data[i]->val->type != GL_VAL_BUILTIN &&
-            args->data[i]->val->type != GL_VAL_SPFORM) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(list_p) {
-    EXPECT_ARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_CONS) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(array_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_ARRAY) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(vector_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_VECTOR) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(typeid_p) {
-    EXPECT_VARGS(1);
-
-    for (size_t i = 0; i < args->size; ++i) {
-        if (args->data[i]->val->type != GL_VAL_TYPEID) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
 GL_BUILTIN(int_con) {
     gl_function_arg_t *arg = args->data[0];
     gl_value_t *val = arg->val;
@@ -865,4 +758,192 @@ GL_BUILTIN(gc_allocated) {
     EXPECT_ARGS(0);
 
     return gl_value_make_int(gl_memory_heap->allocated);
+}
+
+GL_BUILTIN(apply) {
+    EXPECT_VARGS(2);
+    gl_value_t *fn = args->data[0]->val;
+    if (fn->type != GL_VAL_FUNCTION && fn->type != GL_VAL_BUILTIN) {
+        __emit_type_error(args->data[0]->location, "callable", __gl_value_get_type_name(fn));
+        return NULL;
+    }
+
+    gl_value_t *last_arg = args->data[args->size - 1]->val;
+    if (last_arg->type != GL_VAL_CONS && last_arg->type != GL_VAL_NIL &&
+        last_arg->type != GL_VAL_ARRAY && last_arg->type != GL_VAL_VECTOR) {
+        __emit_type_error(args->data[args->size - 1]->location, "list, array, or vector",
+                          __gl_value_get_type_name(last_arg));
+        return NULL;
+    }
+
+    size_t prefix_count = args->size - 2;
+    size_t rest_count = 0;
+    if (last_arg->type == GL_VAL_ARRAY) {
+        rest_count = gl_value_get_array(last_arg)->size;
+    } else if (last_arg->type == GL_VAL_VECTOR) {
+        rest_count = gl_value_get_vector(last_arg)->size;
+    } else if (last_arg->type == GL_VAL_CONS) {
+        gl_value_t *cur = last_arg;
+        while (cur && cur->type == GL_VAL_CONS) {
+            rest_count++;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    }
+
+    size_t total_args = prefix_count + rest_count;
+    gl_function_args_t apply_args;
+    gl_function_args_init(&apply_args, total_args, gl_function_arg_free);
+
+    for (size_t i = 0; i < prefix_count; ++i) {
+        apply_args.data[i] = malloc(sizeof(gl_function_arg_t));
+        apply_args.data[i]->location = args->data[i + 1]->location;
+        apply_args.data[i]->val = args->data[i + 1]->val;
+    }
+
+    if (last_arg->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = gl_value_get_array(last_arg);
+        for (size_t i = 0; i < rest_count; ++i) {
+            apply_args.data[prefix_count + i] = malloc(sizeof(gl_function_arg_t));
+            apply_args.data[prefix_count + i]->location = called_at;
+            apply_args.data[prefix_count + i]->val = arr->data[i];
+        }
+    } else if (last_arg->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = gl_value_get_vector(last_arg);
+        for (size_t i = 0; i < rest_count; ++i) {
+            apply_args.data[prefix_count + i] = malloc(sizeof(gl_function_arg_t));
+            apply_args.data[prefix_count + i]->location = called_at;
+            apply_args.data[prefix_count + i]->val = *gl_value_vector_at(vec, i);
+        }
+    } else if (last_arg->type == GL_VAL_CONS) {
+        gl_value_t *cur = last_arg;
+        for (size_t i = 0; i < rest_count; ++i) {
+            apply_args.data[prefix_count + i] = malloc(sizeof(gl_function_arg_t));
+            apply_args.data[prefix_count + i]->location = called_at;
+            apply_args.data[prefix_count + i]->val = gl_value_get_cons(cur)->car;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    }
+
+    gl_value_t *res = gl_call_function(called_at, fn, &apply_args);
+    gl_function_args_destroy(&apply_args);
+    return res;
+}
+
+static char *__get_directory(const char *path) {
+    if (!path || path[0] == '\0' || path[0] == '<') {
+        return strdup(".");
+    }
+    const char *last_slash = strrchr(path, '/');
+#ifdef _WIN32
+    const char *last_backslash = strrchr(path, '\\');
+    if (!last_slash || (last_backslash && last_backslash > last_slash)) {
+        last_slash = last_backslash;
+    }
+#endif
+    if (!last_slash) {
+        return strdup(".");
+    }
+    if (last_slash == path) {
+        return strdup("/");
+    }
+    size_t len = last_slash - path;
+    char *dir = malloc(len + 1);
+    memcpy(dir, path, len);
+    dir[len] = '\0';
+    return dir;
+}
+
+static int __is_absolute_path(const char *path) {
+    if (!path) {
+        return 0;
+    }
+    if (path[0] == '/') {
+        return 1;
+    }
+#ifdef _WIN32
+    if ((isalpha((unsigned char)path[0]) && path[1] == ':') || path[0] == '\\') {
+        return 1;
+    }
+#endif
+    return 0;
+}
+
+GL_BUILTIN(load) {
+    EXPECT_ARGS(1);
+    if (args->data[0]->val->type != GL_VAL_STRING) {
+        __emit_type_error(args->data[0]->location, "string",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    const char *filepath = args->data[0]->val->val;
+    char *target_path = NULL;
+
+    if (__is_absolute_path(filepath)) {
+        target_path = realpath(filepath, NULL);
+        if (!target_path) {
+            target_path = strdup(filepath);
+        }
+    } else {
+        char *dir = __get_directory(called_at.unit_name);
+        size_t combined_len = strlen(dir) + 1 + strlen(filepath) + 1;
+        char *combined = malloc(combined_len);
+        snprintf(combined, combined_len, "%s/%s", dir, filepath);
+        free(dir);
+
+        target_path = realpath(combined, NULL);
+        if (!target_path) {
+            target_path = combined;
+        } else {
+            free(combined);
+        }
+    }
+
+    FILE *file = fopen(target_path, "r");
+    if (!file) {
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Cannot load file '%s'", filepath);
+        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf);
+        gl_diagnostic_report_error(err);
+        free(target_path);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long filesize = ftell(file);
+    rewind(file);
+
+    if (filesize < 0) {
+        fclose(file);
+        free(target_path);
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Cannot read file '%s'", filepath);
+        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf);
+        gl_diagnostic_report_error(err);
+        return NULL;
+    }
+
+    char *buf = malloc(filesize + 1);
+    if (!buf) {
+        fclose(file);
+        free(target_path);
+        return NULL;
+    }
+
+    size_t bytesread = fread(buf, sizeof(char), filesize, file);
+    buf[bytesread] = '\0';
+    fclose(file);
+
+    gl_register_source(buf, target_path);
+
+    gl_call_stack_push_env(gl_global_env, NULL, "load");
+    gl_parser_t parser = gl_make_parser(buf, target_path);
+    gl_value_t *res = gl_parse_and_eval(&parser);
+    gl_parser_destroy(&parser);
+    gl_call_stack_pop_env();
+
+    if (!res) {
+        res = gl_value_make_bool(1);
+    }
+    return res;
 }

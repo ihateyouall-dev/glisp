@@ -47,6 +47,8 @@ gl_value_t *gl_value_make_symbol(const char *sym);
 
 gl_value_t *gl_value_make_cons(gl_ast_cons_t cons);
 
+gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr);
+
 gl_value_t *gl_value_make_string(char *str);
 
 gl_value_t *gl_value_make_nil(void);
@@ -64,6 +66,8 @@ typedef struct {
 } gl_function_arg_t;
 
 ARRAY_DECLARE(gl_function_arg_t *, gl_function_args)
+
+void gl_function_arg_free(gl_function_arg_t **arg);
 
 typedef gl_value_t *(*gl_builtin_t)(gl_location_t called_at, gl_function_args_t *);
 

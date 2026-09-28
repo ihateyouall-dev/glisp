@@ -24,6 +24,10 @@ static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node) {
     gl_value_t *res = gl_env_get_var((gl_env_t *)env->val, node->value.symbol);
 
     if (!res) {
+        res = gl_env_get_fun((gl_env_t *)env->val, node->value.symbol);
+    }
+
+    if (!res) {
         char buf[1024] = "";
         const char *fmt = "undefined variable '%s'";
         snprintf(buf, sizeof(buf), fmt, node->value.symbol);
@@ -197,6 +201,14 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             return NULL;
         }
 
+        if (argv->size != function->params->size) {
+            gl_diagnostic_report_arity_error(func_node->location, function->params->size,
+                                             argv->size);
+            gl_function_args_destroy(argv);
+            free(argv);
+            return NULL;
+        }
+
         gl_init_call_stack();
         gl_call_stack_push_call(function, func_node);
 
@@ -218,6 +230,38 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
                     "GL_VAL_SPFORM");
     }
     return NULL;
+}
+
+gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_function_args_t *argv) {
+    if (!func_val) {
+        return NULL;
+    }
+    switch (func_val->type) {
+    case GL_VAL_BUILTIN: {
+        gl_builtin_t builtin = func_val->val;
+        return builtin(loc, argv);
+    }
+    case GL_VAL_FUNCTION: {
+        gl_function_t *function = func_val->val;
+        if (argv->size != function->params->size) {
+            gl_diagnostic_report_arity_error(loc, function->params->size, argv->size);
+            return NULL;
+        }
+        gl_init_call_stack();
+        gl_call_stack_push_call(function, NULL);
+        gl_value_t *res = __gl_eval_function(function, argv);
+        if (!res) {
+            gl_call_stack_print_stacktrace();
+            return NULL;
+        }
+        gl_call_stack_pop_call();
+        return res;
+    }
+    default:
+        gl_diagnostic_report_error(
+            gl_make_error(GL_TYPE_ERROR, GL_ERROR, loc, "Expression result cannot be called"));
+        return NULL;
+    }
 }
 
 gl_value_t *gl_eval(gl_ast_node_t *node) {
