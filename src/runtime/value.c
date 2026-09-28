@@ -116,6 +116,7 @@ gl_value_t *gl_value_make_typeid(gl_value_type_t type) {
         type = GL_VAL_FUNCTION;
     }
     *(gl_value_type_t *)res->val = type;
+    gl_register_value(res);
     return res;
 }
 
@@ -479,6 +480,11 @@ gl_value_vector_t *gl_value_get_vector(gl_value_t *val) {
     assert(val->type == GL_VAL_VECTOR);
     return val->val;
 }
+gl_value_type_t gl_value_get_typeid(gl_value_t *val) {
+    assert(val->type == GL_VAL_TYPEID);
+    return *(gl_value_type_t *)val->val;
+}
+
 gl_builtin_t gl_value_get_builtin(gl_value_t *val) {
     assert(val->type == GL_VAL_BUILTIN);
     return val->val;
@@ -594,7 +600,7 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
         if (__gl_value_is_number(rhs)) {
             return __gl_value_compare_numbers(lhs, rhs);
         } else {
-            abort();
+            return -1;
         }
     }
 
@@ -606,7 +612,7 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
                 return -1;
             }
         } else {
-            abort();
+            return -1;
         }
     }
 
@@ -614,7 +620,7 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
         if (rhs->type == GL_VAL_SYMBOL) {
             return strcmp(gl_value_get_symbol(lhs), gl_value_get_symbol(rhs));
         } else {
-            abort();
+            return -1;
         }
     }
 

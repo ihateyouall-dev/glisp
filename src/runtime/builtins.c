@@ -590,6 +590,17 @@ GL_BUILTIN(vector_p) {
     return gl_value_make_bool(1);
 }
 
+GL_BUILTIN(typeid_p) {
+    EXPECT_VARGS(1);
+
+    for (size_t i = 0; i < args->size; ++i) {
+        if (args->data[i]->val->type != GL_VAL_TYPEID) {
+            return gl_value_make_bool(0);
+        }
+    }
+    return gl_value_make_bool(1);
+}
+
 GL_BUILTIN(int_con) {
     gl_function_arg_t *arg = args->data[0];
     gl_value_t *val = arg->val;

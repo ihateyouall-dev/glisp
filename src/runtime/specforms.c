@@ -2,9 +2,12 @@
 
 #include "ast.h"
 #include "callstack.h"
+#include "diagnostics.h"
 #include "eval.h"
 #include "runtime/env.h"
 #include "runtime/value.h"
+
+#include <stdio.h>
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -191,5 +194,199 @@ GL_SPECIAL_FORM(function) {
     if (res->type != GL_VAL_FUNCTION && res->type != GL_VAL_BUILTIN && res->type != GL_VAL_SPFORM) {
         return NULL;
     }
+    return res;
+}
+
+static void __emit_syntax_error(gl_location_t loc, const char *msg) {
+    gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
+}
+
+static int __gl_parse_binding(gl_ast_node_t *binding, const char **out_name,
+                              gl_ast_node_t **out_val_ast) {
+    if (binding->type == GL_AST_SYMBOL) {
+        *out_name = binding->value.symbol;
+        *out_val_ast = NULL;
+        return 1;
+    }
+
+    if (binding->type == GL_AST_CONS) {
+        gl_ast_node_t *var_node = binding->value.cons.car;
+        if (var_node->type != GL_AST_SYMBOL) {
+            __emit_syntax_error(var_node->location,
+                                "Variable name in let binding must be a symbol");
+            return 0;
+        }
+        *out_name = var_node->value.symbol;
+
+        gl_ast_node_t *rest = binding->value.cons.cdr;
+        if (rest->type == GL_AST_NIL) {
+            *out_val_ast = NULL;
+            return 1;
+        }
+
+        if (rest->type == GL_AST_CONS) {
+            *out_val_ast = rest->value.cons.car;
+            if (rest->value.cons.cdr->type != GL_AST_NIL) {
+                __emit_syntax_error(rest->value.cons.cdr->location,
+                                    "Bad let binding: expected at most one value expression");
+                return 0;
+            }
+            return 1;
+        }
+
+        __emit_syntax_error(binding->location, "Malformed let binding");
+        return 0;
+    }
+
+    __emit_syntax_error(binding->location,
+                        "Let binding must be a symbol or a list (symbol [value])");
+    return 0;
+}
+
+static gl_value_t *__gl_eval_body(gl_ast_node_t *body) {
+    gl_value_t *res = gl_value_make_nil();
+    gl_ast_node_t *current = body;
+    while (current && current->type != GL_AST_NIL) {
+        if (current->type != GL_AST_CONS) {
+            return gl_eval(current);
+        }
+        res = gl_eval(current->value.cons.car);
+        if (!res) {
+            return NULL;
+        }
+        current = current->value.cons.cdr;
+    }
+    return res;
+}
+
+GL_SPECIAL_FORM(let) {
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "let requires a bindings list and a body");
+        return NULL;
+    }
+
+    gl_ast_node_t *bindings_node = args->value.cons.car;
+    if (bindings_node->type != GL_AST_CONS && bindings_node->type != GL_AST_NIL) {
+        __emit_syntax_error(bindings_node->location,
+                            "First argument to let must be a list of bindings");
+        return NULL;
+    }
+
+    size_t count = 0;
+    gl_ast_node_t *curr = bindings_node;
+    while (curr->type == GL_AST_CONS) {
+        count++;
+        curr = curr->value.cons.cdr;
+    }
+
+    const char **names = count > 0 ? malloc(sizeof(char *) * count) : NULL;
+
+    gl_value_t *parent_env = gl_current_env();
+    gl_env_t *new_env = gl_make_env(parent_env);
+    gl_value_t *new_env_val = gl_value_make_env(new_env);
+
+    gl_call_stack_push_env(new_env_val, args, "let");
+
+    curr = bindings_node;
+    for (size_t i = 0; i < count; ++i) {
+        gl_ast_node_t *binding = curr->value.cons.car;
+        const char *name = NULL;
+        gl_ast_node_t *val_ast = NULL;
+
+        if (!__gl_parse_binding(binding, &name, &val_ast)) {
+            gl_call_stack_pop_env();
+            free(names);
+            return NULL;
+        }
+
+        names[i] = name;
+        gl_value_t *val = NULL;
+        if (val_ast != NULL) {
+            val = gl_eval(val_ast);
+            if (!val) {
+                gl_call_stack_pop_env();
+                free(names);
+                return NULL;
+            }
+        } else {
+            val = gl_value_make_nil();
+        }
+
+        char temp_key[32];
+        snprintf(temp_key, sizeof(temp_key), " %zu", i);
+        gl_env_set_var(new_env, temp_key, val);
+
+        curr = curr->value.cons.cdr;
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+        char temp_key[32];
+        snprintf(temp_key, sizeof(temp_key), " %zu", i);
+        gl_value_t *val = gl_env_get_var(new_env, temp_key);
+        gl_env_set_var(new_env, names[i], val);
+    }
+
+    free(names);
+
+    gl_ast_node_t *body = args->value.cons.cdr;
+    gl_value_t *res = __gl_eval_body(body);
+
+    gl_call_stack_pop_env();
+
+    return res;
+}
+
+GL_SPECIAL_FORM(let_star) {
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "let* requires a bindings list and a body");
+        return NULL;
+    }
+
+    gl_ast_node_t *bindings_node = args->value.cons.car;
+    if (bindings_node->type != GL_AST_CONS && bindings_node->type != GL_AST_NIL) {
+        __emit_syntax_error(bindings_node->location,
+                            "First argument to let* must be a list of bindings");
+        return NULL;
+    }
+
+    gl_value_t *parent_env = gl_current_env();
+    gl_env_t *new_env = gl_make_env(parent_env);
+    gl_value_t *new_env_val = gl_value_make_env(new_env);
+
+    gl_call_stack_push_env(new_env_val, args, "let*");
+
+    gl_ast_node_t *curr = bindings_node;
+    while (curr->type == GL_AST_CONS) {
+        gl_ast_node_t *binding = curr->value.cons.car;
+        const char *name = NULL;
+        gl_ast_node_t *val_ast = NULL;
+
+        if (!__gl_parse_binding(binding, &name, &val_ast)) {
+            gl_call_stack_pop_env();
+            return NULL;
+        }
+
+        gl_value_t *val = NULL;
+        if (val_ast != NULL) {
+            val = gl_eval(val_ast);
+            if (!val) {
+                gl_call_stack_pop_env();
+                return NULL;
+            }
+        } else {
+            val = gl_value_make_nil();
+        }
+
+        gl_env_set_var(new_env, name, val);
+        curr = curr->value.cons.cdr;
+    }
+
+    gl_ast_node_t *body = args->value.cons.cdr;
+    gl_value_t *res = __gl_eval_body(body);
+
+    gl_call_stack_pop_env();
+
     return res;
 }

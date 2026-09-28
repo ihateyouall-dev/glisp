@@ -30,6 +30,19 @@ void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_no
 
 void gl_call_stack_pop_call(void) { __gl_call_stack_pop_back(&gl_call_stack); }
 
+void gl_call_stack_push_env(gl_value_t *env, gl_ast_node_t *call_node, const char *name) {
+    gl_init_call_stack();
+    __gl_call_stack_push_back(
+        &gl_call_stack,
+        (gl_call_frame_t){.call_node = call_node, .func_name = (char *)name, .env = env});
+}
+
+void gl_call_stack_pop_env(void) {
+    if (gl_call_stack_initialized && gl_call_stack.size > 0) {
+        __gl_call_stack_pop_back(&gl_call_stack);
+    }
+}
+
 static void __gl_print_call_frame(gl_call_frame_t frame) {
     fprintf(stderr, "  at - %s:%zu:%zu (%s)\n", frame.call_node->location.unit_name,
             frame.call_node->location.line, frame.call_node->location.column, frame.func_name);
@@ -38,9 +51,10 @@ static void __gl_print_call_frame(gl_call_frame_t frame) {
 void gl_call_stack_print_stacktrace() {
     for (size_t i = gl_call_stack.size; i > 0; --i) {
         gl_call_frame_t frame = __gl_call_stack_pop_back(&gl_call_stack);
-        __gl_print_call_frame(frame);
-        gl_diagnostic_show_frame(frame.call_node->location);
-        gl_ast_destroy(frame.call_node);
+        if (frame.call_node) {
+            __gl_print_call_frame(frame);
+            gl_diagnostic_show_frame(frame.call_node->location);
+        }
     }
     __gl_call_stack_destroy(&gl_call_stack);
     gl_call_stack_initialized = 0;

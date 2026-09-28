@@ -109,6 +109,8 @@ gl_value_array_t *gl_value_get_array(gl_value_t *val);
 
 gl_value_vector_t *gl_value_get_vector(gl_value_t *val);
 
+gl_value_type_t gl_value_get_typeid(gl_value_t *val);
+
 gl_builtin_t gl_value_get_builtin(gl_value_t *val);
 
 gl_function_t *gl_value_get_function(gl_value_t *val);

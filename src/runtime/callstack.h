@@ -23,6 +23,10 @@ void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_no
 
 void gl_call_stack_pop_call(void);
 
+void gl_call_stack_push_env(gl_value_t *env, gl_ast_node_t *call_node, const char *name);
+
+void gl_call_stack_pop_env(void);
+
 void gl_call_stack_print_stacktrace();
 
 gl_call_frame_t gl_call_stack_current_frame();

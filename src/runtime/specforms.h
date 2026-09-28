@@ -24,3 +24,7 @@ GL_SPECIAL_FORM(while);
 GL_SPECIAL_FORM(quote);
 
 GL_SPECIAL_FORM(function);
+
+GL_SPECIAL_FORM(let);
+
+GL_SPECIAL_FORM(let_star);

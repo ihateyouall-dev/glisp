@@ -77,6 +77,8 @@ GL_BUILTIN(array_p);
 
 GL_BUILTIN(vector_p);
 
+GL_BUILTIN(typeid_p);
+
 // Type constructors
 
 GL_BUILTIN(int_con);
