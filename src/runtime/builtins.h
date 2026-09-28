@@ -83,10 +83,6 @@ GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
 
-GL_BUILTIN(gc_collect);
-
-GL_BUILTIN(gc_allocated);
-
 GL_BUILTIN(apply);
 
 GL_BUILTIN(load);

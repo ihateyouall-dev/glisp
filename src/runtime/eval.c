@@ -69,7 +69,7 @@ static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
     }
 }
 
-static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
+gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     gl_function_args_t *res = malloc(sizeof(gl_function_args_t));
 
     // If have no args, return empty array
@@ -87,7 +87,7 @@ static gl_function_args_t *__gl_eval_args(gl_ast_node_t *args, gl_env_t *env) {
         ++argc;
     }
 
-    gl_function_args_init(res, argc, &__gl_function_arg_destroy);
+    gl_function_args_init(res, argc, gl_function_arg_free);
 
     current = args;
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {
@@ -177,7 +177,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     switch (func_val->type) {
     case GL_VAL_BUILTIN: {
         gl_builtin_t builtin = func_val->val;
-        gl_function_args_t *argv = __gl_eval_args(args, (gl_env_t *)env->val);
+        gl_function_args_t *argv = gl_eval_args(args);
 
         if (argv == NULL) {
             return NULL;
@@ -195,7 +195,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
-        gl_function_args_t *argv = __gl_eval_args(args, (gl_env_t *)env->val);
+        gl_function_args_t *argv = gl_eval_args(args);
 
         if (argv == NULL) {
             return NULL;

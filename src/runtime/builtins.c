@@ -746,20 +746,6 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
-GL_BUILTIN(gc_collect) {
-    EXPECT_ARGS(0);
-
-    gl_gc_collect();
-
-    return gl_value_make_nil();
-}
-
-GL_BUILTIN(gc_allocated) {
-    EXPECT_ARGS(0);
-
-    return gl_value_make_int(gl_memory_heap->allocated);
-}
-
 GL_BUILTIN(apply) {
     EXPECT_VARGS(2);
     gl_value_t *fn = args->data[0]->val;

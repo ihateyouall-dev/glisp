@@ -4,6 +4,7 @@
 #include "callstack.h"
 #include "diagnostics.h"
 #include "eval.h"
+#include "pragma.h"
 #include "runtime/env.h"
 #include "runtime/value.h"
 
@@ -388,5 +389,35 @@ GL_SPECIAL_FORM(let_star) {
 
     gl_call_stack_pop_env();
 
+    return res;
+}
+
+GL_SPECIAL_FORM(pragma) {
+    assert(args);
+    if (args->type == GL_AST_NIL) {
+        gl_diagnostic_report_variadic_arity_error(args->location, 1, 0);
+        return NULL;
+    }
+
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        gl_location_t loc = name_node ? name_node->location : args->location;
+        gl_error_t *err =
+            gl_make_error(GL_TYPE_ERROR, GL_ERROR, loc, "Pragma directive name must be a symbol");
+        gl_diagnostic_report_error(err);
+        return NULL;
+    }
+
+    const char *pragma_name = name_node->value.symbol;
+    gl_ast_node_t *rest_ast = gl_ast_cons_nth_cdr(args, 0);
+
+    gl_function_args_t *pragma_args = gl_eval_args(rest_ast);
+    if (!pragma_args) {
+        return NULL;
+    }
+
+    gl_value_t *res = gl_dispatch_pragma(name_node->location, pragma_name, pragma_args);
+    gl_function_args_destroy(pragma_args);
+    free(pragma_args);
     return res;
 }

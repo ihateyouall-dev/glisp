@@ -28,3 +28,5 @@ GL_SPECIAL_FORM(function);
 GL_SPECIAL_FORM(let);
 
 GL_SPECIAL_FORM(let_star);
+
+GL_SPECIAL_FORM(pragma);

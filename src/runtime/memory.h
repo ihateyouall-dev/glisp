@@ -8,6 +8,7 @@ typedef struct {
 } gl_memory_heap_t;
 
 extern gl_memory_heap_t *gl_memory_heap;
+extern int gl_gc_enabled;
 
 void gl_init_memory_heap(void);
 

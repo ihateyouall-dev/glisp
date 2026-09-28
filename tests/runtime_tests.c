@@ -152,7 +152,7 @@ void test_array_vector_comparison(void) {
 }
 
 void test_array_vector_gc(void) {
-    eval_str("(progn (set gcv {1 2 3}) (set gca [4 5 6]) (gc-collect))");
+    eval_str("(progn (set gcv {1 2 3}) (set gca [4 5 6]) (pragma gc-collect))");
     gl_value_t *v = eval_str("gcv");
     TEST(v->type == GL_VAL_VECTOR, "Vector survives GC");
     TEST(gl_value_get_vector(v)->size == 3, "Vector size after GC");
@@ -334,6 +334,34 @@ void test_stdlib(void) {
     TEST(gl_value_get_bool(eval_str("(all? even? [2 4 5 8])")) == 0, "all? false");
 }
 
+void test_pragma(void) {
+    // gc-allocated returns integer >= 0
+    gl_value_t *alloc = eval_str("(pragma gc-allocated)");
+    TEST(alloc != NULL && alloc->type == GL_VAL_INT, "pragma gc-allocated returns int");
+    TEST(gl_value_get_int(alloc) >= 0, "pragma gc-allocated >= 0");
+
+    // gc-collect returns nil
+    gl_value_t *coll = eval_str("(pragma gc-collect)");
+    TEST(coll != NULL && coll->type == GL_VAL_NIL, "pragma gc-collect returns nil");
+
+    // gc-enabled?
+    TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 1,
+         "pragma gc-enabled? initially true");
+
+    // gc-toggle without args flips flag
+    TEST(gl_value_get_bool(eval_str("(pragma gc-toggle)")) == 0, "pragma gc-toggle flips to false");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 0, "pragma gc-enabled? is false");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-toggle)")) == 1,
+         "pragma gc-toggle flips back to true");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 1, "pragma gc-enabled? is true");
+
+    // gc-toggle with arg sets flag explicitly
+    TEST(gl_value_get_bool(eval_str("(pragma gc-toggle nil)")) == 0, "pragma gc-toggle nil");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 0, "pragma gc-enabled? after nil");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-toggle t)")) == 1, "pragma gc-toggle t");
+    TEST(gl_value_get_bool(eval_str("(pragma gc-enabled?)")) == 1, "pragma gc-enabled? after t");
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     chdir(GLISP_SOURCE_DIR);
@@ -342,6 +370,7 @@ int main(void) {
     test_value_copy();
 
     gl_init_global_env();
+    eval_str("(load \"std/prelude.lisp\")");
     test_array_and_vector_eval();
     test_array_vector_predicates();
     test_array_vector_constructors();
@@ -355,6 +384,7 @@ int main(void) {
     test_apply();
     test_load_relative();
     test_stdlib();
+    test_pragma();
 
     gl_destroy_memory_heap();
     return test_status;

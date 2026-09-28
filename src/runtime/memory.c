@@ -15,6 +15,7 @@ void gl_init_memory_heap(void) {
 }
 
 const size_t GL_GC_THRESHOLD = 5000;
+int gl_gc_enabled = 1;
 
 void gl_register_value(gl_value_t *val) {
     if (!val) {
@@ -32,7 +33,7 @@ void gl_register_value(gl_value_t *val) {
     gl_memory_heap->head = val;
     ++gl_memory_heap->allocated;
 
-    if (gl_memory_heap->allocated > GL_GC_THRESHOLD) {
+    if (gl_gc_enabled && gl_memory_heap->allocated > GL_GC_THRESHOLD) {
         gl_gc_collect();
     }
 }
@@ -197,6 +198,7 @@ void gl_destroy_memory_heap(void) {
     free(gl_memory_heap);
     gl_memory_heap = NULL;
     gl_global_env = NULL;
+    gl_gc_enabled = 1;
 
     gl_destroy_sources();
 }

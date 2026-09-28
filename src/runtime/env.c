@@ -75,9 +75,6 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "pop", gl_value_make_builtin(gl_builtin_vector_pop));
     gl_env_set_fun(env, "vector-pop", gl_value_make_builtin(gl_builtin_vector_pop));
 
-    gl_env_set_fun(env, "gc-collect", gl_value_make_builtin(gl_builtin_gc_collect));
-    gl_env_set_fun(env, "gc-allocated", gl_value_make_builtin(gl_builtin_gc_allocated));
-
     gl_env_set_fun(env, "apply", gl_value_make_builtin(gl_builtin_apply));
     gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
 }
@@ -94,6 +91,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "function", gl_value_make_specform(&gl_specform_function));
     gl_env_set_fun(env, "let", gl_value_make_specform(&gl_specform_let));
     gl_env_set_fun(env, "let*", gl_value_make_specform(&gl_specform_let_star));
+    gl_env_set_fun(env, "pragma", gl_value_make_specform(&gl_specform_pragma));
 }
 
 gl_env_t *gl_make_global_env(void) {
