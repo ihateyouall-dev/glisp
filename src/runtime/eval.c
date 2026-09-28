@@ -105,8 +105,41 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
 
 static void __gl_define_function_args(const gl_function_t *function, gl_function_args_t *args,
                                       gl_env_t *env) {
+    if (!function->params) {
+        return;
+    }
+
+    size_t arg_idx = 0;
+    size_t argc = args ? args->size : 0;
+
     for (size_t i = 0; i < function->params->size; ++i) {
-        gl_env_set_var(env, function->params->data[i], gl_value_copy(args->data[i]->val));
+        gl_function_param_t *p = function->params->data[i];
+        if (p->kind == GL_PARAM_REQUIRED) {
+            if (arg_idx < argc) {
+                gl_env_set_var(env, p->name, gl_value_copy(args->data[arg_idx]->val));
+                arg_idx++;
+            }
+        } else if (p->kind == GL_PARAM_OPTIONAL) {
+            if (arg_idx < argc) {
+                gl_env_set_var(env, p->name, gl_value_copy(args->data[arg_idx]->val));
+                arg_idx++;
+            } else {
+                if (p->default_val) {
+                    gl_value_t *val = gl_eval(p->default_val);
+                    gl_env_set_var(env, p->name, val ? gl_value_copy(val) : gl_value_make_nil());
+                } else {
+                    gl_env_set_var(env, p->name, gl_value_make_nil());
+                }
+            }
+        } else if (p->kind == GL_PARAM_REST) {
+            gl_value_t *rest_list = gl_value_make_nil();
+            for (size_t j = argc; j > arg_idx; --j) {
+                rest_list =
+                    gl_value_make_cons_raw(gl_value_copy(args->data[j - 1]->val), rest_list);
+            }
+            gl_env_set_var(env, p->name, rest_list);
+            arg_idx = argc;
+        }
     }
 }
 
@@ -125,9 +158,7 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
 
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
     gl_value_t *env = gl_current_env();
-    if (args) {
-        __gl_define_function_args(function, args, (gl_env_t *)env->val);
-    }
+    __gl_define_function_args(function, args, (gl_env_t *)env->val);
 
     gl_value_t *res = __gl_eval_function_tree(function->tree, (gl_env_t *)env->val);
     if (!res) {
@@ -201,9 +232,18 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             return NULL;
         }
 
-        if (argv->size != function->params->size) {
-            gl_diagnostic_report_arity_error(func_node->location, function->params->size,
-                                             argv->size);
+        if (argv->size < function->min_args ||
+            (!function->has_rest && argv->size > function->max_args)) {
+            if (function->has_rest) {
+                gl_diagnostic_report_variadic_arity_error(func_node->location, function->min_args,
+                                                          argv->size);
+            } else if (function->min_args == function->max_args) {
+                gl_diagnostic_report_arity_error(func_node->location, function->min_args,
+                                                 argv->size);
+            } else {
+                gl_diagnostic_report_range_arity_error(func_node->location, function->min_args,
+                                                       function->max_args, argv->size);
+            }
             gl_function_args_destroy(argv);
             free(argv);
             return NULL;
@@ -243,8 +283,16 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
-        if (argv->size != function->params->size) {
-            gl_diagnostic_report_arity_error(loc, function->params->size, argv->size);
+        if (argv->size < function->min_args ||
+            (!function->has_rest && argv->size > function->max_args)) {
+            if (function->has_rest) {
+                gl_diagnostic_report_variadic_arity_error(loc, function->min_args, argv->size);
+            } else if (function->min_args == function->max_args) {
+                gl_diagnostic_report_arity_error(loc, function->min_args, argv->size);
+            } else {
+                gl_diagnostic_report_range_arity_error(loc, function->min_args, function->max_args,
+                                                       argv->size);
+            }
             return NULL;
         }
         gl_init_call_stack();

@@ -1,4 +1,5 @@
 #include "diagnostics.h"
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,7 +114,18 @@ void gl_diagnostic_report_variadic_arity_error(gl_location_t location, size_t ex
     const char *fmt = "Argument count mismatch. Expected at least %zu, got %zu";
     char buf[128] = "";
 
-    snprintf(buf, strlen(fmt) + 1, fmt, expected_at_least, got);
+    snprintf(buf, sizeof(buf), fmt, expected_at_least, got);
+
+    gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
+    gl_diagnostic_report_error(err);
+}
+
+void gl_diagnostic_report_range_arity_error(gl_location_t location, size_t min_expected,
+                                            size_t max_expected, size_t got) {
+    const char *fmt = "Argument count mismatch. Expected from %zu to %zu, got %zu";
+    char buf[128] = "";
+
+    snprintf(buf, sizeof(buf), fmt, min_expected, max_expected, got);
 
     gl_error_t *err = gl_make_error(GL_ARITY_ERROR, GL_ERROR, location, buf);
     gl_diagnostic_report_error(err);

@@ -31,3 +31,6 @@ void gl_diagnostic_report_arity_error(gl_location_t location, size_t expected, s
 
 void gl_diagnostic_report_variadic_arity_error(gl_location_t location, size_t expected_at_least,
                                                size_t got);
+
+void gl_diagnostic_report_range_arity_error(gl_location_t location, size_t min_expected,
+                                            size_t max_expected, size_t got);

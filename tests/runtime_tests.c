@@ -283,8 +283,8 @@ void test_stdlib(void) {
     TEST(gl_value_get_int(eval_str("(id 42)")) == 42, "id function");
 
     // Math
-    TEST(gl_value_get_int(eval_str("(inc 5)")) == 6, "inc");
-    TEST(gl_value_get_int(eval_str("(dec 5)")) == 4, "dec");
+    TEST(gl_value_get_int(eval_str("(1+ 5)")) == 6, "1+");
+    TEST(gl_value_get_int(eval_str("(1- 5)")) == 4, "1-");
     TEST(gl_value_get_int(eval_str("(abs -10)")) == 10, "abs negative");
     TEST(gl_value_get_int(eval_str("(abs 10)")) == 10, "abs positive");
     TEST(gl_value_get_int(eval_str("(min 3 7)")) == 3, "min");
@@ -309,10 +309,9 @@ void test_stdlib(void) {
 
     // Higher-order functions
     // map
-    TEST(gl_value_get_bool(eval_str("(= (map inc (list 1 2 3)) (list 2 3 4))")) == 1,
-         "map on list");
-    TEST(gl_value_get_bool(eval_str("(= (map inc [1 2 3]) [2 3 4])")) == 1, "map on array");
-    TEST(gl_value_get_bool(eval_str("(= (map inc {1 2 3}) {2 3 4})")) == 1, "map on vector");
+    TEST(gl_value_get_bool(eval_str("(= (map 1+ (list 1 2 3)) (list 2 3 4))")) == 1, "map on list");
+    TEST(gl_value_get_bool(eval_str("(= (map 1+ [1 2 3]) [2 3 4])")) == 1, "map on array");
+    TEST(gl_value_get_bool(eval_str("(= (map 1+ {1 2 3}) {2 3 4})")) == 1, "map on vector");
 
     // filter
     TEST(gl_value_get_bool(eval_str("(= (filter even? (list 1 2 3 4 5 6)) (list 2 4 6))")) == 1,
@@ -401,6 +400,59 @@ void test_cond(void) {
     TEST(gl_value_get_int(eval_str("test_flag")) == 1, "cond short-circuit");
 }
 
+void test_optional_and_rest(void) {
+    // 1. Bare &optional parameter defaults to nil
+    eval_str("(defun opt1 (a &optional b) (list a b))");
+    TEST(gl_value_get_bool(eval_str("(= (opt1 1) (list 1 nil))")) == 1, "opt bare omitted");
+    TEST(gl_value_get_bool(eval_str("(= (opt1 1 2) (list 1 2))")) == 1, "opt bare provided");
+
+    // 2. &optional with default value
+    eval_str("(defun opt2 (a &optional (b 10)) (+ a b))");
+    TEST(gl_value_get_int(eval_str("(opt2 5)")) == 15, "opt default omitted");
+    TEST(gl_value_get_int(eval_str("(opt2 5 20)")) == 25, "opt default provided");
+
+    // 3. &optional default referencing earlier parameter
+    eval_str("(defun rect (w &optional (h w)) (list w h))");
+    TEST(gl_value_get_bool(eval_str("(= (rect 7) (list 7 7))")) == 1,
+         "opt default referencing param");
+    TEST(gl_value_get_bool(eval_str("(= (rect 7 3) (list 7 3))")) == 1, "opt default overridden");
+
+    // 4. Multiple &optional parameters
+    eval_str("(defun multi-opt (a &optional (b 2) (c 3)) (+ a (* b c)))");
+    TEST(gl_value_get_int(eval_str("(multi-opt 1)")) == 7, "multi-opt 1 arg");
+    TEST(gl_value_get_int(eval_str("(multi-opt 1 10)")) == 31, "multi-opt 2 args");
+    TEST(gl_value_get_int(eval_str("(multi-opt 1 10 5)")) == 51, "multi-opt 3 args");
+
+    // 5. Basic &rest
+    eval_str("(defun rest-fn (&rest args) args)");
+    TEST(eval_str("(rest-fn)")->type == GL_VAL_NIL, "rest empty is nil");
+    TEST(gl_value_get_bool(eval_str("(= (rest-fn 1 2 3) (list 1 2 3))")) == 1,
+         "rest non-empty list");
+
+    // 6. Required + &rest
+    eval_str("(defun req-rest (first &rest others) (list first others))");
+    TEST(gl_value_get_bool(eval_str("(= (req-rest 10) (list 10 nil))")) == 1, "req-rest no rest");
+    TEST(gl_value_get_bool(eval_str("(= (req-rest 10 20 30) (list 10 (list 20 30)))")) == 1,
+         "req-rest with rest");
+
+    // 7. Required + &optional + &rest
+    eval_str("(defun full-fn (a &optional (b 100) &rest c) (list a b c))");
+    TEST(gl_value_get_bool(eval_str("(= (full-fn 1) (list 1 100 nil))")) == 1, "full-fn 1 arg");
+    TEST(gl_value_get_bool(eval_str("(= (full-fn 1 2) (list 1 2 nil))")) == 1, "full-fn 2 args");
+    TEST(gl_value_get_bool(eval_str("(= (full-fn 1 2 3 4) (list 1 2 (list 3 4)))")) == 1,
+         "full-fn 4 args");
+
+    // 8. Anonymous lambda with &optional and &rest
+    TEST(gl_value_get_int(eval_str("((lambda (x &optional (y 5)) (+ x y)) 10)")) == 15,
+         "lambda &optional");
+    TEST(gl_value_get_bool(eval_str("(= ((lambda (&rest r) r) 1 2) (list 1 2))")) == 1,
+         "lambda &rest");
+
+    // 9. apply with &rest function
+    TEST(gl_value_get_bool(eval_str("(= (apply rest-fn [1 2 3 4]) (list 1 2 3 4))")) == 1,
+         "apply with &rest");
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     chdir(GLISP_SOURCE_DIR);
@@ -425,6 +477,7 @@ int main(void) {
     test_stdlib();
     test_pragma();
     test_cond();
+    test_optional_and_rest();
 
     gl_destroy_memory_heap();
     return test_status;

@@ -139,9 +139,39 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
     return res;
 }
 
-ARRAY_DEFINE(char *, gl_function_params);
+ARRAY_DEFINE(gl_function_param_t *, gl_function_params);
 ARRAY_DEFINE(gl_value_t *, gl_value_array);
 VECTOR_DEFINE(gl_value_t *, gl_value_vector);
+
+gl_function_param_t *gl_function_param_make(const char *name, gl_param_kind_t kind,
+                                            gl_ast_node_t *default_val) {
+    gl_function_param_t *p = malloc(sizeof(gl_function_param_t));
+    p->name = name ? strdup(name) : NULL;
+    p->kind = kind;
+    p->default_val = default_val;
+    return p;
+}
+
+gl_function_param_t *gl_function_param_copy(const gl_function_param_t *param) {
+    if (!param) {
+        return NULL;
+    }
+    return gl_function_param_make(param->name, param->kind,
+                                  param->default_val ? gl_ast_copy(param->default_val) : NULL);
+}
+
+void gl_function_param_free(gl_function_param_t **param) {
+    if (param && *param) {
+        if ((*param)->name) {
+            free((*param)->name);
+        }
+        if ((*param)->default_val) {
+            gl_ast_destroy((*param)->default_val);
+        }
+        free(*param);
+        *param = NULL;
+    }
+}
 
 gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
                                    gl_function_params_t *params, gl_value_t *closure) {
@@ -152,12 +182,29 @@ gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
     func->tree = tree;
     func->params = params;
     func->closure = closure;
+    func->min_args = 0;
+    func->max_args = 0;
+    func->has_rest = 0;
+
+    if (params) {
+        for (size_t i = 0; i < params->size; ++i) {
+            gl_function_param_t *p = params->data[i];
+            if (p->kind == GL_PARAM_REQUIRED) {
+                func->min_args++;
+                func->max_args++;
+            } else if (p->kind == GL_PARAM_OPTIONAL) {
+                func->max_args++;
+            } else if (p->kind == GL_PARAM_REST) {
+                func->has_rest = 1;
+                func->max_args = SIZE_MAX;
+            }
+        }
+    }
+
     res->val = func;
     gl_register_value(res);
     return res;
 }
-
-void gl_function_param_free(char **param) { free(*param); }
 
 void gl_function_arg_free(gl_function_arg_t **arg) {
     if (arg && *arg) {
@@ -203,11 +250,14 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         func->name = orig->name ? strdup(orig->name) : NULL;
         func->tree = orig->tree ? gl_ast_copy(orig->tree) : NULL;
         func->closure = orig->closure;
+        func->min_args = orig->min_args;
+        func->max_args = orig->max_args;
+        func->has_rest = orig->has_rest;
         if (orig->params) {
             func->params = malloc(sizeof(gl_function_params_t));
             gl_function_params_init(func->params, orig->params->size, &gl_function_param_free);
             for (size_t i = 0; i < func->params->size; ++i) {
-                func->params->data[i] = strdup(orig->params->data[i]);
+                func->params->data[i] = gl_function_param_copy(orig->params->data[i]);
             }
         } else {
             func->params = NULL;

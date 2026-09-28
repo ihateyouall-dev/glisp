@@ -40,28 +40,176 @@ GL_SPECIAL_FORM(if) {
     }
 }
 
+static void __emit_syntax_error(gl_location_t loc, const char *msg) {
+    gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
+}
+
+static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_ast_node_t *params) {
+    if (!params || params->type == GL_AST_NIL) {
+        gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
+        gl_function_params_init(func_params, 0, &gl_function_param_free);
+        return func_params;
+    }
+
+    if (params->type != GL_AST_CONS) {
+        __emit_syntax_error(params->location, "Function parameters must be a list");
+        return NULL;
+    }
+
+    size_t capacity = 8;
+    size_t count = 0;
+    gl_function_param_t **temp = malloc(sizeof(gl_function_param_t *) * capacity);
+
+    typedef enum { PARSE_STATE_REQUIRED, PARSE_STATE_OPTIONAL, PARSE_STATE_REST } parse_state_t;
+
+    parse_state_t state = PARSE_STATE_REQUIRED;
+    int saw_rest = 0;
+
+    gl_ast_node_t *curr = params;
+    while (curr && curr->type == GL_AST_CONS) {
+        gl_ast_node_t *item = curr->value.cons.car;
+
+        if (item->type == GL_AST_SYMBOL && strcmp(item->value.symbol, "&optional") == 0) {
+            if (state == PARSE_STATE_OPTIONAL) {
+                __emit_syntax_error(item->location, "Duplicate &optional in parameter list");
+                goto error;
+            }
+            if (saw_rest) {
+                __emit_syntax_error(item->location, "&optional cannot appear after &rest");
+                goto error;
+            }
+            state = PARSE_STATE_OPTIONAL;
+            curr = curr->value.cons.cdr;
+            continue;
+        }
+
+        if (item->type == GL_AST_SYMBOL && strcmp(item->value.symbol, "&rest") == 0) {
+            if (saw_rest) {
+                __emit_syntax_error(item->location, "Duplicate &rest in parameter list");
+                goto error;
+            }
+            state = PARSE_STATE_REST;
+            saw_rest = 1;
+            curr = curr->value.cons.cdr;
+            continue;
+        }
+
+        if (state == PARSE_STATE_REQUIRED) {
+            if (item->type != GL_AST_SYMBOL) {
+                __emit_syntax_error(item->location, "Required parameter name must be a symbol");
+                goto error;
+            }
+            if (count == capacity) {
+                capacity *= 2;
+                temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+            }
+            temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_REQUIRED, NULL);
+        } else if (state == PARSE_STATE_OPTIONAL) {
+            if (item->type == GL_AST_SYMBOL) {
+                if (count == capacity) {
+                    capacity *= 2;
+                    temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                }
+                temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_OPTIONAL, NULL);
+            } else if (item->type == GL_AST_CONS) {
+                gl_ast_node_t *name_node = item->value.cons.car;
+                if (name_node->type != GL_AST_SYMBOL) {
+                    __emit_syntax_error(name_node->location,
+                                        "Optional parameter name must be a symbol");
+                    goto error;
+                }
+                gl_ast_node_t *rest_spec = item->value.cons.cdr;
+                gl_ast_node_t *def_ast = NULL;
+                if (rest_spec->type == GL_AST_CONS) {
+                    def_ast = gl_ast_copy(rest_spec->value.cons.car);
+                    if (rest_spec->value.cons.cdr->type != GL_AST_NIL) {
+                        __emit_syntax_error(item->location,
+                                            "Bad &optional parameter: expected (name [default])");
+                        if (def_ast) {
+                            gl_ast_destroy(def_ast);
+                        }
+                        goto error;
+                    }
+                } else if (rest_spec->type != GL_AST_NIL) {
+                    __emit_syntax_error(item->location, "Bad &optional parameter specification");
+                    goto error;
+                }
+                if (count == capacity) {
+                    capacity *= 2;
+                    temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                }
+                temp[count++] =
+                    gl_function_param_make(name_node->value.symbol, GL_PARAM_OPTIONAL, def_ast);
+            } else {
+                __emit_syntax_error(item->location,
+                                    "Optional parameter must be a symbol or (symbol [default])");
+                goto error;
+            }
+        } else if (state == PARSE_STATE_REST) {
+            if (item->type != GL_AST_SYMBOL) {
+                __emit_syntax_error(item->location, "&rest parameter name must be a symbol");
+                goto error;
+            }
+            if (curr->value.cons.cdr->type != GL_AST_NIL) {
+                __emit_syntax_error(curr->value.cons.cdr->location,
+                                    "Only a single variable name allowed after &rest");
+                goto error;
+            }
+            if (count == capacity) {
+                capacity *= 2;
+                temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+            }
+            temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_REST, NULL);
+        }
+
+        curr = curr->value.cons.cdr;
+    }
+
+    if (curr && curr->type != GL_AST_NIL) {
+        __emit_syntax_error(curr->location, "Malformed parameter list");
+        goto error;
+    }
+
+    if (saw_rest && (count == 0 || temp[count - 1]->kind != GL_PARAM_REST)) {
+        __emit_syntax_error(loc, "&rest requires a parameter name");
+        goto error;
+    }
+
+    gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
+    gl_function_params_init(func_params, count, &gl_function_param_free);
+    for (size_t i = 0; i < count; ++i) {
+        func_params->data[i] = temp[i];
+    }
+    free(temp);
+    return func_params;
+
+error:
+    for (size_t i = 0; i < count; ++i) {
+        gl_function_param_free(&temp[i]);
+    }
+    free(temp);
+    return NULL;
+}
+
 GL_SPECIAL_FORM(defun) {
     assert(args);
     assert(args->type == GL_AST_CONS);
 
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(name_node ? name_node->location : args->location,
+                            "Function name must be a symbol");
+        return NULL;
+    }
+    const char *name = name_node->value.symbol;
+
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
-
-    gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
-
-    if (params->type != GL_AST_NIL) {
-        gl_function_params_init(func_params, gl_ast_cons_length(params), &gl_function_param_free);
-        for (size_t i = 0; i < func_params->size; ++i) {
-            gl_ast_node_t *param = gl_ast_cons_nth_car(params, i);
-            func_params->data[i] = strdup(param->value.symbol);
-        }
-    } else {
-        func_params->data = NULL;
-        func_params->size = 0;
+    gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
+    if (params->type != GL_AST_NIL && !func_params) {
+        return NULL;
     }
 
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 1);
-    const char *name = gl_ast_cons_nth_car(args, 0)->value.symbol;
-
     gl_value_t *res =
         gl_value_make_function(name, gl_ast_copy(tree), func_params, gl_current_env());
     gl_env_set_fun(env, name, res);
@@ -74,18 +222,9 @@ GL_SPECIAL_FORM(lambda) {
     assert(args->type == GL_AST_CONS);
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 0);
-
-    gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
-
-    if (params->type != GL_AST_NIL) {
-        gl_function_params_init(func_params, gl_ast_cons_length(params), &gl_function_param_free);
-        for (size_t i = 0; i < func_params->size; ++i) {
-            gl_ast_node_t *param = gl_ast_cons_nth_car(params, i);
-            func_params->data[i] = strdup(param->value.symbol);
-        }
-    } else {
-        func_params->data = NULL;
-        func_params->size = 0;
+    gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
+    if (params->type != GL_AST_NIL && !func_params) {
+        return NULL;
     }
 
     gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 0);
@@ -197,10 +336,6 @@ GL_SPECIAL_FORM(function) {
         return NULL;
     }
     return res;
-}
-
-static void __emit_syntax_error(gl_location_t loc, const char *msg) {
-    gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
 }
 
 static int __gl_parse_binding(gl_ast_node_t *binding, const char **out_name,

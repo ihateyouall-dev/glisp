@@ -73,15 +73,29 @@ typedef gl_value_t *(*gl_builtin_t)(gl_location_t called_at, gl_function_args_t 
 
 gl_value_t *gl_value_make_builtin(gl_builtin_t builtin);
 
-ARRAY_DECLARE(char *, gl_function_params)
+typedef enum { GL_PARAM_REQUIRED, GL_PARAM_OPTIONAL, GL_PARAM_REST } gl_param_kind_t;
 
-void gl_function_param_free(char **param);
+typedef struct {
+    char *name;
+    gl_param_kind_t kind;
+    gl_ast_node_t *default_val;
+} gl_function_param_t;
+
+ARRAY_DECLARE(gl_function_param_t *, gl_function_params)
+
+void gl_function_param_free(gl_function_param_t **param);
+gl_function_param_t *gl_function_param_make(const char *name, gl_param_kind_t kind,
+                                            gl_ast_node_t *default_val);
+gl_function_param_t *gl_function_param_copy(const gl_function_param_t *param);
 
 typedef struct {
     gl_ast_node_t *tree;
     gl_function_params_t *params;
     gl_value_t *closure;
     char *name;
+    size_t min_args;
+    size_t max_args;
+    int has_rest;
 } gl_function_t;
 
 gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
