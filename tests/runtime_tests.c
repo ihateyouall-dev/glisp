@@ -1,9 +1,12 @@
+#include "builtins.h"
 #include "env.h"
 #include "memory.h"
 #include "parser.h"
 #include "runtime/eval.h"
 #include "test.h"
 #include "value.h"
+
+#include <stdlib.h>
 
 #ifdef GLISP_SOURCE_DIR
 #include <unistd.h>
@@ -262,8 +265,7 @@ void test_load_relative(void) {
 }
 
 void test_stdlib(void) {
-    gl_value_t *r = eval_str("(load \"std/std.lisp\")");
-    TEST(r != NULL, "load std/std.lisp succeeds");
+    TEST(gl_load_stdlib() == 0, "gl_load_stdlib succeeds");
 
     // Core predicates
     TEST(gl_value_get_bool(eval_str("(null? nil)")) == 1, "null? on nil");
@@ -453,6 +455,70 @@ void test_optional_and_rest(void) {
          "apply with &rest");
 }
 
+void test_for(void) {
+    // 1. Iterating over list
+    eval_str("(set sum 0)");
+    eval_str("(for (x (list 1 2 3 4)) (set sum (+ sum x)))");
+    TEST(gl_value_get_int(eval_str("sum")) == 10, "for over list");
+
+    // 2. Iterating over array
+    eval_str("(set sum 0)");
+    eval_str("(for (x [10 20 30]) (set sum (+ sum x)))");
+    TEST(gl_value_get_int(eval_str("sum")) == 60, "for over array");
+
+    // 3. Iterating over vector
+    eval_str("(set out {})");
+    eval_str("(for (x {1 2 3}) (push out (* x 2)))");
+    TEST(gl_value_get_bool(eval_str("(= out {2 4 6})")) == 1, "for over vector");
+
+    // 4. Iterating over string
+    eval_str("(set count 0)");
+    eval_str("(for (ch \"hello\") (set count (+ count 1)))");
+    TEST(gl_value_get_int(eval_str("count")) == 5, "for over string");
+
+    // 5. Empty collections do not execute body
+    eval_str("(set ran 0)");
+    eval_str("(for (x nil) (set ran 1))");
+    TEST(gl_value_get_int(eval_str("ran")) == 0, "for over nil");
+
+    eval_str("(for (x []) (set ran 1))");
+    TEST(gl_value_get_int(eval_str("ran")) == 0, "for over empty array");
+
+    // 6. for returns nil
+    gl_value_t *v_ret = eval_str("(for (x [1 2 3]) x)");
+    TEST(v_ret != NULL && v_ret->type == GL_VAL_NIL, "for returns nil");
+
+    // 7. Scoping: variable is local to for loop
+    eval_str("(set i 999)");
+    eval_str("(for (i [1 2 3]) nil)");
+    TEST(gl_value_get_int(eval_str("i")) == 999, "for variable does not leak");
+}
+
+void test_autoload_stdlib(void) {
+    // 1. Loading from directory path in GLISP_STD_PATH
+    setenv("GLISP_STD_PATH", "std", 1);
+    TEST(gl_load_stdlib() == 0, "autoload std from directory in GLISP_STD_PATH");
+    TEST(gl_value_get_int(eval_str("(id 42)")) == 42, "id function available after autoload");
+
+    // 2. Loading from file path in GLISP_STD_PATH
+    setenv("GLISP_STD_PATH", "std/std.lisp", 1);
+    TEST(gl_load_stdlib() == 0, "autoload std from file in GLISP_STD_PATH");
+
+    // 3. Fallback to GLISP_STD alias
+    unsetenv("GLISP_STD_PATH");
+    setenv("GLISP_STD", "std", 1);
+    TEST(gl_load_stdlib() == 0, "autoload std from GLISP_STD alias");
+
+    // 4. Fallback without env vars (relative path or GLISP_SOURCE_DIR)
+    unsetenv("GLISP_STD");
+    TEST(gl_load_stdlib() == 0, "autoload std from default fallback");
+
+    // 5. Invalid path returns failure code (-1)
+    setenv("GLISP_STD_PATH", "nonexistent_dir_12345", 1);
+    TEST(gl_load_stdlib() == -1, "autoload std returns -1 on nonexistent path");
+    unsetenv("GLISP_STD_PATH");
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     chdir(GLISP_SOURCE_DIR);
@@ -461,7 +527,7 @@ int main(void) {
     test_value_copy();
 
     gl_init_global_env();
-    eval_str("(load \"std/std.lisp\")");
+    gl_load_stdlib();
     test_array_and_vector_eval();
     test_array_vector_predicates();
     test_array_vector_constructors();
@@ -475,9 +541,11 @@ int main(void) {
     test_apply();
     test_load_relative();
     test_stdlib();
+    test_autoload_stdlib();
     test_pragma();
     test_cond();
     test_optional_and_rest();
+    test_for();
 
     gl_destroy_memory_heap();
     return test_status;

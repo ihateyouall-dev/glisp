@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifdef MSC_VER
 #include "utils/strdup.h"
@@ -452,42 +453,6 @@ GL_BUILTIN(le) {
     return gl_value_make_bool(1);
 }
 
-GL_BUILTIN(not ) {
-    EXPECT_ARGS(1);
-
-    int val = gl_value_get_bool(args->data[0]->val);
-
-    return gl_value_make_bool(!val);
-}
-
-GL_BUILTIN(and) {
-    EXPECT_VARGS(2);
-
-    gl_value_t *first = args->data[0]->val;
-    for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i]->val;
-
-        if (!(gl_value_get_bool(first) && gl_value_get_bool(second))) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_BUILTIN(or) {
-    EXPECT_VARGS(2);
-
-    gl_value_t *first = args->data[0]->val;
-    for (size_t i = 1; i < args->size; ++i) {
-        gl_value_t *second = args->data[i]->val;
-
-        if (!(gl_value_get_bool(first) || gl_value_get_bool(second))) {
-            return gl_value_make_bool(0);
-        }
-    }
-    return gl_value_make_bool(1);
-}
-
 GL_BUILTIN(typeof) {
     EXPECT_ARGS(1);
 
@@ -854,15 +819,11 @@ static int __is_absolute_path(const char *path) {
     return 0;
 }
 
-GL_BUILTIN(load) {
-    EXPECT_ARGS(1);
-    if (args->data[0]->val->type != GL_VAL_STRING) {
-        __emit_type_error(args->data[0]->location, "string",
-                          __gl_value_get_type_name(args->data[0]->val));
+gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
+    if (!filepath) {
         return NULL;
     }
 
-    const char *filepath = args->data[0]->val->val;
     char *target_path = NULL;
 
     if (__is_absolute_path(filepath)) {
@@ -871,7 +832,7 @@ GL_BUILTIN(load) {
             target_path = strdup(filepath);
         }
     } else {
-        char *dir = __get_directory(called_at.unit_name);
+        char *dir = __get_directory(caller_unit);
         size_t combined_len = strlen(dir) + 1 + strlen(filepath) + 1;
         char *combined = malloc(combined_len);
         snprintf(combined, combined_len, "%s/%s", dir, filepath);
@@ -887,10 +848,6 @@ GL_BUILTIN(load) {
 
     FILE *file = fopen(target_path, "r");
     if (!file) {
-        char err_buf[1024];
-        snprintf(err_buf, sizeof(err_buf), "Cannot load file '%s'", filepath);
-        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf);
-        gl_diagnostic_report_error(err);
         free(target_path);
         return NULL;
     }
@@ -902,10 +859,6 @@ GL_BUILTIN(load) {
     if (filesize < 0) {
         fclose(file);
         free(target_path);
-        char err_buf[1024];
-        snprintf(err_buf, sizeof(err_buf), "Cannot read file '%s'", filepath);
-        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf);
-        gl_diagnostic_report_error(err);
         return NULL;
     }
 
@@ -932,4 +885,72 @@ GL_BUILTIN(load) {
         res = gl_value_make_bool(1);
     }
     return res;
+}
+
+GL_BUILTIN(load) {
+    EXPECT_ARGS(1);
+    if (args->data[0]->val->type != GL_VAL_STRING) {
+        __emit_type_error(args->data[0]->location, "string",
+                          __gl_value_get_type_name(args->data[0]->val));
+        return NULL;
+    }
+
+    const char *filepath = args->data[0]->val->val;
+    gl_value_t *res = gl_load_file(filepath, called_at.unit_name);
+    if (!res) {
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Cannot load file '%s'", filepath);
+        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf);
+        gl_diagnostic_report_error(err);
+        return NULL;
+    }
+    return res;
+}
+
+int gl_load_stdlib(void) {
+    const char *env_path = getenv("GLISP_STD_PATH");
+    if (!env_path || env_path[0] == '\0') {
+        env_path = getenv("GLISP_STD");
+    }
+
+    if (env_path && env_path[0] != '\0') {
+        struct stat st;
+        if (stat(env_path, &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                size_t env_len = strlen(env_path);
+                int has_slash = (env_len > 0 &&
+                                 (env_path[env_len - 1] == '/' || env_path[env_len - 1] == '\\'));
+                size_t len = env_len + (has_slash ? 0 : 1) + strlen("std.lisp") + 1;
+                char *target = malloc(len);
+                snprintf(target, len, "%s%sstd.lisp", env_path, has_slash ? "" : "/");
+                gl_value_t *res = gl_load_file(target, NULL);
+                free(target);
+                return res ? 0 : -1;
+            } else {
+                gl_value_t *res = gl_load_file(env_path, NULL);
+                return res ? 0 : -1;
+            }
+        } else {
+            fprintf(stderr, "Error: standard library path '%s' not found\n", env_path);
+            return -1;
+        }
+    }
+
+    struct stat st;
+    if (stat("std/std.lisp", &st) == 0 && !S_ISDIR(st.st_mode)) {
+        gl_value_t *res = gl_load_file("std/std.lisp", NULL);
+        return res ? 0 : -1;
+    }
+
+#ifdef GLISP_SOURCE_DIR
+    if (strlen(GLISP_SOURCE_DIR) > 0) {
+        const char *src_std = GLISP_SOURCE_DIR "/std/std.lisp";
+        if (stat(src_std, &st) == 0 && !S_ISDIR(st.st_mode)) {
+            gl_value_t *res = gl_load_file(src_std, NULL);
+            return res ? 0 : -1;
+        }
+    }
+#endif
+
+    return -1;
 }

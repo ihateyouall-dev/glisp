@@ -48,12 +48,6 @@ GL_BUILTIN(ge);
 // Logical <=
 GL_BUILTIN(le);
 
-GL_BUILTIN(not );
-
-GL_BUILTIN(and);
-
-GL_BUILTIN(or);
-
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
 
@@ -86,3 +80,12 @@ GL_BUILTIN(vector_pop);
 GL_BUILTIN(apply);
 
 GL_BUILTIN(load);
+
+// Loads and executes a Lisp file.
+// If caller_unit is provided, relative paths resolve relative to caller_unit's directory.
+// Returns evaluated value or NULL on error.
+gl_value_t *gl_load_file(const char *filepath, const char *caller_unit);
+
+// Autoloads standard library. Checks GLISP_STD_PATH, GLISP_STD, then defaults.
+// Returns 0 on success, -1 on failure.
+int gl_load_stdlib(void);

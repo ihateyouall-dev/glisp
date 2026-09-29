@@ -20,3 +20,5 @@ target_include_directories(runtime PUBLIC ${PROJECT_SOURCE_DIR}/src/runtime)
 target_link_libraries(lexer PUBLIC vector)
 target_link_libraries(parser PUBLIC lexer ast vector diagnostics)
 target_link_libraries(runtime PUBLIC parser ast)
+target_compile_definitions(runtime
+                           PRIVATE GLISP_SOURCE_DIR="${CMAKE_SOURCE_DIR}")

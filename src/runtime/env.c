@@ -87,6 +87,9 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "let*", gl_value_make_specform(&gl_specform_let_star));
     gl_env_set_fun(env, "pragma", gl_value_make_specform(&gl_specform_pragma));
     gl_env_set_fun(env, "cond", gl_value_make_specform(&gl_specform_cond));
+    gl_env_set_fun(env, "for", gl_value_make_specform(&gl_specform_for));
+    gl_env_set_fun(env, "and", gl_value_make_specform(&gl_specform_and));
+    gl_env_set_fun(env, "or", gl_value_make_specform(&gl_specform_or));
 }
 
 gl_env_t *gl_make_global_env(void) {

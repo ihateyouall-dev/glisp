@@ -241,7 +241,19 @@ GL_SPECIAL_FORM(set) {
     const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
     gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
-    gl_env_set_var(env, var_name, var_value);
+    // Find the nearest environment where var_name is bound
+    gl_env_t *target_env = env;
+    while (target_env != NULL) {
+        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+            break;
+        }
+        target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;
+    }
+    if (target_env == NULL) {
+        target_env = env;
+    }
+
+    gl_env_set_var(target_env, var_name, var_value);
 
     return var_value;
 }
@@ -607,4 +619,154 @@ GL_SPECIAL_FORM(cond) {
     }
 
     return gl_value_make_nil();
+}
+
+GL_SPECIAL_FORM(for) {
+    if (!args || args->type == GL_AST_NIL) {
+        return gl_value_make_nil();
+    }
+    if (args->type != GL_AST_CONS) {
+        __emit_syntax_error(args->location,
+                            "Malformed for form: expected list of variable name and collection");
+        return NULL;
+    }
+
+    gl_ast_node_t *iter_node = args->value.cons.car;
+
+    if (iter_node->type != GL_AST_CONS) {
+        __emit_syntax_error(iter_node->location,
+                            "Malformed for form: expected list of variable name and collection");
+        return NULL;
+    }
+
+    gl_ast_node_t *iter_name = iter_node->value.cons.car;
+    if (iter_name->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(iter_name->location, "Variable name in for form must be a symbol");
+        return NULL;
+    }
+
+    gl_ast_node_t *iter_coll_cons = iter_node->value.cons.cdr;
+    if (iter_coll_cons->type != GL_AST_CONS) {
+        __emit_syntax_error(iter_node->location,
+                            "Malformed for form: expected list of variable name and collection");
+        return NULL;
+    }
+
+    if (iter_coll_cons->value.cons.cdr->type != GL_AST_NIL) {
+        __emit_syntax_error(iter_node->location,
+                            "Bad for form: expected exactly (variable collection)");
+        return NULL;
+    }
+
+    gl_ast_node_t *iter_coll_node = iter_coll_cons->value.cons.car;
+    gl_value_t *iter_coll = gl_eval(iter_coll_node);
+    if (!iter_coll) {
+        return NULL;
+    }
+
+    const char *var_name = iter_name->value.symbol;
+    gl_ast_node_t *body = args->value.cons.cdr;
+
+    gl_value_t *parent_env = gl_current_env();
+    gl_env_t *new_env = gl_make_env(parent_env);
+    gl_value_t *new_env_val = gl_value_make_env(new_env);
+
+    gl_call_stack_push_env(new_env_val, iter_node, "for");
+
+    if (iter_coll->type == GL_VAL_NIL) {
+        gl_call_stack_pop_env();
+        return gl_value_make_nil();
+    } else if (iter_coll->type == GL_VAL_CONS) {
+        gl_value_t *curr = iter_coll;
+        while (curr && curr->type == GL_VAL_CONS) {
+            gl_value_cons_t *cons = curr->val;
+            gl_env_set_var(new_env, var_name, gl_value_copy(cons->car));
+            if (!__gl_eval_body(body)) {
+                gl_call_stack_pop_env();
+                return NULL;
+            }
+            curr = cons->cdr;
+        }
+        if (curr && curr->type != GL_VAL_NIL) {
+            gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, iter_coll_node->location,
+                                            "Cannot iterate over improper list");
+            gl_diagnostic_report_error(err);
+            gl_call_stack_pop_env();
+            return NULL;
+        }
+    } else if (iter_coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = iter_coll->val;
+        for (size_t i = 0; i < arr->size; ++i) {
+            gl_env_set_var(new_env, var_name, gl_value_copy(arr->data[i]));
+            if (!__gl_eval_body(body)) {
+                gl_call_stack_pop_env();
+                return NULL;
+            }
+        }
+    } else if (iter_coll->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = iter_coll->val;
+        for (size_t i = 0; i < vec->size; ++i) {
+            gl_env_set_var(new_env, var_name, gl_value_copy(*gl_value_vector_at(vec, i)));
+            if (!__gl_eval_body(body)) {
+                gl_call_stack_pop_env();
+                return NULL;
+            }
+        }
+    } else if (iter_coll->type == GL_VAL_STRING) {
+        const char *s = iter_coll->val;
+        size_t slen = strlen(s);
+        char ch_buf[2] = {0, 0};
+        for (size_t i = 0; i < slen; ++i) {
+            ch_buf[0] = s[i];
+            gl_env_set_var(new_env, var_name, gl_value_make_string(ch_buf));
+            if (!__gl_eval_body(body)) {
+                gl_call_stack_pop_env();
+                return NULL;
+            }
+        }
+    } else {
+        gl_error_t *err =
+            gl_make_error(GL_TYPE_ERROR, GL_ERROR, iter_coll_node->location,
+                          "Expected a collection (list, array, vector, or string) in for form");
+        gl_diagnostic_report_error(err);
+        gl_call_stack_pop_env();
+        return NULL;
+    }
+
+    gl_call_stack_pop_env();
+    return gl_value_make_nil();
+}
+
+GL_SPECIAL_FORM(and) {
+    if (!args || args->type == GL_AST_NIL) {
+        return gl_value_make_nil();
+    }
+
+    gl_ast_node_t *current = args;
+    while (current->type != GL_AST_NIL) {
+        gl_value_t *current_val = gl_eval(current->value.cons.car);
+
+        if (!gl_value_get_bool(current_val)) {
+            return gl_value_make_bool(0);
+        }
+        current = current->value.cons.cdr;
+    }
+    return gl_value_make_bool(1);
+}
+
+GL_SPECIAL_FORM(or) {
+    if (!args || args->type == GL_AST_NIL) {
+        return gl_value_make_nil();
+    }
+
+    gl_ast_node_t *current = args;
+    while (current->type != GL_AST_NIL) {
+        gl_value_t *current_val = gl_eval(current->value.cons.car);
+
+        if (gl_value_get_bool(current_val)) {
+            return gl_value_make_bool(1);
+        }
+        current = current->value.cons.cdr;
+    }
+    return gl_value_make_bool(0);
 }
