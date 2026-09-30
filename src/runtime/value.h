@@ -121,6 +121,8 @@ long double gl_value_get_float(gl_value_t *val);
 
 char *gl_value_get_symbol(gl_value_t *val);
 
+char *gl_value_get_string(gl_value_t *val);
+
 gl_value_cons_t *gl_value_get_cons(gl_value_t *val);
 
 gl_value_array_t *gl_value_get_array(gl_value_t *val);

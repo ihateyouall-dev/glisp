@@ -1,10 +1,11 @@
 ;;; core.lisp - Core predicates and boolean operations
 
+;; Popular aliases from other lisps
+(set setq set)
+(set set! set)
+
 (defun not (x)
   (if x nil t))
-
-(defun list (&rest args)
-  args)
 
 (defun zero? (x)
   (= x 0))

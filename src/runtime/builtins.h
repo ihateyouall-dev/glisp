@@ -89,3 +89,5 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit);
 // Autoloads standard library. Checks GLISP_STD_PATH, GLISP_STD, then defaults.
 // Returns 0 on success, -1 on failure.
 int gl_load_stdlib(void);
+
+GL_BUILTIN(assert);

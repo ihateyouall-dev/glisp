@@ -27,6 +27,11 @@
     ((> x high) high)
     (else       x)))
 
+(defun factorial (x)
+  (if (= x 0)
+      1
+      (* x (factorial (1- x)))))
+
 (defun pow (x power)
   (cond
     ((= power 1) x)

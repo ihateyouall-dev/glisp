@@ -540,6 +540,10 @@ char *gl_value_get_symbol(gl_value_t *val) {
     assert(val->type == GL_VAL_SYMBOL);
     return val->val;
 }
+char *gl_value_get_string(gl_value_t *val) {
+    assert(val->type == GL_VAL_STRING);
+    return val->val;
+}
 gl_value_cons_t *gl_value_get_cons(gl_value_t *val) {
     assert(val->type == GL_VAL_CONS);
     return val->val;

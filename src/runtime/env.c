@@ -53,7 +53,6 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
     gl_env_set_fun(env, "int", gl_value_make_builtin(gl_builtin_int_con));
     gl_env_set_fun(env, "float", gl_value_make_builtin(gl_builtin_float_con));
-    /* gl_env_set_fun(env, "list", gl_value_make_builtin(gl_builtin_list_con)); */
     gl_env_set_fun(env, "array", gl_value_make_builtin(gl_builtin_array_con));
     gl_env_set_fun(env, "vector", gl_value_make_builtin(gl_builtin_vector_con));
 
@@ -71,6 +70,8 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
     gl_env_set_fun(env, "apply", gl_value_make_builtin(gl_builtin_apply));
     gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
+
+    gl_env_set_fun(env, "assert", gl_value_make_builtin(gl_builtin_assert));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
@@ -90,6 +91,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "for", gl_value_make_specform(&gl_specform_for));
     gl_env_set_fun(env, "and", gl_value_make_specform(&gl_specform_and));
     gl_env_set_fun(env, "or", gl_value_make_specform(&gl_specform_or));
+    gl_env_set_fun(env, "add-to-list", gl_value_make_specform(&gl_specform_add_to_list));
 }
 
 gl_env_t *gl_make_global_env(void) {

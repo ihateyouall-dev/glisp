@@ -770,3 +770,136 @@ GL_SPECIAL_FORM(or) {
     }
     return gl_value_make_bool(0);
 }
+
+GL_SPECIAL_FORM(add_to_list) {
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "add-to-list requires at least 2 arguments: (add-to-list var element "
+                            "&optional append)");
+        return NULL;
+    }
+
+    gl_ast_node_t *var_node = args->value.cons.car;
+    const char *var_name = NULL;
+
+    if (var_node->type == GL_AST_SYMBOL) {
+        var_name = var_node->value.symbol;
+    } else if (var_node->type == GL_AST_CONS && var_node->value.cons.car &&
+               var_node->value.cons.car->type == GL_AST_SYMBOL &&
+               strcmp(var_node->value.cons.car->value.symbol, "quote") == 0 &&
+               var_node->value.cons.cdr && var_node->value.cons.cdr->type == GL_AST_CONS &&
+               var_node->value.cons.cdr->value.cons.car &&
+               var_node->value.cons.cdr->value.cons.car->type == GL_AST_SYMBOL) {
+        var_name = var_node->value.cons.cdr->value.cons.car->value.symbol;
+    } else {
+        __emit_syntax_error(
+            var_node->location,
+            "First argument to add-to-list must be a variable symbol or quoted symbol");
+        return NULL;
+    }
+
+    gl_ast_node_t *rest1 = args->value.cons.cdr;
+    if (!rest1 || rest1->type != GL_AST_CONS) {
+        __emit_syntax_error(args->location, "add-to-list requires at least 2 arguments: "
+                                            "(add-to-list var element &optional append)");
+        return NULL;
+    }
+
+    gl_ast_node_t *elem_node = rest1->value.cons.car;
+    gl_ast_node_t *rest2 = rest1->value.cons.cdr;
+    gl_ast_node_t *app_node = NULL;
+
+    if (rest2 && rest2->type == GL_AST_CONS) {
+        app_node = rest2->value.cons.car;
+        if (rest2->value.cons.cdr && rest2->value.cons.cdr->type != GL_AST_NIL) {
+            __emit_syntax_error(args->location, "add-to-list accepts at most 3 arguments");
+            return NULL;
+        }
+    } else if (rest2 && rest2->type != GL_AST_NIL) {
+        __emit_syntax_error(args->location, "Malformed add-to-list form");
+        return NULL;
+    }
+
+    gl_value_t *elem = gl_eval(elem_node);
+    if (!elem) {
+        return NULL;
+    }
+
+    int do_append = 0;
+    if (app_node) {
+        gl_value_t *app_val = gl_eval(app_node);
+        if (!app_val) {
+            return NULL;
+        }
+        do_append = gl_value_get_bool(app_val);
+    }
+
+    // Find the nearest environment where var_name is bound
+    gl_env_t *target_env = env;
+    while (target_env != NULL) {
+        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+            break;
+        }
+        target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;
+    }
+    if (target_env == NULL) {
+        target_env = env;
+    }
+
+    gl_value_t *cur_val = gl_env_get_var(env, var_name);
+    if (cur_val && cur_val->type != GL_VAL_NIL && cur_val->type != GL_VAL_CONS) {
+        gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, var_node->location,
+                                        "Variable in add-to-list must contain a list or nil");
+        gl_diagnostic_report_error(err);
+        return NULL;
+    }
+
+    // Check if element is already present in the list
+    gl_value_t *p = cur_val;
+    while (p && p->type == GL_VAL_CONS) {
+        gl_value_cons_t *cons = p->val;
+        if (gl_value_compare(cons->car, elem) == 0) {
+            return cur_val ? cur_val : gl_value_make_nil();
+        }
+        p = cons->cdr;
+    }
+
+    gl_value_t *new_list = NULL;
+    if (!do_append) {
+        gl_value_t *tail =
+            (cur_val && cur_val->type == GL_VAL_CONS) ? cur_val : gl_value_make_nil();
+        new_list = gl_value_make_cons_raw(elem, tail);
+    } else {
+        if (!cur_val || cur_val->type == GL_VAL_NIL) {
+            new_list = gl_value_make_cons_raw(elem, gl_value_make_nil());
+        } else {
+            gl_value_t *head = NULL;
+            gl_value_t *tail = NULL;
+            gl_value_t *curr = cur_val;
+            while (curr && curr->type == GL_VAL_CONS) {
+                gl_value_cons_t *cons = curr->val;
+                gl_value_t *cell = gl_value_make_cons_raw(cons->car, gl_value_make_nil());
+                if (!head) {
+                    head = cell;
+                    tail = cell;
+                } else {
+                    gl_value_cons_t *tail_cons = tail->val;
+                    tail_cons->cdr = cell;
+                    tail = cell;
+                }
+                curr = cons->cdr;
+            }
+            gl_value_t *elem_cell = gl_value_make_cons_raw(elem, gl_value_make_nil());
+            if (!head) {
+                head = elem_cell;
+            } else {
+                gl_value_cons_t *tail_cons = tail->val;
+                tail_cons->cdr = elem_cell;
+            }
+            new_list = head;
+        }
+    }
+
+    gl_env_set_var(target_env, var_name, new_list);
+    return new_list;
+}

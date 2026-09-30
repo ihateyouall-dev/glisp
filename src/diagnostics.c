@@ -92,9 +92,17 @@ void gl_diagnostic_report_error(gl_error_t *err) {
     case GL_ARITY_ERROR:
         fprintf(stderr, "Arity error: ");
         break;
+    case GL_ASSERTION_FAIL:
+        // Message for assertions is optional
+        if (err->msg) {
+            fprintf(stderr, "Assertion failed: ");
+        } else {
+            fprintf(stderr, "Assertion failed.");
+        }
+        break;
     }
 
-    fprintf(stderr, "%s\n", err->msg);
+    fprintf(stderr, "%s\n", (err->msg ? err->msg : ""));
     gl_diagnostic_show_frame(err->location);
     free(err);
 }

@@ -38,3 +38,5 @@ GL_SPECIAL_FORM(for);
 GL_SPECIAL_FORM(and);
 
 GL_SPECIAL_FORM(or);
+
+GL_SPECIAL_FORM(add_to_list);

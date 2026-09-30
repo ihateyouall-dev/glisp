@@ -494,6 +494,43 @@ void test_for(void) {
     TEST(gl_value_get_int(eval_str("i")) == 999, "for variable does not leak");
 }
 
+void test_add_to_list(void) {
+    // 1. Add to uninitialized / nil variable
+    eval_str("(set my_l nil)");
+    eval_str("(add-to-list my_l 10)");
+    TEST(gl_value_get_bool(eval_str("(= my_l (list 10))")) == 1, "add-to-list to nil");
+
+    // 2. Add to beginning by default (cons)
+    eval_str("(add-to-list my_l 20)");
+    TEST(gl_value_get_bool(eval_str("(= my_l (list 20 10))")) == 1, "add-to-list prepends");
+
+    // 3. Do not add duplicate
+    eval_str("(add-to-list my_l 10)");
+    TEST(gl_value_get_bool(eval_str("(= my_l (list 20 10))")) == 1,
+         "add-to-list ignores duplicate");
+
+    // 4. Add to end when append is true
+    eval_str("(add-to-list my_l 30 t)");
+    TEST(gl_value_get_bool(eval_str("(= my_l (list 20 10 30))")) == 1, "add-to-list appends");
+
+    // 5. Quoted symbol syntax
+    eval_str("(add-to-list 'my_l 40)");
+    TEST(gl_value_get_bool(eval_str("(= my_l (list 40 20 10 30))")) == 1,
+         "add-to-list with quoted symbol");
+
+    // 6. Return value is the updated list
+    gl_value_t *ret = eval_str("(add-to-list my_l 50)");
+    TEST(ret != NULL && gl_value_get_bool(eval_str("(= my_l (list 50 40 20 10 30))")) == 1,
+         "add-to-list returns updated list");
+
+    // 7. Scoping: updates local binding in let
+    eval_str("(set outer (list 1 2))");
+    eval_str("(let ((outer (list 10 20))) (add-to-list outer 30) (assert (= outer (list 30 10 "
+             "20))))");
+    TEST(gl_value_get_bool(eval_str("(= outer (list 1 2))")) == 1,
+         "add-to-list respects lexical scope");
+}
+
 void test_autoload_stdlib(void) {
     // 1. Loading from directory path in GLISP_STD_PATH
     setenv("GLISP_STD_PATH", "std", 1);
@@ -546,6 +583,7 @@ int main(void) {
     test_cond();
     test_optional_and_rest();
     test_for();
+    test_add_to_list();
 
     gl_destroy_memory_heap();
     return test_status;

@@ -1,5 +1,14 @@
 ;;; list.lisp - List accessors and operations
 
+(defun list (&rest args)
+  args)
+
+(defun first (x)
+  (car x))
+
+(defun last (x)
+  (nth x (1- (len x))))
+
 (defun caar (x)
   (car (car x)))
 

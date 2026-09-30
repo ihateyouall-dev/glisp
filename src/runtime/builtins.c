@@ -39,6 +39,13 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
         }                                                                                          \
     } while (0)
 
+#define EXPECT_RVARGS(min, max)                                                                    \
+    do {                                                                                           \
+        if (args->size < min || args->size > max) {                                                \
+            gl_diagnostic_report_range_arity_error(called_at, min, max, args->size);               \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
 static void __emit_type_error(gl_location_t location, const char *expected, const char *got) {
     const char *fmt = "Argument type mismatch. Expected %s, got %s";
     char buf[1024] = "";
@@ -953,4 +960,26 @@ int gl_load_stdlib(void) {
 #endif
 
     return -1;
+}
+
+GL_BUILTIN(assert) {
+    EXPECT_RVARGS(1, 2);
+
+    gl_value_t *cond = args->data[0]->val;
+    char *msg = NULL;
+    if (args->size == 2) {
+        gl_value_t *msg_val = args->data[1]->val;
+
+        if (msg_val->type != GL_VAL_STRING) {
+            __emit_type_error(called_at, "string", __gl_value_get_type_name(msg_val));
+            return NULL;
+        }
+        msg = gl_value_get_string(msg_val);
+    }
+
+    if (!gl_value_get_bool(args->data[0]->val)) {
+        gl_diagnostic_report_error(gl_make_error(GL_ASSERTION_FAIL, GL_FATAL, called_at, msg));
+        return NULL;
+    }
+    return gl_value_make_bool(1);
 }
