@@ -14,6 +14,7 @@ HASHMAP_DECLARE(gl_value_t *, gl_value_table)
 typedef struct gl_env_t {
     gl_value_table_t *variables;
     gl_value_table_t *functions;
+    gl_value_table_t *constants;
     gl_value_t *parent;
 } gl_env_t;
 
@@ -30,6 +31,10 @@ void gl_env_destroy(gl_env_t *env);
 void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val);
 
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val);
+
+void gl_env_set_const(gl_env_t *env, const char *sym, gl_value_t *val);
+
+int gl_env_is_const(gl_env_t *env, const char *sym);
 
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym);
 

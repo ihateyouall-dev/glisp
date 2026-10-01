@@ -21,6 +21,18 @@ static gl_value_t *eval_str(const char *src) {
     return res;
 }
 
+static gl_value_t *eval_expr(const char *src) {
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    gl_value_t *res = NULL;
+    if (node) {
+        res = gl_eval(node);
+        gl_ast_destroy(node);
+    }
+    gl_parser_destroy(&parser);
+    return res;
+}
+
 void test_value_copy(void) {
     gl_value_t *val = gl_value_make_int(42);
     gl_value_t *copy = gl_value_copy(val);
@@ -547,6 +559,56 @@ void test_add_to_list(void) {
          "add-to-list respects lexical scope");
 }
 
+void test_defconst(void) {
+    // 1. Defining a constant and reading it
+    gl_value_t *v = eval_str("(defconst PI 3.14159)");
+    TEST(v != NULL && v->type == GL_VAL_FLOAT, "defconst evaluates and returns value");
+    TEST(eval_str("PI") != NULL && gl_value_get_float(eval_str("PI")) > 3.14,
+         "defconst variable access");
+
+    // 2. defconst with optional docstring
+    gl_value_t *v_doc = eval_str("(defconst MY_CONST 42 \"A docstring\")");
+    TEST(v_doc != NULL && gl_value_get_int(eval_str("MY_CONST")) == 42, "defconst with docstring");
+
+    // 3. defconstant alias
+    gl_value_t *v_alias = eval_str("(defconstant E 2.71828)");
+    TEST(v_alias != NULL && gl_value_get_float(eval_str("E")) > 2.7,
+         "defconstant alias defines constant");
+
+    // 4. Modifying constant via set fails
+    TEST(eval_expr("(set PI 3.0)") == NULL, "set on constant fails");
+    TEST(eval_expr("(set E 2.0)") == NULL, "set on defconstant fails");
+    TEST(eval_expr("(set t nil)") == NULL, "set on built-in t fails");
+    TEST(eval_expr("(set nil 1)") == NULL, "set on built-in nil fails");
+    TEST(eval_expr("(set else nil)") == NULL, "set on built-in else fails");
+
+    // 5. Modifying constant via set-global fails
+    TEST(eval_expr("(set-global PI 3.0)") == NULL, "set-global on constant fails");
+    TEST(eval_expr("(set-global t nil)") == NULL, "set-global on built-in t fails");
+    TEST(eval_expr("(set-global int-t 42)") == NULL, "set-global on built-in typeid fails");
+
+    // 6. Redefining constant via defconst fails
+    TEST(eval_expr("(defconst PI 3.0)") == NULL, "re-defining constant fails");
+    TEST(eval_expr("(defconst t 1)") == NULL, "defconst on built-in t fails");
+
+    // 7. Modifying constant via add-to-list fails
+    eval_str("(defconst CONST_LIST '(1 2))");
+    TEST(eval_expr("(add-to-list 'CONST_LIST 3)") == NULL, "add-to-list on constant fails");
+    TEST(eval_expr("(add-to-list 'nil 3)") == NULL, "add-to-list on nil fails");
+
+    // 8. Binding constant in let / let* / for fails
+    TEST(eval_expr("(let ((t 10)) t)") == NULL, "binding t in let fails");
+    TEST(eval_expr("(let* ((nil 10)) nil)") == NULL, "binding nil in let* fails");
+    TEST(eval_expr("(let ((PI 10)) PI)") == NULL, "binding constant in let fails");
+    TEST(eval_expr("(for (t '(1 2 3)) t)") == NULL, "binding t in for fails");
+    TEST(eval_expr("(for (PI '(1 2 3)) PI)") == NULL, "binding constant in for fails");
+
+    // 9. Built-in constants remain unaffected
+    TEST(gl_value_get_bool(eval_str("t")) == 1, "t is still true");
+    TEST(eval_str("nil")->type == GL_VAL_NIL, "nil is still nil");
+    TEST(eval_str("int-t")->type == GL_VAL_TYPEID, "int-t is still typeid");
+}
+
 void test_autoload_stdlib(void) {
     // 1. Loading from directory path in GLISP_STD_PATH
     setenv("GLISP_STD_PATH", "std", 1);
@@ -601,6 +663,7 @@ int main(void) {
     test_optional_and_rest();
     test_for();
     test_add_to_list();
+    test_defconst();
 
     gl_destroy_memory_heap();
     return test_status;

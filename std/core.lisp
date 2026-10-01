@@ -1,8 +1,8 @@
 ;;; core.lisp - Core predicates and boolean operations
 
 ;; Popular aliases from other lisps
-(set setq set)
-(set set! set)
+(defconst setq set)
+(defconst set! set)
 
 (defun not (x)
   (if x nil t))

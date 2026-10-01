@@ -24,6 +24,8 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
     gl_value_table_init(functions, NULL, gl_value_copy);
     res->functions = functions;
 
+    res->constants = NULL;
+
     return res;
 }
 
@@ -92,26 +94,28 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     gl_env_set_fun(env, "and", gl_value_make_specform(&gl_specform_and));
     gl_env_set_fun(env, "or", gl_value_make_specform(&gl_specform_or));
     gl_env_set_fun(env, "add-to-list", gl_value_make_specform(&gl_specform_add_to_list));
+    gl_env_set_fun(env, "defconst", gl_value_make_specform(&gl_specform_defconst));
+    gl_env_set_fun(env, "defconstant", gl_value_make_specform(&gl_specform_defconst));
 }
 
 gl_env_t *gl_make_global_env(void) {
     gl_env_t *res = gl_make_env(NULL);
 
-    gl_env_set_var(res, "t", gl_value_make_bool(1));
-    gl_env_set_var(res, "else", gl_value_make_bool(1));
-    gl_env_set_var(res, "nil", gl_value_make_nil());
+    gl_env_set_const(res, "t", gl_value_make_bool(1));
+    gl_env_set_const(res, "else", gl_value_make_bool(1));
+    gl_env_set_const(res, "nil", gl_value_make_nil());
 
     // Basic type identifiers
-    gl_env_set_var(res, "nil-t", gl_value_make_typeid(GL_VAL_NIL));
-    gl_env_set_var(res, "int-t", gl_value_make_typeid(GL_VAL_INT));
-    gl_env_set_var(res, "float-t", gl_value_make_typeid(GL_VAL_FLOAT));
-    gl_env_set_var(res, "symbol-t", gl_value_make_typeid(GL_VAL_SYMBOL));
-    gl_env_set_var(res, "string-t", gl_value_make_typeid(GL_VAL_STRING));
-    gl_env_set_var(res, "function-t", gl_value_make_typeid(GL_VAL_FUNCTION));
-    gl_env_set_var(res, "list-t", gl_value_make_typeid(GL_VAL_CONS));
-    gl_env_set_var(res, "array-t", gl_value_make_typeid(GL_VAL_ARRAY));
-    gl_env_set_var(res, "vector-t", gl_value_make_typeid(GL_VAL_VECTOR));
-    gl_env_set_var(res, "typeid-t", gl_value_make_typeid(GL_VAL_TYPEID));
+    gl_env_set_const(res, "nil-t", gl_value_make_typeid(GL_VAL_NIL));
+    gl_env_set_const(res, "int-t", gl_value_make_typeid(GL_VAL_INT));
+    gl_env_set_const(res, "float-t", gl_value_make_typeid(GL_VAL_FLOAT));
+    gl_env_set_const(res, "symbol-t", gl_value_make_typeid(GL_VAL_SYMBOL));
+    gl_env_set_const(res, "string-t", gl_value_make_typeid(GL_VAL_STRING));
+    gl_env_set_const(res, "function-t", gl_value_make_typeid(GL_VAL_FUNCTION));
+    gl_env_set_const(res, "list-t", gl_value_make_typeid(GL_VAL_CONS));
+    gl_env_set_const(res, "array-t", gl_value_make_typeid(GL_VAL_ARRAY));
+    gl_env_set_const(res, "vector-t", gl_value_make_typeid(GL_VAL_VECTOR));
+    gl_env_set_const(res, "typeid-t", gl_value_make_typeid(GL_VAL_TYPEID));
 
     __gl_global_env_define_builtins(res);
     __gl_global_env_define_specforms(res);
@@ -128,6 +132,11 @@ void gl_env_destroy(gl_env_t *env) {
     free(env->variables);
     gl_value_table_destroy(env->functions);
     free(env->functions);
+    if (env->constants) {
+        gl_value_table_destroy(env->constants);
+        free(env->constants);
+        env->constants = NULL;
+    }
     free(env);
     env = NULL;
 }
@@ -140,6 +149,29 @@ void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
     assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION ||
            val->type == GL_VAL_SPFORM);
     gl_value_table_insert(env->functions, sym, val);
+}
+
+void gl_env_set_const(gl_env_t *env, const char *sym, gl_value_t *val) {
+    gl_env_set_var(env, sym, val);
+    if (env->constants == NULL) {
+        gl_value_table_t *constants = malloc(sizeof(gl_value_table_t));
+        gl_value_table_init(constants, NULL, gl_value_copy);
+        env->constants = constants;
+    }
+    gl_value_table_insert(env->constants, sym, val);
+}
+
+int gl_env_is_const(gl_env_t *env, const char *sym) {
+    if (!env || !sym) {
+        return 0;
+    }
+    if (env->constants != NULL && gl_value_table_get(env->constants, sym) != NULL) {
+        return 1;
+    }
+    if (env->parent != NULL) {
+        return gl_env_is_const((gl_env_t *)env->parent->val, sym);
+    }
+    return 0;
 }
 
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {

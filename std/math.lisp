@@ -1,5 +1,7 @@
 ;;; math.lisp - Numerical and mathematical utilities
 
+(defconst PI 3.14159)
+
 (defun 1+ (x)
   (+ x 1))
 

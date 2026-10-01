@@ -238,7 +238,21 @@ GL_SPECIAL_FORM(set) {
     assert(args);
     assert(args->type == GL_AST_CONS);
 
-    const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(name_node ? name_node->location : args->location,
+                            "Variable name in set must be a symbol");
+        return NULL;
+    }
+    const char *var_name = name_node->value.symbol;
+
+    if (gl_env_is_const(env, var_name)) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot modify constant '%s'", var_name);
+        __emit_syntax_error(name_node->location, buf);
+        return NULL;
+    }
+
     gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
     // Find the nearest environment where var_name is bound
@@ -262,7 +276,21 @@ GL_SPECIAL_FORM(set_global) {
     assert(args);
     assert(args->type == GL_AST_CONS);
 
-    const char *var_name = gl_ast_cons_nth_car(args, 0)->value.symbol;
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(name_node ? name_node->location : args->location,
+                            "Variable name in set-global must be a symbol");
+        return NULL;
+    }
+    const char *var_name = name_node->value.symbol;
+
+    if (gl_env_is_const(env, var_name)) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot modify constant '%s'", var_name);
+        __emit_syntax_error(name_node->location, buf);
+        return NULL;
+    }
+
     gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
 
     // Getting the global environment
@@ -449,6 +477,15 @@ GL_SPECIAL_FORM(let) {
             return NULL;
         }
 
+        if (gl_env_is_const(env, name)) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Cannot bind constant '%s'", name);
+            __emit_syntax_error(binding->location, buf);
+            gl_call_stack_pop_env();
+            free(names);
+            return NULL;
+        }
+
         names[i] = name;
         gl_value_t *val = NULL;
         if (val_ast != NULL) {
@@ -513,6 +550,14 @@ GL_SPECIAL_FORM(let_star) {
         gl_ast_node_t *val_ast = NULL;
 
         if (!__gl_parse_binding(binding, &name, &val_ast)) {
+            gl_call_stack_pop_env();
+            return NULL;
+        }
+
+        if (gl_env_is_const(env, name)) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Cannot bind constant '%s'", name);
+            __emit_syntax_error(binding->location, buf);
             gl_call_stack_pop_env();
             return NULL;
         }
@@ -642,6 +687,13 @@ GL_SPECIAL_FORM(for) {
     gl_ast_node_t *iter_name = iter_node->value.cons.car;
     if (iter_name->type != GL_AST_SYMBOL) {
         __emit_syntax_error(iter_name->location, "Variable name in for form must be a symbol");
+        return NULL;
+    }
+
+    if (gl_env_is_const(env, iter_name->value.symbol)) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot bind constant '%s'", iter_name->value.symbol);
+        __emit_syntax_error(iter_name->location, buf);
         return NULL;
     }
 
@@ -798,6 +850,13 @@ GL_SPECIAL_FORM(add_to_list) {
         return NULL;
     }
 
+    if (gl_env_is_const(env, var_name)) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot modify constant '%s'", var_name);
+        __emit_syntax_error(var_node->location, buf);
+        return NULL;
+    }
+
     gl_ast_node_t *rest1 = args->value.cons.cdr;
     if (!rest1 || rest1->type != GL_AST_CONS) {
         __emit_syntax_error(args->location, "add-to-list requires at least 2 arguments: "
@@ -902,4 +961,66 @@ GL_SPECIAL_FORM(add_to_list) {
 
     gl_env_set_var(target_env, var_name, new_list);
     return new_list;
+}
+
+GL_SPECIAL_FORM(defconst) {
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "defconst requires a constant name and value: (defconst name value "
+                            "[&optional docstring])");
+        return NULL;
+    }
+
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(name_node ? name_node->location : args->location,
+                            "Constant name must be a symbol");
+        return NULL;
+    }
+    const char *name = name_node->value.symbol;
+
+    if (gl_env_is_const(env, name)) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot re-define constant '%s'", name);
+        __emit_syntax_error(name_node->location, buf);
+        return NULL;
+    }
+
+    gl_ast_node_t *rest1 = args->value.cons.cdr;
+    if (!rest1 || rest1->type != GL_AST_CONS) {
+        __emit_syntax_error(
+            args->location,
+            "defconst requires a value: (defconst name value [&optional docstring])");
+        return NULL;
+    }
+
+    gl_ast_node_t *val_node = rest1->value.cons.car;
+    gl_ast_node_t *rest2 = rest1->value.cons.cdr;
+    if (rest2 && rest2->type == GL_AST_CONS) {
+        gl_ast_node_t *doc_node = rest2->value.cons.car;
+        if (doc_node->type != GL_AST_STRING) {
+            __emit_syntax_error(doc_node->location, "Docstring must be a string");
+            return NULL;
+        }
+        if (rest2->value.cons.cdr && rest2->value.cons.cdr->type != GL_AST_NIL) {
+            __emit_syntax_error(args->location, "Too many arguments to defconst");
+            return NULL;
+        }
+    } else if (rest2 && rest2->type != GL_AST_NIL) {
+        __emit_syntax_error(args->location, "Malformed defconst form");
+        return NULL;
+    }
+
+    gl_value_t *val = gl_eval(val_node);
+    if (!val) {
+        return NULL;
+    }
+
+    gl_env_t *global_env = env;
+    while (global_env->parent != NULL) {
+        global_env = (gl_env_t *)global_env->parent->val;
+    }
+
+    gl_env_set_const(global_env, name, val);
+    return val;
 }
