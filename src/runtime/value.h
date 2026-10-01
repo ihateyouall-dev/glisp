@@ -31,6 +31,9 @@ typedef struct gl_value_t {
     struct gl_value_t *next_in_heap;
 } gl_value_t;
 
+extern gl_value_t *gl_nil;
+extern gl_value_t *gl_t;
+
 CONS_DECLARE(gl_value_t *, gl_value_cons);
 ARRAY_DECLARE(gl_value_t *, gl_value_array);
 VECTOR_DECLARE(gl_value_t *, gl_value_vector);

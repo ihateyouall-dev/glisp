@@ -18,7 +18,7 @@ const size_t GL_GC_THRESHOLD = 5000;
 int gl_gc_enabled = 1;
 
 void gl_register_value(gl_value_t *val) {
-    if (!val) {
+    if (!val || val == gl_nil || val == gl_t) {
         return;
     }
 
@@ -42,7 +42,7 @@ static void __gl_trace_env_raw(gl_env_t *raw);
 static void __gl_trace_environment(gl_value_t *env);
 
 static void __gl_trace_value(gl_value_t *val) {
-    if (val == NULL || val->gc_marked) {
+    if (val == NULL || val == gl_nil || val == gl_t || val->gc_marked) {
         return;
     }
     val->gc_marked = 1;
@@ -199,6 +199,15 @@ void gl_destroy_memory_heap(void) {
     gl_memory_heap = NULL;
     gl_global_env = NULL;
     gl_gc_enabled = 1;
+
+    if (gl_nil) {
+        free(gl_nil);
+        gl_nil = NULL;
+    }
+    if (gl_t) {
+        free(gl_t);
+        gl_t = NULL;
+    }
 
     gl_destroy_sources();
 }

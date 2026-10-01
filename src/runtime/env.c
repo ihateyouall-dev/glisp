@@ -97,8 +97,8 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
 gl_env_t *gl_make_global_env(void) {
     gl_env_t *res = gl_make_env(NULL);
 
-    gl_env_set_var(res, "t", gl_value_make_symbol("t"));
-    gl_env_set_var(res, "else", gl_value_make_symbol("t"));
+    gl_env_set_var(res, "t", gl_value_make_bool(1));
+    gl_env_set_var(res, "else", gl_value_make_bool(1));
     gl_env_set_var(res, "nil", gl_value_make_nil());
 
     // Basic type identifiers

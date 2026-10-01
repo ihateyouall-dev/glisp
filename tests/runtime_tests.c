@@ -32,6 +32,22 @@ void test_value_copy(void) {
     TEST((*(int64_t *)val->val) == (*(int64_t *)copy->val), "Copy has same value");
 }
 
+void test_singletons(void) {
+    gl_value_t *nil1 = gl_value_make_nil();
+    gl_value_t *nil2 = gl_value_make_nil();
+    TEST(nil1 == nil2, "nil is a singleton");
+
+    gl_value_t *t1 = gl_value_make_bool(1);
+    gl_value_t *t2 = gl_value_make_bool(1);
+    TEST(t1 == t2, "t is a singleton");
+
+    gl_value_t *nil_copy = gl_value_copy(nil1);
+    TEST(nil_copy == nil1, "copying nil returns the singleton");
+
+    gl_value_t *t_copy = gl_value_copy(t1);
+    TEST(t_copy == t1, "copying t returns the singleton");
+}
+
 void test_derived_envs(void) {
     gl_env_t *global = gl_make_global_env();
     gl_env_t *derived = gl_make_env(gl_value_make_env(global));
@@ -562,6 +578,7 @@ int main(void) {
 #endif
     test_derived_envs();
     test_value_copy();
+    test_singletons();
 
     gl_init_global_env();
     gl_load_stdlib();

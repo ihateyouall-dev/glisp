@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+gl_value_t *gl_nil = NULL;
+gl_value_t *gl_t = NULL;
+
 gl_value_t *gl_value_make_int(int64_t num) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_INT;
@@ -104,16 +107,24 @@ gl_value_t *gl_value_make_string(char *str) {
 }
 
 gl_value_t *gl_value_make_nil(void) {
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_NIL;
-    res->val = NULL;
-    gl_register_value(res);
-    return res;
+    if (gl_nil == NULL) {
+        gl_value_t *nil = calloc(1, sizeof(gl_value_t));
+        nil->type = GL_VAL_NIL;
+        nil->val = NULL;
+        gl_nil = nil;
+    }
+    return gl_nil;
 }
 
 gl_value_t *gl_value_make_bool(int b) {
     if (b) {
-        return gl_value_make_symbol("t");
+        if (gl_t == NULL) {
+            gl_value_t *t = calloc(1, sizeof(gl_value_t));
+            t->type = GL_VAL_SYMBOL;
+            t->val = "t";
+            gl_t = t;
+        }
+        return gl_t;
     } else {
         return gl_value_make_nil();
     }
@@ -214,8 +225,14 @@ void gl_function_arg_free(gl_function_arg_t **arg) {
 }
 
 gl_value_t *gl_value_copy(gl_value_t *val) {
+    if (!val || val == gl_nil || val->type == GL_VAL_NIL) {
+        return gl_value_make_nil();
+    }
+    if (val == gl_t) {
+        return gl_value_make_bool(1);
+    }
+
     gl_value_t *res = malloc(sizeof(gl_value_t));
-    assert(val);
     assert(val->type == GL_VAL_NIL || val->val);
     res->type = val->type;
     res->gc_marked = val->gc_marked;
@@ -299,6 +316,11 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
 void gl_value_destroy(gl_value_t **val) {
     if (val == NULL || *val == NULL)
         return;
+
+    if (*val == gl_nil || *val == gl_t) {
+        *val = NULL;
+        return;
+    }
 
     switch ((*val)->type) {
     case GL_VAL_INT:
