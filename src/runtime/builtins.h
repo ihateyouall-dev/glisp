@@ -93,3 +93,27 @@ int gl_load_stdlib(void);
 GL_BUILTIN(assert);
 
 GL_BUILTIN(sqrt);
+
+GL_BUILTIN(fma);
+
+GL_BUILTIN(copysign);
+
+GL_BUILTIN(exp);
+
+GL_BUILTIN(exp2);
+
+GL_BUILTIN(log);
+
+GL_BUILTIN(log2);
+
+GL_BUILTIN(floor);
+
+GL_BUILTIN(ceil);
+
+GL_BUILTIN(round);
+
+GL_BUILTIN(sin);
+
+GL_BUILTIN(cos);
+
+GL_BUILTIN(atan2);

@@ -551,10 +551,16 @@ void gl_value_print(gl_value_t *val) {
     }
 }
 int64_t gl_value_get_int(gl_value_t *val) {
+    if (val->type == GL_VAL_FLOAT) {
+        return (int64_t)gl_value_get_float(val);
+    }
     assert(val->type == GL_VAL_INT);
     return *(int64_t *)val->val;
 }
 long double gl_value_get_float(gl_value_t *val) {
+    if (val->type == GL_VAL_INT) {
+        return (long double)gl_value_get_int(val);
+    }
     assert(val->type == GL_VAL_FLOAT);
     return *(long double *)val->val;
 }
@@ -796,6 +802,9 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
 
     if (lhs->type == GL_VAL_BUILTIN || lhs->type == GL_VAL_SPFORM || lhs->type == GL_VAL_FUNCTION) {
         if (lhs->type == rhs->type) {
+            if (lhs->type == GL_VAL_FUNCTION) {
+                return strcmp(gl_value_get_function(lhs)->name, gl_value_get_function(rhs)->name);
+            }
             if (lhs->val == rhs->val) {
                 return 0;
             }

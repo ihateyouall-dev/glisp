@@ -74,7 +74,20 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
 
     gl_env_set_fun(env, "assert", gl_value_make_builtin(gl_builtin_assert));
+
     gl_env_set_fun(env, "sqrt", gl_value_make_builtin(gl_builtin_sqrt));
+    gl_env_set_fun(env, "fma", gl_value_make_builtin(gl_builtin_fma));
+    gl_env_set_fun(env, "copysign", gl_value_make_builtin(gl_builtin_copysign));
+    gl_env_set_fun(env, "exp", gl_value_make_builtin(gl_builtin_exp));
+    gl_env_set_fun(env, "exp2", gl_value_make_builtin(gl_builtin_exp2));
+    gl_env_set_fun(env, "log", gl_value_make_builtin(gl_builtin_log));
+    gl_env_set_fun(env, "log2", gl_value_make_builtin(gl_builtin_log2));
+    gl_env_set_fun(env, "floor", gl_value_make_builtin(gl_builtin_floor));
+    gl_env_set_fun(env, "ceil", gl_value_make_builtin(gl_builtin_ceil));
+    gl_env_set_fun(env, "round", gl_value_make_builtin(gl_builtin_round));
+    gl_env_set_fun(env, "sin", gl_value_make_builtin(gl_builtin_sin));
+    gl_env_set_fun(env, "cos", gl_value_make_builtin(gl_builtin_cos));
+    gl_env_set_fun(env, "atan2", gl_value_make_builtin(gl_builtin_atan2));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {

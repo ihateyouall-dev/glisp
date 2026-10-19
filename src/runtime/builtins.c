@@ -82,8 +82,8 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
 #define EXPECT_STRING(val)                                                                         \
     do {                                                                                           \
-        if (val->type != GL_VAL_SYMBOL) {                                                          \
-            __emit_type_error(called_at, "symbol", __gl_value_get_type_name(val));                 \
+        if (val->type != GL_VAL_STRING) {                                                          \
+            __emit_type_error(called_at, "string", __gl_value_get_type_name(val));                 \
             return NULL;                                                                           \
         }                                                                                          \
     } while (0)
@@ -512,10 +512,7 @@ GL_BUILTIN(int_con) {
     gl_function_arg_t *arg = args->data[0];
     gl_value_t *val = arg->val;
 
-    if (val->type != GL_VAL_INT && val->type != GL_VAL_FLOAT) {
-        __emit_type_error(arg->location, "number", __gl_value_get_type_name(val));
-        return NULL;
-    }
+    EXPECT_NUMBER(val);
 
     if (val->type == GL_VAL_INT) {
         return val;
@@ -1036,4 +1033,139 @@ GL_BUILTIN(sqrt) {
         return gl_value_make_float(sqrt(gl_value_get_int(val)));
     }
     return gl_value_make_float(sqrt(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(fma) {
+    EXPECT_ARGS(3);
+
+    gl_value_t *x = args->data[0]->val;
+    gl_value_t *y = args->data[1]->val;
+    gl_value_t *z = args->data[2]->val;
+
+    EXPECT_NUMBER(x);
+    EXPECT_NUMBER(y);
+    EXPECT_NUMBER(z);
+
+    long double fx = gl_value_get_float(x);
+    long double fy = gl_value_get_float(y);
+    long double fz = gl_value_get_float(z);
+
+    return gl_value_make_float(fma(fx, fy, fz));
+}
+
+GL_BUILTIN(copysign) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *x = args->data[0]->val;
+    gl_value_t *y = args->data[1]->val;
+
+    EXPECT_NUMBER(x);
+    EXPECT_NUMBER(y);
+
+    long double fx = gl_value_get_float(x);
+    long double fy = gl_value_get_float(y);
+
+    return gl_value_make_float(copysign(fx, fy));
+}
+
+GL_BUILTIN(exp) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(exp(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(exp2) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(exp2(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(log) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(log(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(log2) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(log2(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(floor) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(floor(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(ceil) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(ceil(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(round) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(round(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(sin) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(sin(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(cos) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+
+    return gl_value_make_float(cos(gl_value_get_float(val)));
+}
+
+GL_BUILTIN(atan2) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *y = args->data[0]->val;
+    gl_value_t *x = args->data[1]->val;
+
+    EXPECT_NUMBER(y);
+    EXPECT_NUMBER(x);
+
+    return gl_value_make_float(atan2(gl_value_get_float(y), gl_value_get_float(x)));
 }
