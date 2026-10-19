@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 
         gl_parser_t parser = gl_make_parser(input, "<repl>");
 
-        gl_value_t *res = gl_parse_and_eval(&parser);
+        gl_value_t *res = gl_parse_and_eval(&parser, 0);
 
         gl_parser_destroy(&parser);
 

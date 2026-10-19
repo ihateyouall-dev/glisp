@@ -74,6 +74,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
 
     gl_env_set_fun(env, "assert", gl_value_make_builtin(gl_builtin_assert));
+    gl_env_set_fun(env, "sqrt", gl_value_make_builtin(gl_builtin_sqrt));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {

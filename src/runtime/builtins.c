@@ -10,6 +10,7 @@
 #include "runtime/value.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -46,6 +47,47 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
             return NULL;                                                                           \
         }                                                                                          \
     } while (0)
+
+#define EXPECT_INT(val)                                                                            \
+    do {                                                                                           \
+        if (val->type != GL_VAL_INT) {                                                             \
+            __emit_type_error(called_at, "int", __gl_value_get_type_name(val));                    \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+#define EXPECT_FLOAT(val)                                                                          \
+    do {                                                                                           \
+        if (val->type != GL_VAL_FLOAT) {                                                           \
+            __emit_type_error(called_at, "float", __gl_value_get_type_name(val));                  \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+#define EXPECT_NUMBER(val)                                                                         \
+    do {                                                                                           \
+        if (val->type != GL_VAL_INT && val->type != GL_VAL_FLOAT) {                                \
+            __emit_type_error(called_at, "number", __gl_value_get_type_name(val));                 \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+#define EXPECT_SYMBOL(val)                                                                         \
+    do {                                                                                           \
+        if (val->type != GL_VAL_SYMBOL) {                                                          \
+            __emit_type_error(called_at, "symbol", __gl_value_get_type_name(val));                 \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
+#define EXPECT_STRING(val)                                                                         \
+    do {                                                                                           \
+        if (val->type != GL_VAL_SYMBOL) {                                                          \
+            __emit_type_error(called_at, "symbol", __gl_value_get_type_name(val));                 \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
 static void __emit_type_error(gl_location_t location, const char *expected, const char *got) {
     const char *fmt = "Argument type mismatch. Expected %s, got %s";
     char buf[1024] = "";
@@ -884,7 +926,7 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
 
     gl_call_stack_push_env(gl_global_env, NULL, "load");
     gl_parser_t parser = gl_make_parser(buf, target_path);
-    gl_value_t *res = gl_parse_and_eval(&parser);
+    gl_value_t *res = gl_parse_and_eval(&parser, 1);
     gl_parser_destroy(&parser);
     gl_call_stack_pop_env();
 
@@ -982,4 +1024,16 @@ GL_BUILTIN(assert) {
         return NULL;
     }
     return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(sqrt) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = args->data[0]->val;
+
+    EXPECT_NUMBER(val);
+    if (val->type == GL_VAL_INT) {
+        return gl_value_make_float(sqrt(gl_value_get_int(val)));
+    }
+    return gl_value_make_float(sqrt(gl_value_get_float(val)));
 }

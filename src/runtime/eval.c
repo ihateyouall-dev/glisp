@@ -346,7 +346,7 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
     }
 }
 
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error) {
     gl_ast_node_t *current = gl_parser_parse(parser);
 
     gl_value_t *res = NULL;
@@ -354,7 +354,7 @@ gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
     while (current) {
         res = gl_eval(current);
         // Aborting if got error during parsing
-        if (!res) {
+        if (!res && abort_on_error) {
             exit(-1);
         }
         gl_ast_node_t *next = gl_parser_parse(parser);

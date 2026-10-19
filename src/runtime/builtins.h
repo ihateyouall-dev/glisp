@@ -91,3 +91,5 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit);
 int gl_load_stdlib(void);
 
 GL_BUILTIN(assert);
+
+GL_BUILTIN(sqrt);

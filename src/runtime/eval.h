@@ -6,7 +6,7 @@
 
 gl_value_t *gl_eval(gl_ast_node_t *node);
 
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser);
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error);
 
 gl_function_args_t *gl_eval_args(gl_ast_node_t *args);
 

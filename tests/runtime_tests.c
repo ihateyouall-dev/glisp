@@ -16,7 +16,7 @@ int test_status = 0;
 
 static gl_value_t *eval_str(const char *src) {
     gl_parser_t parser = gl_make_parser(src, "");
-    gl_value_t *res = gl_parse_and_eval(&parser);
+    gl_value_t *res = gl_parse_and_eval(&parser, 0);
     gl_parser_destroy(&parser);
     return res;
 }
@@ -561,9 +561,9 @@ void test_add_to_list(void) {
 
 void test_defconst(void) {
     // 1. Defining a constant and reading it
-    gl_value_t *v = eval_str("(defconst PI 3.14159)");
+    gl_value_t *v = eval_str("(defconst pi 3.14159)");
     TEST(v != NULL && v->type == GL_VAL_FLOAT, "defconst evaluates and returns value");
-    TEST(eval_str("PI") != NULL && gl_value_get_float(eval_str("PI")) > 3.14,
+    TEST(eval_str("pi") != NULL && gl_value_get_float(eval_str("pi")) > 3.14,
          "defconst variable access");
 
     // 2. defconst with optional docstring
@@ -571,8 +571,8 @@ void test_defconst(void) {
     TEST(v_doc != NULL && gl_value_get_int(eval_str("MY_CONST")) == 42, "defconst with docstring");
 
     // 3. defconstant alias
-    gl_value_t *v_alias = eval_str("(defconstant E 2.71828)");
-    TEST(v_alias != NULL && gl_value_get_float(eval_str("E")) > 2.7,
+    gl_value_t *v_alias = eval_str("(defconstant e 2.71828)");
+    TEST(v_alias != NULL && gl_value_get_float(eval_str("e")) > 2.7,
          "defconstant alias defines constant");
 
     // 4. Modifying constant via set fails

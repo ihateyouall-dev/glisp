@@ -1,6 +1,8 @@
 ;;; math.lisp - Numerical and mathematical utilities
 
-(defconst PI 3.14159)
+(defconst PI  3.141592653589793)
+(defconst E   2.718281828459045)
+(defconst PHI 1.618033988749895)
 
 (defun 1+ (x)
   (+ x 1))
@@ -33,8 +35,3 @@
   (if (= x 0)
       1
       (* x (factorial (1- x)))))
-
-(defun pow (x power)
-  (cond
-    ((= power 1) x)
-    (else (* x (pow x (1- power))))))

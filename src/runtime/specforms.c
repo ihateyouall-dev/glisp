@@ -979,9 +979,9 @@ GL_SPECIAL_FORM(defconst) {
     }
     const char *name = name_node->value.symbol;
 
-    if (gl_env_is_const(env, name)) {
+    if (strcmp(name, "t") == 0 || strcmp(name, "nil") == 0 || strcmp(name, "else") == 0) {
         char buf[256];
-        snprintf(buf, sizeof(buf), "Cannot re-define constant '%s'", name);
+        snprintf(buf, sizeof(buf), "Cannot re-define built-in constant '%s'", name);
         __emit_syntax_error(name_node->location, buf);
         return NULL;
     }
@@ -1013,6 +1013,17 @@ GL_SPECIAL_FORM(defconst) {
 
     gl_value_t *val = gl_eval(val_node);
     if (!val) {
+        return NULL;
+    }
+
+    if (gl_env_is_const(env, name)) {
+        gl_value_t *existing = gl_env_get_var(env, name);
+        if (existing && gl_value_compare(existing, val) == 0) {
+            return val;
+        }
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Cannot re-define constant '%s'", name);
+        __emit_syntax_error(name_node->location, buf);
         return NULL;
     }
 
