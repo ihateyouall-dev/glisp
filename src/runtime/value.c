@@ -803,7 +803,15 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
     if (lhs->type == GL_VAL_BUILTIN || lhs->type == GL_VAL_SPFORM || lhs->type == GL_VAL_FUNCTION) {
         if (lhs->type == rhs->type) {
             if (lhs->type == GL_VAL_FUNCTION) {
-                return strcmp(gl_value_get_function(lhs)->name, gl_value_get_function(rhs)->name);
+                gl_function_t *f1 = gl_value_get_function(lhs);
+                gl_function_t *f2 = gl_value_get_function(rhs);
+                if (f1 == f2) {
+                    return 0;
+                }
+                if (f1->name && f2->name) {
+                    return strcmp(f1->name, f2->name);
+                }
+                return -1;
             }
             if (lhs->val == rhs->val) {
                 return 0;

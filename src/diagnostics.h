@@ -7,7 +7,8 @@ typedef enum {
     GL_TYPE_ERROR,
     GL_SYMBOL_ERROR,
     GL_ARITY_ERROR,
-    GL_ASSERTION_FAIL
+    GL_ASSERTION_FAIL,
+    GL_DIVISION_BY_ZERO
 } gl_error_type_t;
 
 typedef enum { GL_WARNING, GL_ERROR, GL_FATAL } gl_error_severity_t;

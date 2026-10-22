@@ -40,7 +40,6 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "*", gl_value_make_builtin(gl_builtin_mul));
     gl_env_set_fun(env, "/", gl_value_make_builtin(gl_builtin_div));
     gl_env_set_fun(env, "%", gl_value_make_builtin(gl_builtin_mod));
-    gl_env_set_fun(env, "mod", gl_value_make_builtin(gl_builtin_mod));
 
     gl_env_set_fun(env, "=", gl_value_make_builtin(gl_builtin_eq));
     gl_env_set_fun(env, "eq", gl_value_make_builtin(gl_builtin_eq));
@@ -88,6 +87,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "sin", gl_value_make_builtin(gl_builtin_sin));
     gl_env_set_fun(env, "cos", gl_value_make_builtin(gl_builtin_cos));
     gl_env_set_fun(env, "atan2", gl_value_make_builtin(gl_builtin_atan2));
+    gl_env_set_fun(env, "pow", gl_value_make_builtin(gl_builtin_pow));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {

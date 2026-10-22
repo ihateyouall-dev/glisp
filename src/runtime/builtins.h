@@ -117,3 +117,5 @@ GL_BUILTIN(sin);
 GL_BUILTIN(cos);
 
 GL_BUILTIN(atan2);
+
+GL_BUILTIN(pow);

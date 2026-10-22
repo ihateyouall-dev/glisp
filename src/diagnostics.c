@@ -100,6 +100,9 @@ void gl_diagnostic_report_error(gl_error_t *err) {
             fprintf(stderr, "Assertion failed.");
         }
         break;
+    case GL_DIVISION_BY_ZERO:
+        fprintf(stderr, "Division by zero: ");
+        break;
     }
 
     fprintf(stderr, "%s\n", (err->msg ? err->msg : ""));
