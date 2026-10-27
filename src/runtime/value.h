@@ -7,6 +7,7 @@
 #include "utils/vector.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 typedef enum {
     GL_VAL_NIL,
@@ -21,7 +22,8 @@ typedef enum {
     GL_VAL_ENV,
     GL_VAL_ARRAY,
     GL_VAL_VECTOR,
-    GL_VAL_TYPEID
+    GL_VAL_TYPEID,
+    GL_VAL_FILE
 } gl_value_type_t;
 
 typedef struct gl_value_t {
@@ -59,6 +61,20 @@ gl_value_t *gl_value_make_nil(void);
 gl_value_t *gl_value_make_bool(int b);
 
 gl_value_t *gl_value_make_typeid(gl_value_type_t type);
+
+// If multiple permissions provided, just sum up the modes.
+// Like "rw" = GL_FILE_READ + GL_FILE_WRITE = 3
+typedef enum { GL_FILE_READ = 1, GL_FILE_WRITE = 2, GL_FILE_APPEND = 4 } gl_file_mode_t;
+
+typedef struct {
+    FILE *handle;
+    char *name;
+    int is_open;
+    gl_file_mode_t mode;
+    int ref_count;
+} gl_file_t;
+
+gl_value_t *gl_value_make_file(FILE *handle, char *name, int is_open, gl_file_mode_t mode);
 
 typedef struct gl_env_t gl_env_t;
 
@@ -116,7 +132,9 @@ gl_value_t *gl_value_make_array_from(gl_value_array_t *arr);
 gl_value_t *gl_value_make_vector(void);
 gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec);
 
+void gl_value_fprint(FILE *file, gl_value_t *val);
 void gl_value_print(gl_value_t *val);
+char *gl_value_to_string(gl_value_t *val);
 
 int64_t gl_value_get_int(gl_value_t *val);
 
@@ -133,6 +151,8 @@ gl_value_array_t *gl_value_get_array(gl_value_t *val);
 gl_value_vector_t *gl_value_get_vector(gl_value_t *val);
 
 gl_value_type_t gl_value_get_typeid(gl_value_t *val);
+
+gl_file_t *gl_value_get_file(gl_value_t *val);
 
 gl_builtin_t gl_value_get_builtin(gl_value_t *val);
 

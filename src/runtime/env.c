@@ -5,6 +5,7 @@
 #include "runtime/value.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,8 +33,8 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
 static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "exit", gl_value_make_builtin(gl_builtin_exit));
     gl_env_set_fun(env, "typeof", gl_value_make_builtin(gl_builtin_typeof));
-    gl_env_set_fun(env, "print", gl_value_make_builtin(gl_builtin_print));
-    gl_env_set_fun(env, "println", gl_value_make_builtin(gl_builtin_println));
+    /* gl_env_set_fun(env, "print", gl_value_make_builtin(gl_builtin_print)); */
+    /* gl_env_set_fun(env, "println", gl_value_make_builtin(gl_builtin_println)); */
 
     gl_env_set_fun(env, "+", gl_value_make_builtin(gl_builtin_add));
     gl_env_set_fun(env, "-", gl_value_make_builtin(gl_builtin_sub));
@@ -88,6 +89,14 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     gl_env_set_fun(env, "cos", gl_value_make_builtin(gl_builtin_cos));
     gl_env_set_fun(env, "atan2", gl_value_make_builtin(gl_builtin_atan2));
     gl_env_set_fun(env, "pow", gl_value_make_builtin(gl_builtin_pow));
+
+    gl_env_set_fun(env, "open", gl_value_make_builtin(gl_builtin_open));
+    gl_env_set_fun(env, "close", gl_value_make_builtin(gl_builtin_close));
+    gl_env_set_fun(env, "write-string", gl_value_make_builtin(gl_builtin_write_str));
+    gl_env_set_fun(env, "to-string", gl_value_make_builtin(gl_builtin_to_str));
+    gl_env_set_fun(env, "read-line", gl_value_make_builtin(gl_builtin_read_line));
+    gl_env_set_fun(env, "open?", gl_value_make_builtin(gl_builtin_open_p));
+    gl_env_set_fun(env, "eof?", gl_value_make_builtin(gl_builtin_eof_p));
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
@@ -129,7 +138,12 @@ gl_env_t *gl_make_global_env(void) {
     gl_env_set_const(res, "list-t", gl_value_make_typeid(GL_VAL_CONS));
     gl_env_set_const(res, "array-t", gl_value_make_typeid(GL_VAL_ARRAY));
     gl_env_set_const(res, "vector-t", gl_value_make_typeid(GL_VAL_VECTOR));
+    gl_env_set_const(res, "file-t", gl_value_make_typeid(GL_VAL_FILE));
     gl_env_set_const(res, "typeid-t", gl_value_make_typeid(GL_VAL_TYPEID));
+
+    gl_env_set_const(res, "*stdin*", gl_value_make_file(stdin, "<stdin>", 1, GL_FILE_READ));
+    gl_env_set_const(res, "*stdout*", gl_value_make_file(stdout, "<stdout>", 1, GL_FILE_WRITE));
+    gl_env_set_const(res, "*stderr*", gl_value_make_file(stderr, "<stderr>", 1, GL_FILE_WRITE));
 
     __gl_global_env_define_builtins(res);
     __gl_global_env_define_specforms(res);

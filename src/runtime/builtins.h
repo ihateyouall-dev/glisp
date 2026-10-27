@@ -119,3 +119,17 @@ GL_BUILTIN(cos);
 GL_BUILTIN(atan2);
 
 GL_BUILTIN(pow);
+
+GL_BUILTIN(open);
+
+GL_BUILTIN(close);
+
+GL_BUILTIN(write_str);
+
+GL_BUILTIN(to_str);
+
+GL_BUILTIN(read_line);
+
+GL_BUILTIN(open_p);
+
+GL_BUILTIN(eof_p);

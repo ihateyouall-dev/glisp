@@ -10,6 +10,7 @@
 #include "runtime/value.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -136,6 +137,14 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
         }                                                                                          \
     } while (0)
 
+#define EXPECT_FILE(val)                                                                           \
+    do {                                                                                           \
+        if (val->type != GL_VAL_FILE) {                                                            \
+            __emit_type_error(called_at, "file", __gl_value_get_type_name(val));                   \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
 #define NTH_ARG(n) args->data[n]
 
 #define NTH_VAL(n) NTH_ARG(n)->val
@@ -194,6 +203,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "array";
     case GL_VAL_VECTOR:
         return "vector";
+    case GL_VAL_FILE:
+        return "file";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
@@ -1145,4 +1156,205 @@ GL_BUILTIN(pow) {
     }
 
     return gl_value_make_float(pow(gl_value_get_float(x), gl_value_get_float(power)));
+}
+
+static gl_file_mode_t __gl_parse_file_mode(const char *mode) {
+    if (!mode) {
+        return 0;
+    }
+
+    char *current = (char *)mode;
+
+    gl_file_mode_t res = 0;
+    while (*current != '\0') {
+        switch (*current) {
+        case 'r':
+            res |= GL_FILE_READ;
+            break;
+        case 'w':
+            res |= GL_FILE_WRITE;
+            break;
+        case 'a':
+            res |= GL_FILE_APPEND;
+            break;
+        case '+':
+            res |= (GL_FILE_READ | GL_FILE_WRITE);
+            break;
+        default:
+            return 0;
+        }
+        current += 1;
+    }
+    return res;
+}
+
+GL_BUILTIN(open) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *filename = NTH_VAL(0);
+    gl_value_t *mode = NTH_VAL(1);
+
+    EXPECT_STRING(filename);
+    EXPECT_STRING(mode);
+
+    char *filename_str = gl_value_get_string(filename);
+    const char *mode_str = (const char *)gl_value_get_string(mode);
+    gl_file_mode_t file_mode = __gl_parse_file_mode(mode_str);
+
+    if (file_mode == 0) {
+        gl_diagnostic_report_error(
+            gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, called_at,
+                          "Wrong file mode string: expected \"r\", \"w\" or \"a\""));
+        return NULL;
+    }
+
+    FILE *file = fopen(filename_str, mode_str);
+    if (!file) {
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Cannot open file '%s': %s", filename_str,
+                 strerror(errno));
+        gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf));
+        return NULL;
+    }
+
+    return gl_value_make_file(file, filename_str, 1, __gl_parse_file_mode(mode_str));
+}
+
+GL_BUILTIN(close) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *file = NTH_VAL(0);
+
+    EXPECT_FILE(file);
+
+    gl_file_t *f = gl_value_get_file(file);
+
+    if (f->handle == stdin || f->handle == stdout || f->handle == stderr) {
+        return gl_value_make_bool(0);
+    }
+
+    if (!f->is_open) {
+        return gl_value_make_bool(0);
+    }
+
+    int status = fclose(f->handle);
+
+    if (status != 0) {
+        return gl_value_make_bool(0);
+    }
+
+    f->is_open = 0;
+    f->handle = NULL;
+
+    return gl_value_make_bool(1);
+}
+
+GL_BUILTIN(write_str) {
+    EXPECT_RVARGS(1, 2);
+
+    gl_value_t *str = NTH_VAL(0);
+
+    FILE *dest = stdout;
+
+    if (ARGC == 2) {
+        gl_value_t *file = NTH_VAL(1);
+
+        EXPECT_FILE(file);
+
+        gl_file_t *f = gl_value_get_file(file);
+
+        if (!f->is_open || !f->handle) {
+            gl_diagnostic_report_error(
+                gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, "Cannot write to a closed file"));
+            return NULL;
+        }
+
+        if (!(f->mode & (GL_FILE_WRITE | GL_FILE_APPEND))) {
+            gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at,
+                                                     "File is not opened for writing"));
+            return NULL;
+        }
+
+        dest = f->handle;
+    }
+
+    fputs(gl_value_get_string(str), dest);
+
+    return gl_value_make_int(strlen(gl_value_get_string(str)));
+}
+
+GL_BUILTIN(to_str) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+
+    if (val->type == GL_VAL_STRING) {
+        return gl_value_copy(val);
+    }
+
+    char *str = gl_value_to_string(val);
+    gl_value_t *res = gl_value_make_string(str);
+    free(str);
+    return res;
+}
+
+GL_BUILTIN(read_line) {
+    EXPECT_RVARGS(0, 1);
+
+    FILE *stream = stdin;
+    if (ARGC == 1) {
+        gl_value_t *f_val = NTH_VAL(0);
+        EXPECT_FILE(f_val);
+        gl_file_t *f = gl_value_get_file(f_val);
+        if (!f->is_open || !f->handle) {
+            gl_diagnostic_report_error(
+                gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, "Cannot read from closed file"));
+            return NULL;
+        }
+        if (!(f->mode & GL_FILE_READ)) {
+            gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at,
+                                                     "File is not opened for reading"));
+            return NULL;
+        }
+        stream = f->handle;
+    }
+
+    char *line = NULL;
+    size_t cap = 0;
+    ssize_t nread = getline(&line, &cap, stream);
+
+    if (nread == -1) {
+        free(line);
+        return gl_value_make_nil(); // EOF
+    }
+
+    // Cutting newline character if present
+    if (nread > 0 && line[nread - 1] == '\n') {
+        line[nread - 1] = '\0';
+        if (nread > 1 && line[nread - 2] == '\r') {
+            line[nread - 2] = '\0'; // CRLF
+        }
+    }
+
+    gl_value_t *res = gl_value_make_string(line);
+    free(line);
+    return res;
+}
+
+GL_BUILTIN(open_p) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *file = NTH_VAL(0);
+
+    return gl_value_make_bool(gl_value_get_file(file)->is_open);
+}
+
+GL_BUILTIN(eof_p) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *file = NTH_VAL(0);
+
+    EXPECT_FILE(file);
+
+    return gl_value_make_bool(feof(gl_value_get_file(file)->handle));
 }

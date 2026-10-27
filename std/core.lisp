@@ -16,12 +16,6 @@
 (defun neg? (x)
   (< x 0))
 
-(defun even? (x)
-  (= (% x 2) 0))
-
-(defun odd? (x)
-  (not (= (% x 2) 0)))
-
 (defun identity (x)
   x)
 

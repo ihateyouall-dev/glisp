@@ -40,3 +40,6 @@
 
 (defun typeid? (x)
   (= (typeof x) typeid-t))
+
+(defun file? (x)
+  (= (typeof x) file-t))

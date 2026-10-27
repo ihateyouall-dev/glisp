@@ -4,6 +4,8 @@
 #include "env.h"
 #include "memory.h"
 
+#include <stdio.h>
+
 #ifdef _WIN32
 #include "utils/strdup.h"
 #endif
@@ -138,6 +140,16 @@ gl_value_t *gl_value_make_typeid(gl_value_type_t type) {
         type = GL_VAL_FUNCTION;
     }
     *(gl_value_type_t *)res->val = type;
+    gl_register_value(res);
+    return res;
+}
+
+gl_value_t *gl_value_make_file(FILE *handle, char *name, int is_open, gl_file_mode_t mode) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_FILE;
+    res->val = malloc(sizeof(gl_file_t));
+    gl_file_t port = (gl_file_t){handle, name, is_open, mode, 1};
+    *(gl_file_t *)res->val = port;
     gl_register_value(res);
     return res;
 }
@@ -308,6 +320,14 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = vec;
         break;
     }
+    case GL_VAL_FILE: {
+        gl_file_t *file = val->val;
+        if (file) {
+            file->ref_count++;
+        }
+        res->val = file;
+        break;
+    }
     }
     gl_register_value(res);
     return res;
@@ -370,6 +390,20 @@ void gl_value_destroy(gl_value_t **val) {
             gl_value_vector_t *vec = (*val)->val;
             free(vec->data);
             free(vec);
+            (*val)->val = NULL;
+        }
+        break;
+    case GL_VAL_FILE:
+        if ((*val)->val != NULL) {
+            gl_file_t *file = gl_value_get_file(*val);
+            if (--file->ref_count <= 0) {
+                if (file->is_open && file->handle && file->handle != stdin &&
+                    file->handle != stdout && file->handle != stderr) {
+                    fclose(file->handle);
+                    file->is_open = 0;
+                }
+                free(file);
+            }
             (*val)->val = NULL;
         }
         break;
@@ -468,31 +502,33 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
         return "array";
     case GL_VAL_VECTOR:
         return "vector";
+    case GL_VAL_FILE:
+        return "file";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
 }
 
-void gl_value_print(gl_value_t *val) {
+void gl_value_fprint(FILE *file, gl_value_t *val) {
     if (!val) {
         return;
     }
     switch (val->type) {
     case GL_VAL_INT:
-        printf("%lld", (*(int64_t *)val->val));
+        fprintf(file, "%lld", (*(int64_t *)val->val));
         break;
     case GL_VAL_FLOAT:
-        printf("%Lf", (*(long double *)val->val));
+        fprintf(file, "%Lf", (*(long double *)val->val));
         break;
     case GL_VAL_TYPEID:
-        printf("%s", __gl_typeid_str(*(gl_value_type_t *)val->val));
+        fprintf(file, "%s", __gl_typeid_str(*(gl_value_type_t *)val->val));
         break;
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
-        printf("%s", (char *)val->val);
+        fprintf(file, "%s", (char *)val->val);
         break;
     case GL_VAL_NIL:
-        printf("nil");
+        fprintf(file, "nil");
         break;
     case GL_VAL_BUILTIN:
     case GL_VAL_FUNCTION:
@@ -501,55 +537,73 @@ void gl_value_print(gl_value_t *val) {
         // Nothing to print now
         break;
     case GL_VAL_CONS: {
-        printf("(");
+        fprintf(file, "(");
         gl_value_t *cur = val;
         int first = 1;
         while (cur && cur->type == GL_VAL_CONS) {
             if (!first) {
-                printf(" ");
+                fprintf(file, " ");
             }
             first = 0;
             gl_value_cons_t *cons = cur->val;
-            gl_value_print(cons->car);
+            gl_value_fprint(file, cons->car);
             cur = cons->cdr;
         }
         if (cur && cur->type != GL_VAL_NIL) {
-            printf(" . ");
-            gl_value_print(cur);
+            fprintf(file, " . ");
+            gl_value_fprint(file, cur);
         }
-        printf(")");
+        fprintf(file, ")");
         break;
     }
     case GL_VAL_ARRAY: {
-        printf("[");
+        fprintf(file, "[");
         gl_value_array_t *arr = val->val;
         if (arr && arr->size > 0) {
             for (size_t i = 0; i < arr->size; ++i) {
-                gl_value_print(arr->data[i]);
+                gl_value_fprint(file, arr->data[i]);
                 if (i + 1 < arr->size) {
-                    printf(" ");
+                    fprintf(file, " ");
                 }
             }
         }
-        printf("]");
+        fprintf(file, "]");
         break;
     }
     case GL_VAL_VECTOR: {
-        printf("{");
+        fprintf(file, "{");
         gl_value_vector_t *vec = val->val;
         if (vec && vec->size > 0) {
             for (size_t i = 0; i < vec->size; ++i) {
-                gl_value_print(*gl_value_vector_at(vec, i));
+                gl_value_fprint(file, *gl_value_vector_at(vec, i));
                 if (i + 1 < vec->size) {
-                    printf(" ");
+                    fprintf(file, " ");
                 }
             }
         }
-        printf("}");
+        fprintf(file, "}");
+        break;
+    }
+    case GL_VAL_FILE: {
+        gl_file_t *f = gl_value_get_file(val);
+        fprintf(file, "#<file %s %s>", f->name ? f->name : "unnamed",
+                f->is_open ? "open" : "closed");
         break;
     }
     }
 }
+void gl_value_print(gl_value_t *val) { gl_value_fprint(stdout, val); }
+char *gl_value_to_string(gl_value_t *val) {
+    char *buf = NULL;
+    size_t size = 0;
+
+    FILE *mem = open_memstream(&buf, &size);
+    gl_value_fprint(mem, val);
+
+    fclose(mem);
+    return buf;
+}
+
 int64_t gl_value_get_int(gl_value_t *val) {
     if (val->type == GL_VAL_FLOAT) {
         return (int64_t)gl_value_get_float(val);
@@ -587,6 +641,10 @@ gl_value_vector_t *gl_value_get_vector(gl_value_t *val) {
 gl_value_type_t gl_value_get_typeid(gl_value_t *val) {
     assert(val->type == GL_VAL_TYPEID);
     return *(gl_value_type_t *)val->val;
+}
+gl_file_t *gl_value_get_file(gl_value_t *val) {
+    assert(val->type == GL_VAL_FILE);
+    return val->val;
 }
 
 gl_builtin_t gl_value_get_builtin(gl_value_t *val) {
