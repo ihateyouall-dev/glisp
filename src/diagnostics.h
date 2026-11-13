@@ -14,7 +14,8 @@ typedef enum {
     GL_SYMBOL_ERROR,
     GL_ARITY_ERROR,
     GL_ASSERTION_FAIL,
-    GL_DIVISION_BY_ZERO
+    GL_DIVISION_BY_ZERO,
+    GL_RECURSION_ERROR
 } gl_error_type_t;
 
 /** Severity attached to a diagnostic. */

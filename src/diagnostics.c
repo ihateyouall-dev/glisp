@@ -110,6 +110,9 @@ void gl_diagnostic_report_error(gl_error_t *err) {
     case GL_DIVISION_BY_ZERO:
         fprintf(stderr, "Division by zero: ");
         break;
+    case GL_RECURSION_ERROR:
+        fprintf(stderr, "Recursion error: ");
+        break;
     }
 
     fprintf(stderr, "%s\n", (err->msg ? err->msg : ""));

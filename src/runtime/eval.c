@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file eval.c
  * @brief Tree-walking evaluator and function application.
  */
@@ -16,6 +16,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+// Deeper nesting than this is reported as an error: the C stack is finite, so
+// a runaway Lisp call has to end with a diagnostic instead of a crash.
+const size_t GL_MAX_EVAL_DEPTH = 2000;
+
+static size_t gl_eval_depth = 0;
 
 static gl_value_t *__gl_eval_int(gl_ast_node_t *node) {
     return gl_value_make_int(node->value.integral);
@@ -363,7 +369,27 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
     }
 }
 
+static gl_value_t *__gl_eval_node(gl_ast_node_t *node);
+
 gl_value_t *gl_eval(gl_ast_node_t *node) {
+    if (node == NULL) {
+        return NULL;
+    }
+
+    if (gl_eval_depth == GL_MAX_EVAL_DEPTH) {
+        gl_diagnostic_report_error(
+            gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
+                          "Maximum recursion depth exceeded"));
+        return NULL;
+    }
+
+    ++gl_eval_depth;
+    gl_value_t *res = __gl_eval_node(node);
+    --gl_eval_depth;
+    return res;
+}
+
+static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
     if (node == NULL)
         return NULL;
 
