@@ -42,6 +42,13 @@ static int gl_test_make_temp(char *path, size_t size) {
         dir = ".";
     }
     snprintf(path, size, "%s\\glisp_io_test_%ld.txt", dir, (long)_getpid());
+    // GLisp strings interpret backslashes as C escapes, so the path embedded
+    // into source below has to use forward slashes.
+    for (char *p = path; *p != '\0'; ++p) {
+        if (*p == '\\') {
+            *p = '/';
+        }
+    }
     FILE *f = fopen(path, "wb");
     if (f == NULL) {
         return -1;
