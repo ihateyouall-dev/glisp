@@ -25,6 +25,7 @@ void test_parse_float(void) {
     // two values are never bit-identical.
     TEST(node->value.floating > 45.66L && node->value.floating < 45.68L,
          "Parse FLOAT value");
+    TEST(node->value.floating > 45.66 && node->value.floating < 45.68, "Parse FLOAT value");
     gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 }

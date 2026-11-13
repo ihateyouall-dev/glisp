@@ -131,7 +131,7 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         gl_lexer_advance(lexer);
         return res;
     case '"':
-        // Strings are copied verbatim: escape sequences are not interpreted.
+        // The lexer copies raw string text; gl_ast_make_string decodes escapes.
         res.type = GL_LEX_STRLITERAL;
         gl_lexer_advance(lexer);
         size_t start_pos = lexer->location.pos;

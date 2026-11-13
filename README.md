@@ -33,7 +33,7 @@ frozen.
 ## Quick start
 
 ```bash
-git clone <repository-url> glisp
+git clone https://github.com/ihateyouall-dev/glisp.git
 cd glisp
 make
 ./build/glisp

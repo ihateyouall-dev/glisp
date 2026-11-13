@@ -47,7 +47,7 @@ the standard library, then either evaluate a file or run the REPL.
 | `array.h` | `ARRAY_DECLARE(T, Name)` / `ARRAY_DEFINE(T, Name)`: fixed-size typed array. |
 | `vector.h` | `VECTOR_DECLARE(T, Name)` / `VECTOR_DEFINE(T, Name)`: growable typed vector. |
 | `hashmap.h` | `HASHMAP_DECLARE(T, Name)` / `HASHMAP_DEFINE(T, Name)`: chained hash map keyed by C strings. |
-| `ansi.h` | ANSI SGR escape sequences and `gl_process_ansi_str` helpers used by diagnostics. |
+| `ansi.h` | ANSI SGR sequences and `gl_process_ansi_str`, which decodes string-literal escapes for `gl_ast_make_string`. |
 | `strdup.h` | `strdup` shim for MSVC. |
 | `rl_wrapper.h` | Convenience include for GNU Readline. |
 

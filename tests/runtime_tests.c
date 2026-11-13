@@ -735,6 +735,10 @@ void test_io(void) {
     snprintf(src, sizeof(src), "(set io-file (open \"%s\" \"w+\"))", path);
     gl_value_t *file = eval_str(src);
     TEST(file != NULL && file->type == GL_VAL_FILE, "open file with w+ mode");
+    if (file == NULL || file->type != GL_VAL_FILE) {
+        remove(path);
+        return;
+    }
     TEST(gl_value_get_bool(eval_str("(open? io-file)")) == 1, "open? on open file");
 
     TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == (GL_FILE_READ | GL_FILE_WRITE),
@@ -765,9 +769,12 @@ void test_io(void) {
          "file-mode returns read for rb");
     TEST(gl_value_get_bool(eval_str("(readable? io-file)")) == 1, "readable? on rb file");
     TEST(gl_value_get_bool(eval_str("(writable? io-file)")) == 0, "writable? on rb file");
-    TEST(strcmp(gl_value_get_string(eval_str("(read-line io-file)")), "hello") == 0,
+    gl_value_t *line = eval_str("(read-line io-file)");
+    TEST(line != NULL && line->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(line), "hello") == 0,
          "read back written contents");
-    TEST(eval_str("(read-line io-file)")->type == GL_VAL_NIL, "read-line returns nil at EOF");
+    gl_value_t *eof_line = eval_str("(read-line io-file)");
+    TEST(eof_line != NULL && eof_line->type == GL_VAL_NIL, "read-line returns nil at EOF");
     TEST(gl_value_get_bool(eval_str("(eof? io-file)")) == 1, "eof? is true after EOF");
     eval_str("(close io-file)");
 
@@ -807,6 +814,12 @@ void test_io(void) {
     TEST(eval_expr(src) == NULL, "open rejects unknown mode bits");
 
     remove(path);
+}
+
+void test_string_escapes(void) {
+    TEST(gl_value_get_int(eval_str("(len \"a\\nb\")")) == 3, "newline escape");
+    TEST(gl_value_get_int(eval_str("(len \"\\x41\\x42\")")) == 2, "hex escapes");
+    TEST(strcmp(gl_value_get_string(eval_str("\"\\x41\\x42\"")), "AB") == 0, "hex escape value");
 }
 
 void test_gc_stress(void) {
@@ -863,6 +876,7 @@ int main(void) {
     test_add_to_list();
     test_defconst();
     test_io();
+    test_string_escapes();
     test_gc_stress();
     test_recursion();
 
