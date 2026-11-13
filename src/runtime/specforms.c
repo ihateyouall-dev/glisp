@@ -4,6 +4,7 @@
 #include "callstack.h"
 #include "diagnostics.h"
 #include "eval.h"
+#include "memory.h"
 #include "pragma.h"
 #include "runtime/env.h"
 #include "runtime/value.h"
@@ -604,14 +605,17 @@ GL_SPECIAL_FORM(pragma) {
     const char *pragma_name = name_node->value.symbol;
     gl_ast_node_t *rest_ast = gl_ast_cons_nth_cdr(args, 0);
 
+    size_t root_mark = gl_gc_root_mark();
     gl_function_args_t *pragma_args = gl_eval_args(rest_ast);
     if (!pragma_args) {
+        gl_gc_roots_release(root_mark);
         return NULL;
     }
 
     gl_value_t *res = gl_dispatch_pragma(name_node->location, pragma_name, pragma_args);
     gl_function_args_destroy(pragma_args);
     free(pragma_args);
+    gl_gc_roots_release(root_mark);
     return res;
 }
 
@@ -711,10 +715,12 @@ GL_SPECIAL_FORM(for) {
     }
 
     gl_ast_node_t *iter_coll_node = iter_coll_cons->value.cons.car;
+    size_t root_mark = gl_gc_root_mark();
     gl_value_t *iter_coll = gl_eval(iter_coll_node);
     if (!iter_coll) {
         return NULL;
     }
+    gl_gc_push_root(iter_coll);
 
     const char *var_name = iter_name->value.symbol;
     gl_ast_node_t *body = args->value.cons.cdr;
@@ -727,6 +733,7 @@ GL_SPECIAL_FORM(for) {
 
     if (iter_coll->type == GL_VAL_NIL) {
         gl_call_stack_pop_env();
+        gl_gc_roots_release(root_mark);
         return gl_value_make_nil();
     } else if (iter_coll->type == GL_VAL_CONS) {
         gl_value_t *curr = iter_coll;
@@ -735,6 +742,7 @@ GL_SPECIAL_FORM(for) {
             gl_env_set_var(new_env, var_name, gl_value_copy(cons->car));
             if (!__gl_eval_body(body)) {
                 gl_call_stack_pop_env();
+                gl_gc_roots_release(root_mark);
                 return NULL;
             }
             curr = cons->cdr;
@@ -744,6 +752,7 @@ GL_SPECIAL_FORM(for) {
                                             "Cannot iterate over improper list");
             gl_diagnostic_report_error(err);
             gl_call_stack_pop_env();
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
     } else if (iter_coll->type == GL_VAL_ARRAY) {
@@ -752,6 +761,7 @@ GL_SPECIAL_FORM(for) {
             gl_env_set_var(new_env, var_name, gl_value_copy(arr->data[i]));
             if (!__gl_eval_body(body)) {
                 gl_call_stack_pop_env();
+                gl_gc_roots_release(root_mark);
                 return NULL;
             }
         }
@@ -761,6 +771,7 @@ GL_SPECIAL_FORM(for) {
             gl_env_set_var(new_env, var_name, gl_value_copy(*gl_value_vector_at(vec, i)));
             if (!__gl_eval_body(body)) {
                 gl_call_stack_pop_env();
+                gl_gc_roots_release(root_mark);
                 return NULL;
             }
         }
@@ -773,6 +784,7 @@ GL_SPECIAL_FORM(for) {
             gl_env_set_var(new_env, var_name, gl_value_make_string(ch_buf));
             if (!__gl_eval_body(body)) {
                 gl_call_stack_pop_env();
+                gl_gc_roots_release(root_mark);
                 return NULL;
             }
         }
@@ -782,10 +794,12 @@ GL_SPECIAL_FORM(for) {
                           "Expected a collection (list, array, vector, or string) in for form");
         gl_diagnostic_report_error(err);
         gl_call_stack_pop_env();
+        gl_gc_roots_release(root_mark);
         return NULL;
     }
 
     gl_call_stack_pop_env();
+    gl_gc_roots_release(root_mark);
     return gl_value_make_nil();
 }
 
@@ -879,15 +893,18 @@ GL_SPECIAL_FORM(add_to_list) {
         return NULL;
     }
 
+    size_t root_mark = gl_gc_root_mark();
     gl_value_t *elem = gl_eval(elem_node);
     if (!elem) {
         return NULL;
     }
+    gl_gc_push_root(elem);
 
     int do_append = 0;
     if (app_node) {
         gl_value_t *app_val = gl_eval(app_node);
         if (!app_val) {
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
         do_append = gl_value_get_bool(app_val);
@@ -910,6 +927,7 @@ GL_SPECIAL_FORM(add_to_list) {
         gl_error_t *err = gl_make_error(GL_TYPE_ERROR, GL_ERROR, var_node->location,
                                         "Variable in add-to-list must contain a list or nil");
         gl_diagnostic_report_error(err);
+        gl_gc_roots_release(root_mark);
         return NULL;
     }
 
@@ -918,7 +936,9 @@ GL_SPECIAL_FORM(add_to_list) {
     while (p && p->type == GL_VAL_CONS) {
         gl_value_cons_t *cons = p->val;
         if (gl_value_compare(cons->car, elem) == 0) {
-            return cur_val ? cur_val : gl_value_make_nil();
+            gl_value_t *res = cur_val ? cur_val : gl_value_make_nil();
+            gl_gc_roots_release(root_mark);
+            return res;
         }
         p = cons->cdr;
     }
@@ -960,6 +980,7 @@ GL_SPECIAL_FORM(add_to_list) {
     }
 
     gl_env_set_var(target_env, var_name, new_list);
+    gl_gc_roots_release(root_mark);
     return new_list;
 }
 

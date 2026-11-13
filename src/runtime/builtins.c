@@ -224,21 +224,6 @@ GL_BUILTIN(exit) {
     exit(exit_code);
 }
 
-GL_BUILTIN(print) {
-    for (size_t i = 0; i < ARGC; ++i) {
-        gl_value_print(NTH_VAL(i));
-    }
-    return gl_value_make_nil();
-}
-
-GL_BUILTIN(println) {
-    if (ARGC > 0) {
-        gl_builtin_print(called_at, args);
-    }
-    printf("\n");
-    return gl_value_make_nil();
-}
-
 GL_BUILTIN(car) {
     EXPECT_ARGS(1);
 
@@ -1180,12 +1165,30 @@ static gl_file_mode_t __gl_parse_file_mode(const char *mode) {
         case '+':
             res |= (GL_FILE_READ | GL_FILE_WRITE);
             break;
+        case 'b':
+            break;
         default:
             return 0;
         }
         current += 1;
     }
     return res;
+}
+
+static const char *__gl_file_mode_to_fopen(gl_file_mode_t mode) {
+    int can_read = (mode & GL_FILE_READ) != 0;
+    int can_write = (mode & GL_FILE_WRITE) != 0;
+
+    if (mode & GL_FILE_APPEND) {
+        return can_read ? "a+" : "a";
+    }
+    if (can_read && can_write) {
+        return "r+";
+    }
+    if (can_write) {
+        return "w";
+    }
+    return "r";
 }
 
 GL_BUILTIN(open) {
@@ -1195,16 +1198,41 @@ GL_BUILTIN(open) {
     gl_value_t *mode = NTH_VAL(1);
 
     EXPECT_STRING(filename);
-    EXPECT_STRING(mode);
 
     char *filename_str = gl_value_get_string(filename);
-    const char *mode_str = (const char *)gl_value_get_string(mode);
-    gl_file_mode_t file_mode = __gl_parse_file_mode(mode_str);
+    const char *mode_str = NULL;
+    gl_file_mode_t file_mode = 0;
 
-    if (file_mode == 0) {
-        gl_diagnostic_report_error(
-            gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, called_at,
-                          "Wrong file mode string: expected \"r\", \"w\" or \"a\""));
+    if (mode->type == GL_VAL_STRING) {
+        mode_str = gl_value_get_string(mode);
+        file_mode = __gl_parse_file_mode(mode_str);
+
+        if (file_mode == 0) {
+            gl_diagnostic_report_error(
+                gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, called_at,
+                              "Wrong file mode string: expected \"r\", \"w\" or \"a\", optionally "
+                              "followed by \"+\" and/or \"b\""));
+            return NULL;
+        }
+    } else if (mode->type == GL_VAL_INT) {
+        int64_t raw_mode = gl_value_get_int(mode);
+        int64_t valid_bits = GL_FILE_READ | GL_FILE_WRITE | GL_FILE_APPEND;
+
+        if (raw_mode <= 0 || (raw_mode & ~valid_bits) != 0) {
+            char err_buf[256];
+            snprintf(err_buf, sizeof(err_buf),
+                     "Wrong file mode: expected a combination of read (%d), write (%d) and "
+                     "append (%d)",
+                     GL_FILE_READ, GL_FILE_WRITE, GL_FILE_APPEND);
+            gl_diagnostic_report_error(
+                gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, called_at, err_buf));
+            return NULL;
+        }
+
+        file_mode = (gl_file_mode_t)raw_mode;
+        mode_str = __gl_file_mode_to_fopen(file_mode);
+    } else {
+        __emit_type_error(called_at, "string or int", __gl_value_get_type_name(mode));
         return NULL;
     }
 
@@ -1217,7 +1245,7 @@ GL_BUILTIN(open) {
         return NULL;
     }
 
-    return gl_value_make_file(file, filename_str, 1, __gl_parse_file_mode(mode_str));
+    return gl_value_make_file(file, filename_str, 1, file_mode);
 }
 
 GL_BUILTIN(close) {
@@ -1278,9 +1306,19 @@ GL_BUILTIN(write_str) {
         dest = f->handle;
     }
 
-    fputs(gl_value_get_string(str), dest);
+    const char *text = gl_value_get_string(str);
+    size_t len = strlen(text);
+    size_t written = fwrite(text, 1, len, dest);
 
-    return gl_value_make_int(strlen(gl_value_get_string(str)));
+    if (written != len || ferror(dest)) {
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Failed to write to file: %s",
+                 errno != 0 ? strerror(errno) : "I/O error");
+        gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf));
+        return NULL;
+    }
+
+    return gl_value_make_int((int64_t)written);
 }
 
 GL_BUILTIN(to_str) {
@@ -1346,7 +1384,19 @@ GL_BUILTIN(open_p) {
 
     gl_value_t *file = NTH_VAL(0);
 
+    EXPECT_FILE(file);
+
     return gl_value_make_bool(gl_value_get_file(file)->is_open);
+}
+
+GL_BUILTIN(file_mode) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *file = NTH_VAL(0);
+
+    EXPECT_FILE(file);
+
+    return gl_value_make_int((int64_t)gl_value_get_file(file)->mode);
 }
 
 GL_BUILTIN(eof_p) {
@@ -1356,5 +1406,91 @@ GL_BUILTIN(eof_p) {
 
     EXPECT_FILE(file);
 
-    return gl_value_make_bool(feof(gl_value_get_file(file)->handle));
+    gl_file_t *f = gl_value_get_file(file);
+
+    if (!f->is_open || !f->handle) {
+        gl_diagnostic_report_error(
+            gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, "Cannot check EOF of a closed file"));
+        return NULL;
+    }
+
+    return gl_value_make_bool(feof(f->handle));
+}
+
+GL_BUILTIN(flush) {
+    EXPECT_RVARGS(0, 1);
+
+    FILE *stream = stdout;
+
+    if (ARGC == 1) {
+        gl_value_t *file = NTH_VAL(0);
+
+        EXPECT_FILE(file);
+
+        gl_file_t *f = gl_value_get_file(file);
+
+        if (!f->is_open || !f->handle) {
+            gl_diagnostic_report_error(
+                gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, "Cannot flush a closed file"));
+            return NULL;
+        }
+
+        stream = f->handle;
+    }
+
+    if (fflush(stream) != 0) {
+        char err_buf[1024];
+        snprintf(err_buf, sizeof(err_buf), "Failed to flush file: %s",
+                 errno != 0 ? strerror(errno) : "I/O error");
+        gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, called_at, err_buf));
+        return NULL;
+    }
+
+    return gl_value_make_nil();
+}
+
+GL_BUILTIN(logand) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *lhs = NTH_VAL(0);
+    gl_value_t *rhs = NTH_VAL(1);
+
+    EXPECT_INT(lhs);
+    EXPECT_INT(rhs);
+
+    return gl_value_make_int(gl_value_get_int(lhs) & gl_value_get_int(rhs));
+}
+
+GL_BUILTIN(logior) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *lhs = NTH_VAL(0);
+    gl_value_t *rhs = NTH_VAL(1);
+
+    EXPECT_INT(lhs);
+    EXPECT_INT(rhs);
+
+    return gl_value_make_int(gl_value_get_int(lhs) | gl_value_get_int(rhs));
+}
+
+GL_BUILTIN(logxor) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *lhs = NTH_VAL(0);
+    gl_value_t *rhs = NTH_VAL(1);
+
+    EXPECT_INT(lhs);
+    EXPECT_INT(rhs);
+
+    return gl_value_make_int(gl_value_get_int(lhs) ^ gl_value_get_int(rhs));
+}
+
+GL_BUILTIN(lognot) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+
+    EXPECT_INT(val);
+
+    return gl_value_make_int(~gl_value_get_int(val));
 }

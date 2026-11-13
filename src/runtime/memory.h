@@ -20,4 +20,12 @@ void gl_destroy_sources(void);
 
 void gl_gc_collect(void);
 
+size_t gl_gc_root_mark(void);
+
+void gl_gc_push_root(gl_value_t *val);
+
+void gl_gc_roots_release(size_t mark);
+
+void gl_gc_maybe_collect(void);
+
 void gl_destroy_memory_heap(void);

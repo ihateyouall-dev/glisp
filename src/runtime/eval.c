@@ -4,6 +4,7 @@
 #include "callstack.h"
 #include "diagnostics.h"
 #include "location.h"
+#include "memory.h"
 #include "parser.h"
 #include "runtime/env.h"
 #include "value.h"
@@ -44,22 +45,31 @@ static gl_value_t *__gl_eval_string(gl_ast_node_t *node) {
 static gl_value_t *__gl_eval_nil(void) { return gl_value_make_nil(); }
 
 static gl_value_t *__gl_eval_array(gl_ast_node_t *node) {
+    size_t root_mark = gl_gc_root_mark();
     size_t size = node->value.array.size;
     gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
     gl_value_array_init(arr, size, NULL);
     for (size_t i = 0; i < size; ++i) {
         arr->data[i] = gl_eval(node->value.array.data[i]);
+        gl_gc_push_root(arr->data[i]);
     }
-    return gl_value_make_array_from(arr);
+    gl_value_t *res = gl_value_make_array_from(arr);
+    gl_gc_roots_release(root_mark);
+    return res;
 }
 
 static gl_value_t *__gl_eval_vector(gl_ast_node_t *node) {
+    size_t root_mark = gl_gc_root_mark();
     gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
     gl_value_vector_init(vec, NULL);
     for (size_t i = 0; i < node->value.vector.size; ++i) {
-        gl_value_vector_push_back(vec, gl_eval(*gl_ast_vector_at(&node->value.vector, i)));
+        gl_value_t *elem = gl_eval(*gl_ast_vector_at(&node->value.vector, i));
+        gl_gc_push_root(elem);
+        gl_value_vector_push_back(vec, elem);
     }
-    return gl_value_make_vector_from(vec);
+    gl_value_t *res = gl_value_make_vector_from(vec);
+    gl_gc_roots_release(root_mark);
+    return res;
 }
 
 static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
@@ -99,6 +109,7 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
             free(res);
             return NULL;
         }
+        gl_gc_push_root(res->data[i]->val);
     }
     return res;
 }
@@ -172,6 +183,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     gl_ast_node_t *func_node = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
 
+    size_t root_mark = gl_gc_root_mark();
     gl_value_t *func_val = NULL;
 
     gl_value_t *env = gl_current_env();
@@ -179,10 +191,15 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     // Trying to evaluate expression given instead of function name
     if (func_node->type != GL_AST_SYMBOL) {
         func_val = gl_eval(func_node);
+        if (func_val == NULL) {
+            return NULL;
+        }
+        gl_gc_push_root(func_val);
         if (func_val->type != GL_VAL_FUNCTION && func_val->type != GL_VAL_BUILTIN &&
             func_val->type != GL_VAL_SPFORM) {
             gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, func_node->location,
                                                      "Expression result cannot be called"));
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
     } else {
@@ -202,6 +219,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             gl_diagnostic_report_error(err);
             return NULL;
         }
+        gl_gc_push_root(func_val);
     }
 
     // Evaluating function
@@ -211,24 +229,29 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         gl_function_args_t *argv = gl_eval_args(args);
 
         if (argv == NULL) {
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
 
         gl_value_t *res = builtin(func_node->location, argv);
         gl_function_args_destroy(argv);
         free(argv);
+        gl_gc_roots_release(root_mark);
         return res;
     }
     case GL_VAL_SPFORM: {
         gl_special_form_t spform = func_val->val;
 
-        return spform((gl_env_t *)env->val, args);
+        gl_value_t *res = spform((gl_env_t *)env->val, args);
+        gl_gc_roots_release(root_mark);
+        return res;
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
         gl_function_args_t *argv = gl_eval_args(args);
 
         if (argv == NULL) {
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
 
@@ -246,6 +269,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             }
             gl_function_args_destroy(argv);
             free(argv);
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
 
@@ -258,11 +282,13 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
             gl_call_stack_print_stacktrace();
             gl_function_args_destroy(argv);
             free(argv);
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
         gl_call_stack_pop_call();
         gl_function_args_destroy(argv);
         free(argv);
+        gl_gc_roots_release(root_mark);
         return res;
     }
     default:
@@ -276,10 +302,22 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
     if (!func_val) {
         return NULL;
     }
+
+    size_t root_mark = gl_gc_root_mark();
+    gl_gc_push_root(func_val);
+
+    if (argv != NULL) {
+        for (size_t i = 0; i < argv->size; ++i) {
+            gl_gc_push_root(argv->data[i]->val);
+        }
+    }
+
     switch (func_val->type) {
     case GL_VAL_BUILTIN: {
         gl_builtin_t builtin = func_val->val;
-        return builtin(loc, argv);
+        gl_value_t *res = builtin(loc, argv);
+        gl_gc_roots_release(root_mark);
+        return res;
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
@@ -293,6 +331,7 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
                 gl_diagnostic_report_range_arity_error(loc, function->min_args, function->max_args,
                                                        argv->size);
             }
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
         gl_init_call_stack();
@@ -300,14 +339,17 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
         gl_value_t *res = __gl_eval_function(function, argv);
         if (!res) {
             gl_call_stack_print_stacktrace();
+            gl_gc_roots_release(root_mark);
             return NULL;
         }
         gl_call_stack_pop_call();
+        gl_gc_roots_release(root_mark);
         return res;
     }
     default:
         gl_diagnostic_report_error(
             gl_make_error(GL_TYPE_ERROR, GL_ERROR, loc, "Expression result cannot be called"));
+        gl_gc_roots_release(root_mark);
         return NULL;
     }
 }
@@ -315,6 +357,8 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
 gl_value_t *gl_eval(gl_ast_node_t *node) {
     if (node == NULL)
         return NULL;
+
+    gl_gc_maybe_collect();
 
     gl_value_t *env = gl_global_env;
 

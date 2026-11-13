@@ -53,7 +53,7 @@
 
 (defun println-err (&rest args)
   "Print ARGS and write new line to *stderr*."
-  (apply println-err args)
+  (apply print-err args)
   (write "\n" *stderr*)
   nil)
 
@@ -62,12 +62,53 @@
   (each (lambda (val) (println-err val)) args)
   nil)
 
-(defun input (&optional (invite ""))
-  "Print INVITE invitation and return user's input."
-  (print invite)
+(defun input (&optional (invitation ""))
+  "Print INVITATION and return user's input."
+  (print invitation)
   (read-line *stdin*))
 
 (defun closed? (file)
   "Returns t if FILE is closed."
   (assert (file? file) "FILE must be file")
   (not (open? file)))
+
+;;; File modes
+
+(defconst file-read 1)
+(defconst file-write 2)
+(defconst file-append 4)
+
+(defun file-mode? (file mode)
+  "Returns t if FILE has all MODE bits set."
+  (assert (file? file) "FILE must be file")
+  (assert (int? mode) "MODE must be int")
+  (= mode (logand (file-mode file) mode)))
+
+(defun readable? (file)
+  "Returns t if FILE is opened for reading."
+  (file-mode? file file-read))
+
+(defun writable? (file)
+  "Returns t if FILE is opened for writing."
+  (assert (file? file) "FILE must be file")
+  (not (= 0 (logand (file-mode file) (logior file-write file-append)))))
+
+(defun appendable? (file)
+  "Returns t if FILE is opened for appending."
+  (file-mode? file file-append))
+
+(defun open-read (path)
+  "Opens PATH for reading."
+  (open path file-read))
+
+(defun open-write (path)
+  "Opens PATH for writing, truncating it."
+  (open path file-write))
+
+(defun open-append (path)
+  "Opens PATH for appending."
+  (open path file-append))
+
+(defun open-read-write (path)
+  "Opens PATH for reading and writing without truncating it."
+  (open path (logior file-read file-write)))

@@ -63,7 +63,7 @@ gl_value_t *gl_value_make_bool(int b);
 gl_value_t *gl_value_make_typeid(gl_value_type_t type);
 
 // If multiple permissions provided, just sum up the modes.
-// Like "rw" = GL_FILE_READ + GL_FILE_WRITE = 3
+// Like "rw" = GL_FILE_READ | GL_FILE_WRITE = 3
 typedef enum { GL_FILE_READ = 1, GL_FILE_WRITE = 2, GL_FILE_APPEND = 4 } gl_file_mode_t;
 
 typedef struct {

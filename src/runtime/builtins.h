@@ -8,10 +8,6 @@
 
 GL_BUILTIN(exit);
 
-GL_BUILTIN(print);
-
-GL_BUILTIN(println);
-
 GL_BUILTIN(car);
 
 GL_BUILTIN(cdr);
@@ -132,4 +128,16 @@ GL_BUILTIN(read_line);
 
 GL_BUILTIN(open_p);
 
+GL_BUILTIN(file_mode);
+
 GL_BUILTIN(eof_p);
+
+GL_BUILTIN(flush);
+
+GL_BUILTIN(logand);
+
+GL_BUILTIN(logior);
+
+GL_BUILTIN(logxor);
+
+GL_BUILTIN(lognot);

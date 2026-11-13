@@ -1,45 +1,54 @@
 ;;; types.lisp - Type predicates
 
+(defun typeid? (x)
+  (= (typeof x) typeid-t))
+
+(defun instanceof? (type x)
+  "Checks if value of X has type TYPE."
+  (assert (typeid? type) "TYPE must be typeid")
+  (= (typeof x) type))
+
 (defun int? (x)
-  (= (typeof x) int-t))
+  (instanceof? int-t x))
 
 (defun float? (x)
-  (= (typeof x) float-t))
+  (instanceof? float-t x))
 
 (defun number? (x)
   (or (int? x) (float? x)))
 
 (defun string? (x)
-  (= (typeof x) string-t))
+  (instanceof? string-t x))
 
 (defun symbol? (x)
-  (= (typeof x) symbol-t))
+  (instanceof? symbol-t x))
 
 (defun nil? (x)
-  (= (typeof x) nil-t))
+  (instanceof? nil-t x))
 
 (set null? nil?)
 
 (defun function? (x)
-  (= (typeof x) function-t))
+  (instanceof? function-t x))
 
 (defun list? (x)
-  (= (typeof x) list-t))
+  (instanceof? list-t x))
 
 (defun array? (x)
-  (= (typeof x) array-t))
+  (instanceof? array-t x))
 
 (defun vector? (x)
-  (= (typeof x) vector-t))
+  (instanceof? vector-t x))
 
 (defun collection? (x)
   (or
-   (= (typeof x) list-t)
-   (= (typeof x) array-t)
-   (= (typeof x) vector-t)))
-
-(defun typeid? (x)
-  (= (typeof x) typeid-t))
+   (instanceof? list-t x)
+   (instanceof? array-t x)
+   (instanceof? vector-t x)))
 
 (defun file? (x)
-  (= (typeof x) file-t))
+  (instanceof? file-t x))
+
+(defun type= (a b)
+  "Checks whether A and B have the same type."
+  (= (typeof a) (typeof b)))

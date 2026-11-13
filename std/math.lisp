@@ -124,8 +124,18 @@
     (+ (* (- 1.0 ft) a) (* ft b))))
 
 (defconst float= approx=)
-(defconst feq approx=)
-(defconst isclose approx=)
+
+(defun frac? (x)
+  "Checks if X has fractional part."
+  (if (float? x)
+      (not (approx= x (trunc x)))
+      nil))
+
+(defun natural? (x)
+  "Checks if X is natural number."
+  (if (number? x)
+      (and (not (frac? x)) (>= x 0))
+      nil))
 
 ;; Trigonometry
 

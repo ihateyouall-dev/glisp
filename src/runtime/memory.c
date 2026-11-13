@@ -5,6 +5,7 @@
 #include "value.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 
 gl_memory_heap_t *gl_memory_heap = NULL;
 
@@ -16,6 +17,30 @@ void gl_init_memory_heap(void) {
 
 const size_t GL_GC_THRESHOLD = 5000;
 int gl_gc_enabled = 1;
+
+static gl_value_vector_t gl_temp_roots;
+
+size_t gl_gc_root_mark(void) { return gl_temp_roots.size; }
+
+void gl_gc_push_root(gl_value_t *val) {
+    if (val == NULL || val == gl_nil || val == gl_t) {
+        return;
+    }
+
+    gl_value_vector_push_back(&gl_temp_roots, val);
+}
+
+void gl_gc_roots_release(size_t mark) {
+    if (mark < gl_temp_roots.size) {
+        gl_value_vector_resize(&gl_temp_roots, mark);
+    }
+}
+
+void gl_gc_maybe_collect(void) {
+    if (gl_gc_enabled && gl_memory_heap != NULL && gl_memory_heap->allocated > GL_GC_THRESHOLD) {
+        gl_gc_collect();
+    }
+}
 
 void gl_register_value(gl_value_t *val) {
     if (!val || val == gl_nil || val == gl_t) {
@@ -32,10 +57,6 @@ void gl_register_value(gl_value_t *val) {
 
     gl_memory_heap->head = val;
     ++gl_memory_heap->allocated;
-
-    if (gl_gc_enabled && gl_memory_heap->allocated > GL_GC_THRESHOLD) {
-        gl_gc_collect();
-    }
 }
 
 static void __gl_trace_env_raw(gl_env_t *raw);
@@ -45,6 +66,12 @@ static void __gl_trace_value(gl_value_t *val) {
     if (val == NULL || val == gl_nil || val == gl_t || val->gc_marked) {
         return;
     }
+
+    if (val->type == GL_VAL_ENV) {
+        __gl_trace_environment(val);
+        return;
+    }
+
     val->gc_marked = 1;
 
     switch (val->type) {
@@ -60,12 +87,6 @@ static void __gl_trace_value(gl_value_t *val) {
         gl_function_t *func = val->val;
         if (func && func->closure) {
             __gl_trace_value(func->closure);
-        }
-        break;
-    }
-    case GL_VAL_ENV: {
-        if (val->val) {
-            __gl_trace_environment(val);
         }
         break;
     }
@@ -99,10 +120,6 @@ static void __gl_trace_value_table(gl_value_table_t *table) {
     for (size_t i = 0, count = 0; i < table->buckets_count && count < table->size; ++i) {
         gl_value_tableBucket_t *bucket = &table->buckets[i];
 
-        if (bucket == NULL) {
-            continue;
-        }
-
         for (size_t j = 0; j < bucket->size; ++j) {
             gl_value_tableEntry_t *val = gl_value_tableBucket_at(bucket, j);
             if (val && val->value) {
@@ -122,6 +139,9 @@ static void __gl_trace_env_raw(gl_env_t *raw) {
     }
     if (raw->functions) {
         __gl_trace_value_table(raw->functions);
+    }
+    if (raw->constants) {
+        __gl_trace_value_table(raw->constants);
     }
 
     if (raw->parent != NULL) {
@@ -157,6 +177,10 @@ void gl_gc_collect(void) {
                 __gl_trace_environment(frame->env);
             }
         }
+    }
+
+    for (size_t i = 0; i < gl_temp_roots.size; ++i) {
+        __gl_trace_value(gl_temp_roots.data[i]);
     }
 
     current = gl_memory_heap->head;
@@ -199,6 +223,8 @@ void gl_destroy_memory_heap(void) {
     gl_memory_heap = NULL;
     gl_global_env = NULL;
     gl_gc_enabled = 1;
+
+    gl_value_vector_destroy(&gl_temp_roots);
 
     if (gl_nil) {
         free(gl_nil);

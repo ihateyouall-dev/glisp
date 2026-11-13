@@ -30,95 +30,115 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
     return res;
 }
 
+#define DEFINE_BUILTIN(Name, CName)                                                                \
+    do {                                                                                           \
+        gl_env_set_fun(env, Name, gl_value_make_builtin(gl_builtin_##CName));                      \
+    } while (0)
+
+#define DEFINE_SPECFORM(Name, CName)                                                               \
+    do {                                                                                           \
+        gl_env_set_fun(env, Name, gl_value_make_specform(&gl_specform_##CName));                   \
+    } while (0)
+
+#define DEFINE_TYPEID(Name, CName)                                                                 \
+    do {                                                                                           \
+        gl_env_set_const(res, Name, gl_value_make_typeid(CName));                                  \
+    } while (0)
+
 static void __gl_global_env_define_builtins(gl_env_t *env) {
-    gl_env_set_fun(env, "exit", gl_value_make_builtin(gl_builtin_exit));
-    gl_env_set_fun(env, "typeof", gl_value_make_builtin(gl_builtin_typeof));
-    /* gl_env_set_fun(env, "print", gl_value_make_builtin(gl_builtin_print)); */
-    /* gl_env_set_fun(env, "println", gl_value_make_builtin(gl_builtin_println)); */
+    DEFINE_BUILTIN("exit", exit);
+    DEFINE_BUILTIN("typeof", typeof);
 
-    gl_env_set_fun(env, "+", gl_value_make_builtin(gl_builtin_add));
-    gl_env_set_fun(env, "-", gl_value_make_builtin(gl_builtin_sub));
-    gl_env_set_fun(env, "*", gl_value_make_builtin(gl_builtin_mul));
-    gl_env_set_fun(env, "/", gl_value_make_builtin(gl_builtin_div));
-    gl_env_set_fun(env, "%", gl_value_make_builtin(gl_builtin_mod));
+    DEFINE_BUILTIN("+", add);
+    DEFINE_BUILTIN("-", sub);
+    DEFINE_BUILTIN("*", mul);
+    DEFINE_BUILTIN("/", div);
+    DEFINE_BUILTIN("%", mod);
 
-    gl_env_set_fun(env, "=", gl_value_make_builtin(gl_builtin_eq));
-    gl_env_set_fun(env, "eq", gl_value_make_builtin(gl_builtin_eq));
-    gl_env_set_fun(env, ">", gl_value_make_builtin(gl_builtin_gt));
-    gl_env_set_fun(env, "<", gl_value_make_builtin(gl_builtin_lt));
-    gl_env_set_fun(env, ">=", gl_value_make_builtin(gl_builtin_ge));
-    gl_env_set_fun(env, "<=", gl_value_make_builtin(gl_builtin_le));
+    DEFINE_BUILTIN("=", eq);
+    DEFINE_BUILTIN("eq", eq);
+    DEFINE_BUILTIN(">", gt);
+    DEFINE_BUILTIN("<", lt);
+    DEFINE_BUILTIN(">=", ge);
+    DEFINE_BUILTIN("<=", le);
 
-    gl_env_set_fun(env, "car", gl_value_make_builtin(gl_builtin_car));
-    gl_env_set_fun(env, "cdr", gl_value_make_builtin(gl_builtin_cdr));
-    gl_env_set_fun(env, "cons", gl_value_make_builtin(gl_builtin_cons));
+    DEFINE_BUILTIN("car", car);
+    DEFINE_BUILTIN("cdr", cdr);
+    DEFINE_BUILTIN("cons", cons);
 
-    gl_env_set_fun(env, "int", gl_value_make_builtin(gl_builtin_int_con));
-    gl_env_set_fun(env, "float", gl_value_make_builtin(gl_builtin_float_con));
-    gl_env_set_fun(env, "array", gl_value_make_builtin(gl_builtin_array_con));
-    gl_env_set_fun(env, "vector", gl_value_make_builtin(gl_builtin_vector_con));
+    DEFINE_BUILTIN("int", int_con);
+    DEFINE_BUILTIN("float", float_con);
+    DEFINE_BUILTIN("array", array_con);
+    DEFINE_BUILTIN("vector", vector_con);
 
-    gl_env_set_fun(env, "len", gl_value_make_builtin(gl_builtin_len));
-    gl_env_set_fun(env, "length", gl_value_make_builtin(gl_builtin_len));
-    gl_env_set_fun(env, "get", gl_value_make_builtin(gl_builtin_get));
-    gl_env_set_fun(env, "nth", gl_value_make_builtin(gl_builtin_get));
-    gl_env_set_fun(env, "aref", gl_value_make_builtin(gl_builtin_get));
-    gl_env_set_fun(env, "set-at", gl_value_make_builtin(gl_builtin_set_at));
-    gl_env_set_fun(env, "aset", gl_value_make_builtin(gl_builtin_set_at));
-    gl_env_set_fun(env, "push", gl_value_make_builtin(gl_builtin_vector_push));
-    gl_env_set_fun(env, "vector-push", gl_value_make_builtin(gl_builtin_vector_push));
-    gl_env_set_fun(env, "pop", gl_value_make_builtin(gl_builtin_vector_pop));
-    gl_env_set_fun(env, "vector-pop", gl_value_make_builtin(gl_builtin_vector_pop));
+    DEFINE_BUILTIN("len", len);
+    DEFINE_BUILTIN("length", len);
+    DEFINE_BUILTIN("get", get);
+    DEFINE_BUILTIN("nth", get);
+    DEFINE_BUILTIN("aref", get);
+    DEFINE_BUILTIN("set-at", set_at);
+    DEFINE_BUILTIN("aset", set_at);
+    DEFINE_BUILTIN("push", vector_push);
+    DEFINE_BUILTIN("vector-push", vector_push);
+    DEFINE_BUILTIN("pop", vector_pop);
+    DEFINE_BUILTIN("vector-pop", vector_pop);
 
-    gl_env_set_fun(env, "apply", gl_value_make_builtin(gl_builtin_apply));
-    gl_env_set_fun(env, "load", gl_value_make_builtin(gl_builtin_load));
+    DEFINE_BUILTIN("apply", apply);
+    DEFINE_BUILTIN("load", load);
 
-    gl_env_set_fun(env, "assert", gl_value_make_builtin(gl_builtin_assert));
+    DEFINE_BUILTIN("assert", assert);
 
-    gl_env_set_fun(env, "sqrt", gl_value_make_builtin(gl_builtin_sqrt));
-    gl_env_set_fun(env, "fma", gl_value_make_builtin(gl_builtin_fma));
-    gl_env_set_fun(env, "copysign", gl_value_make_builtin(gl_builtin_copysign));
-    gl_env_set_fun(env, "exp", gl_value_make_builtin(gl_builtin_exp));
-    gl_env_set_fun(env, "exp2", gl_value_make_builtin(gl_builtin_exp2));
-    gl_env_set_fun(env, "log", gl_value_make_builtin(gl_builtin_log));
-    gl_env_set_fun(env, "log2", gl_value_make_builtin(gl_builtin_log2));
-    gl_env_set_fun(env, "floor", gl_value_make_builtin(gl_builtin_floor));
-    gl_env_set_fun(env, "ceil", gl_value_make_builtin(gl_builtin_ceil));
-    gl_env_set_fun(env, "round", gl_value_make_builtin(gl_builtin_round));
-    gl_env_set_fun(env, "sin", gl_value_make_builtin(gl_builtin_sin));
-    gl_env_set_fun(env, "cos", gl_value_make_builtin(gl_builtin_cos));
-    gl_env_set_fun(env, "atan2", gl_value_make_builtin(gl_builtin_atan2));
-    gl_env_set_fun(env, "pow", gl_value_make_builtin(gl_builtin_pow));
+    DEFINE_BUILTIN("sqrt", sqrt);
+    DEFINE_BUILTIN("fma", fma);
+    DEFINE_BUILTIN("copysign", copysign);
+    DEFINE_BUILTIN("exp", exp);
+    DEFINE_BUILTIN("exp2", exp2);
+    DEFINE_BUILTIN("log", log);
+    DEFINE_BUILTIN("log2", log2);
+    DEFINE_BUILTIN("floor", floor);
+    DEFINE_BUILTIN("ceil", ceil);
+    DEFINE_BUILTIN("round", round);
+    DEFINE_BUILTIN("sin", sin);
+    DEFINE_BUILTIN("cos", cos);
+    DEFINE_BUILTIN("atan2", atan2);
+    DEFINE_BUILTIN("pow", pow);
 
-    gl_env_set_fun(env, "open", gl_value_make_builtin(gl_builtin_open));
-    gl_env_set_fun(env, "close", gl_value_make_builtin(gl_builtin_close));
-    gl_env_set_fun(env, "write-string", gl_value_make_builtin(gl_builtin_write_str));
-    gl_env_set_fun(env, "to-string", gl_value_make_builtin(gl_builtin_to_str));
-    gl_env_set_fun(env, "read-line", gl_value_make_builtin(gl_builtin_read_line));
-    gl_env_set_fun(env, "open?", gl_value_make_builtin(gl_builtin_open_p));
-    gl_env_set_fun(env, "eof?", gl_value_make_builtin(gl_builtin_eof_p));
+    DEFINE_BUILTIN("open", open);
+    DEFINE_BUILTIN("close", close);
+    DEFINE_BUILTIN("write-string", write_str);
+    DEFINE_BUILTIN("to-string", to_str);
+    DEFINE_BUILTIN("read-line", read_line);
+    DEFINE_BUILTIN("open?", open_p);
+    DEFINE_BUILTIN("file-mode", file_mode);
+    DEFINE_BUILTIN("eof?", eof_p);
+    DEFINE_BUILTIN("flush", flush);
+
+    DEFINE_BUILTIN("logand", logand);
+    DEFINE_BUILTIN("logior", logior);
+    DEFINE_BUILTIN("logxor", logxor);
+    DEFINE_BUILTIN("lognot", lognot);
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
-    gl_env_set_fun(env, "if", gl_value_make_specform(&gl_specform_if));
-    gl_env_set_fun(env, "defun", gl_value_make_specform(&gl_specform_defun));
-    gl_env_set_fun(env, "lambda", gl_value_make_specform(&gl_specform_lambda));
-    gl_env_set_fun(env, "set", gl_value_make_specform(&gl_specform_set));
-    gl_env_set_fun(env, "set-global", gl_value_make_specform(&gl_specform_set_global));
-    gl_env_set_fun(env, "progn", gl_value_make_specform(&gl_specform_progn));
-    gl_env_set_fun(env, "while", gl_value_make_specform(&gl_specform_while));
-    gl_env_set_fun(env, "quote", gl_value_make_specform(&gl_specform_quote));
-    gl_env_set_fun(env, "function", gl_value_make_specform(&gl_specform_function));
-    gl_env_set_fun(env, "let", gl_value_make_specform(&gl_specform_let));
-    gl_env_set_fun(env, "let*", gl_value_make_specform(&gl_specform_let_star));
-    gl_env_set_fun(env, "pragma", gl_value_make_specform(&gl_specform_pragma));
-    gl_env_set_fun(env, "cond", gl_value_make_specform(&gl_specform_cond));
-    gl_env_set_fun(env, "for", gl_value_make_specform(&gl_specform_for));
-    gl_env_set_fun(env, "and", gl_value_make_specform(&gl_specform_and));
-    gl_env_set_fun(env, "or", gl_value_make_specform(&gl_specform_or));
-    gl_env_set_fun(env, "add-to-list", gl_value_make_specform(&gl_specform_add_to_list));
-    gl_env_set_fun(env, "defconst", gl_value_make_specform(&gl_specform_defconst));
-    gl_env_set_fun(env, "defconstant", gl_value_make_specform(&gl_specform_defconst));
+    DEFINE_SPECFORM("if", if);
+    DEFINE_SPECFORM("defun", defun);
+    DEFINE_SPECFORM("lambda", lambda);
+    DEFINE_SPECFORM("set", set);
+    DEFINE_SPECFORM("set-global", set_global);
+    DEFINE_SPECFORM("progn", progn);
+    DEFINE_SPECFORM("while", while);
+    DEFINE_SPECFORM("quote", quote);
+    DEFINE_SPECFORM("function", function);
+    DEFINE_SPECFORM("let", let);
+    DEFINE_SPECFORM("let*", let_star);
+    DEFINE_SPECFORM("pragma", pragma);
+    DEFINE_SPECFORM("cond", cond);
+    DEFINE_SPECFORM("for", for);
+    DEFINE_SPECFORM("and", and);
+    DEFINE_SPECFORM("or", or);
+    DEFINE_SPECFORM("add-to-list", add_to_list);
+    DEFINE_SPECFORM("defconst", defconst);
+    DEFINE_SPECFORM("defconstant", defconst);
 }
 
 gl_env_t *gl_make_global_env(void) {
@@ -129,17 +149,17 @@ gl_env_t *gl_make_global_env(void) {
     gl_env_set_const(res, "nil", gl_value_make_nil());
 
     // Basic type identifiers
-    gl_env_set_const(res, "nil-t", gl_value_make_typeid(GL_VAL_NIL));
-    gl_env_set_const(res, "int-t", gl_value_make_typeid(GL_VAL_INT));
-    gl_env_set_const(res, "float-t", gl_value_make_typeid(GL_VAL_FLOAT));
-    gl_env_set_const(res, "symbol-t", gl_value_make_typeid(GL_VAL_SYMBOL));
-    gl_env_set_const(res, "string-t", gl_value_make_typeid(GL_VAL_STRING));
-    gl_env_set_const(res, "function-t", gl_value_make_typeid(GL_VAL_FUNCTION));
-    gl_env_set_const(res, "list-t", gl_value_make_typeid(GL_VAL_CONS));
-    gl_env_set_const(res, "array-t", gl_value_make_typeid(GL_VAL_ARRAY));
-    gl_env_set_const(res, "vector-t", gl_value_make_typeid(GL_VAL_VECTOR));
-    gl_env_set_const(res, "file-t", gl_value_make_typeid(GL_VAL_FILE));
-    gl_env_set_const(res, "typeid-t", gl_value_make_typeid(GL_VAL_TYPEID));
+    DEFINE_TYPEID("nil-t", GL_VAL_NIL);
+    DEFINE_TYPEID("int-t", GL_VAL_INT);
+    DEFINE_TYPEID("float-t", GL_VAL_FLOAT);
+    DEFINE_TYPEID("symbol-t", GL_VAL_SYMBOL);
+    DEFINE_TYPEID("string-t", GL_VAL_STRING);
+    DEFINE_TYPEID("function-t", GL_VAL_FUNCTION);
+    DEFINE_TYPEID("list-t", GL_VAL_CONS);
+    DEFINE_TYPEID("array-t", GL_VAL_ARRAY);
+    DEFINE_TYPEID("vector-t", GL_VAL_VECTOR);
+    DEFINE_TYPEID("file-t", GL_VAL_FILE);
+    DEFINE_TYPEID("typeid-t", GL_VAL_TYPEID);
 
     gl_env_set_const(res, "*stdin*", gl_value_make_file(stdin, "<stdin>", 1, GL_FILE_READ));
     gl_env_set_const(res, "*stdout*", gl_value_make_file(stdout, "<stdout>", 1, GL_FILE_WRITE));

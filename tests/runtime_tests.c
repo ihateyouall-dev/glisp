@@ -7,6 +7,7 @@
 #include "value.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef GLISP_SOURCE_DIR
 #include <unistd.h>
@@ -634,6 +635,109 @@ void test_autoload_stdlib(void) {
     unsetenv("GLISP_STD_PATH");
 }
 
+void test_io(void) {
+    char path[] = "/tmp/glisp_io_test_XXXXXX";
+    int fd = mkstemp(path);
+    TEST(fd != -1, "create temporary file");
+    if (fd == -1) {
+        return;
+    }
+    close(fd);
+
+    char src[512];
+
+    snprintf(src, sizeof(src), "(set io-file (open \"%s\" \"w+\"))", path);
+    gl_value_t *file = eval_str(src);
+    TEST(file != NULL && file->type == GL_VAL_FILE, "open file with w+ mode");
+    TEST(gl_value_get_bool(eval_str("(open? io-file)")) == 1, "open? on open file");
+
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == (GL_FILE_READ | GL_FILE_WRITE),
+         "file-mode returns read|write");
+    TEST(gl_value_get_bool(eval_str("(readable? io-file)")) == 1, "readable? on w+ file");
+    TEST(gl_value_get_bool(eval_str("(writable? io-file)")) == 1, "writable? on w+ file");
+    TEST(gl_value_get_bool(eval_str("(appendable? io-file)")) == 0, "appendable? on w+ file");
+    TEST(gl_value_get_bool(eval_str("(file-mode? io-file (logior file-read file-write))")) == 1,
+         "file-mode? matches read|write");
+
+    TEST(gl_value_get_int(eval_str("(write-string \"hello\" io-file)")) == 5,
+         "write-string returns bytes written");
+    TEST(eval_str("(flush io-file)") != NULL, "flush on open file");
+
+    TEST(gl_value_get_bool(eval_str("(close io-file)")) == 1, "close file");
+    TEST(gl_value_get_bool(eval_str("(open? io-file)")) == 0, "open? on closed file");
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == (GL_FILE_READ | GL_FILE_WRITE),
+         "file-mode survives close");
+    TEST(eval_expr("(eof? io-file)") == NULL, "eof? on closed file fails");
+    TEST(eval_expr("(flush io-file)") == NULL, "flush on closed file fails");
+    TEST(eval_expr("(open? 1)") == NULL, "open? rejects non-file");
+    TEST(eval_expr("(eof? 1)") == NULL, "eof? rejects non-file");
+    TEST(eval_expr("(file-mode 1)") == NULL, "file-mode rejects non-file");
+
+    snprintf(src, sizeof(src), "(set io-file (open \"%s\" \"rb\"))", path);
+    TEST(eval_str(src) != NULL, "open file with binary read mode");
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == GL_FILE_READ,
+         "file-mode returns read for rb");
+    TEST(gl_value_get_bool(eval_str("(readable? io-file)")) == 1, "readable? on rb file");
+    TEST(gl_value_get_bool(eval_str("(writable? io-file)")) == 0, "writable? on rb file");
+    TEST(strcmp(gl_value_get_string(eval_str("(read-line io-file)")), "hello") == 0,
+         "read back written contents");
+    TEST(eval_str("(read-line io-file)")->type == GL_VAL_NIL, "read-line returns nil at EOF");
+    TEST(gl_value_get_bool(eval_str("(eof? io-file)")) == 1, "eof? is true after EOF");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open \"%s\" (logior file-read file-write)))", path);
+    TEST(eval_str(src) != NULL, "open with integer read|write mode");
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == (GL_FILE_READ | GL_FILE_WRITE),
+         "file-mode from integer mode");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-read \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open-read helper");
+    TEST(gl_value_get_bool(eval_str("(readable? io-file)")) == 1, "open-read is readable");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-append \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open-append helper");
+    TEST(gl_value_get_bool(eval_str("(writable? io-file)")) == 1, "append file is writable");
+    TEST(gl_value_get_bool(eval_str("(appendable? io-file)")) == 1, "append file is appendable");
+    TEST(gl_value_get_bool(eval_str("(readable? io-file)")) == 0, "append file is not readable");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-write \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open-write helper");
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == GL_FILE_WRITE,
+         "open-write mode is write");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-read-write \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open-read-write helper");
+    TEST(gl_value_get_int(eval_str("(file-mode io-file)")) == (GL_FILE_READ | GL_FILE_WRITE),
+         "open-read-write mode is read|write");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(open \"%s\" 0)", path);
+    TEST(eval_expr(src) == NULL, "open rejects zero integer mode");
+    snprintf(src, sizeof(src), "(open \"%s\" 8)", path);
+    TEST(eval_expr(src) == NULL, "open rejects unknown mode bits");
+
+    remove(path);
+}
+
+void test_gc_stress(void) {
+    TEST(eval_str("(defun gc-default (&optional (x 7)) x)") != NULL,
+         "define function for GC stress");
+    TEST(eval_str("(set gc-i 0)") != NULL, "initialize GC stress counter");
+    TEST(eval_str("(set gc-acc nil)") != NULL, "initialize GC stress accumulator");
+
+    gl_value_t *loop = eval_str("(while (< gc-i 3000) (gc-default) "
+                                "  (set gc-acc (cons gc-i gc-acc)) (set gc-i (+ gc-i 1)))");
+    TEST(loop != NULL, "GC stress loop completes");
+
+    TEST(gl_value_get_int(eval_str("gc-i")) == 3000, "GC stress counter value");
+    TEST(gl_value_get_int(eval_str("(len gc-acc)")) == 3000, "GC stress accumulator length");
+    TEST(gl_value_get_int(eval_str("(gc-default)")) == 7, "optional default survives GC");
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     chdir(GLISP_SOURCE_DIR);
@@ -664,6 +768,8 @@ int main(void) {
     test_for();
     test_add_to_list();
     test_defconst();
+    test_io();
+    test_gc_stress();
 
     gl_destroy_memory_heap();
     return test_status;
