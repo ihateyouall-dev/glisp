@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file eval.c
  * @brief Tree-walking evaluator and function application.
  */
@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Deeper nesting than this is reported as an error: the C stack is finite, so
 // a runaway Lisp call has to end with a diagnostic instead of a crash.
@@ -111,6 +112,9 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     }
 
     gl_function_args_init(res, argc, gl_function_arg_free);
+    // Arguments past a failing one are never filled, so the partial array is
+    // zeroed to let the cleanup path free it safely.
+    memset(res->data, 0, sizeof(gl_function_arg_t *) * argc);
 
     current = args;
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {

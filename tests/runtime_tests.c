@@ -827,6 +827,7 @@ void test_gc_stress(void) {
 void test_recursion(void) {
     eval_str("(defun endless (n) (endless (+ n 1)))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
+    TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");
 }
 
 int main(void) {
