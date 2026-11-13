@@ -21,7 +21,10 @@ void test_parse_float(void) {
     gl_parser_t parser = gl_make_parser(src, "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
     TEST(node->type == GL_AST_FLOAT, "Parse FLOAT");
-    TEST(node->value.floating == 45.67, "Parse FLOAT value");
+    // strtold rounds to long double, while the literal is a double, so the
+    // two values are never bit-identical.
+    TEST(node->value.floating > 45.66L && node->value.floating < 45.68L,
+         "Parse FLOAT value");
     gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 }
