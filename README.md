@@ -63,6 +63,10 @@ Run a script:
 - Conan 2.x
 - GNU Readline (installed by Conan)
 
+On Windows, use the MSYS2 MinGW-w64 toolchain with the `readline` and
+`pkgconf` packages. CMake falls back to `pkg-config` when no Conan-provided
+`readline` package is present.
+
 ## Building
 
 The `Makefile` installs Conan dependencies, configures a CMake preset, and
@@ -77,6 +81,13 @@ make clean               # Remove the build directory
 ```
 
 Builds are placed in `build/`. The executable is `build/glisp`.
+
+On Windows (MSYS2), or when a Conan toolchain is not available, let CMake find
+Readline through `pkg-config` instead:
+
+```bash
+make USE_CONAN=0 BUILD_TYPE=Test CMAKE_ARGS='-G Ninja'
+```
 
 If you prefer to drive CMake directly:
 
@@ -180,6 +191,7 @@ See the [standard library reference](docs/stdlib.md).
 
 ```text
 glisp/
+├── .github/workflows/     CI pipeline (Linux, macOS, Windows, leak gate)
 ├── CMakeLists.txt         Root build configuration
 ├── CMakePresets.json      Release, Debug (ASan/UBSan), Test, Leaks presets
 ├── Makefile               Developer entry point
@@ -202,7 +214,7 @@ glisp/
 │   │   └── pragma.c/.h    Runtime directives
 │   └── utils/             Typed containers and terminal helpers
 ├── std/                   Lisp standard library
-├── tests/                 C test suites and Lisp fixtures
+├── tests/                 C test suites, Lisp fixtures, and the leak-check script
 └── docs/                  Language, builtin, stdlib, and C API references
 ```
 
@@ -222,6 +234,28 @@ Run a single suite directly:
 ```bash
 ./build/tests/runtime_tests
 ```
+
+The macOS `leaks` tool can be used to check a run for leaked allocations:
+
+```bash
+make BUILD_TYPE=Leaks
+leaks --atExit -- ./build/glisp tests/leak.lisp
+```
+
+## Continuous integration
+
+`.github/workflows/ci.yml` builds and tests the project on:
+
+- **Linux** — GCC, Debug with AddressSanitizer/UndefinedBehaviorSanitizer,
+  plus a Release build.
+- **macOS** — Apple Clang, Debug with AddressSanitizer/UndefinedBehaviorSanitizer.
+- **Windows** — MSYS2 MinGW-w64, Debug and Release, built with `make USE_CONAN=0`.
+- **macOS leak gate** — `leaks --atExit -- ./glisp tests/leak.lisp` must report
+  zero leaks.
+
+The leak gate runs the interpreter on a dedicated script that exercises
+closures, collections, higher-order functions, file I/O, and garbage
+collection.
 
 ## Contributing
 

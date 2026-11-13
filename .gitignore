@@ -2,3 +2,5 @@ build/
 .cache/
 CMakeUserPresets.json
 __cmake_systeminformation/
+build-*/
+leaks.log

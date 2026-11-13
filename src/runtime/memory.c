@@ -10,18 +10,25 @@
 #include "value.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 gl_memory_heap_t *gl_memory_heap = NULL;
+
+const size_t GL_GC_THRESHOLD = 5000;
+int gl_gc_enabled = 1;
+
+// Collection runs when the heap exceeds this threshold. After a collection the
+// threshold is raised to twice the live set so that a large but stable heap
+// does not trigger a collection at every safe point (which would be O(n^2)).
+static size_t gl_gc_threshold = GL_GC_THRESHOLD;
 
 void gl_init_memory_heap(void) {
     gl_memory_heap = malloc(sizeof(gl_memory_heap_t));
     gl_memory_heap->allocated = 0;
     gl_memory_heap->head = NULL;
+    gl_gc_threshold = GL_GC_THRESHOLD;
 }
-
-const size_t GL_GC_THRESHOLD = 5000;
-int gl_gc_enabled = 1;
 
 static gl_value_vector_t gl_temp_roots;
 
@@ -44,7 +51,7 @@ void gl_gc_roots_release(size_t mark) {
 }
 
 void gl_gc_maybe_collect(void) {
-    if (gl_gc_enabled && gl_memory_heap != NULL && gl_memory_heap->allocated > GL_GC_THRESHOLD) {
+    if (gl_gc_enabled && gl_memory_heap != NULL && gl_memory_heap->allocated > gl_gc_threshold) {
         gl_gc_collect();
     }
 }
@@ -215,6 +222,10 @@ void gl_gc_collect(void) {
             current = current->next_in_heap;
         }
     }
+
+    size_t live = gl_memory_heap->allocated;
+    gl_gc_threshold =
+        live > GL_GC_THRESHOLD ? (live > SIZE_MAX / 2 ? SIZE_MAX : live * 2) : GL_GC_THRESHOLD;
 }
 
 void gl_destroy_memory_heap(void) {

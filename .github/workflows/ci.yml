@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (GCC, ASan/UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            m4 autoconf automake libtool libncurses-dev
+          python -m pip install --upgrade pip "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.txt') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Build and test (Debug, ASan/UBSan)
+        run: make BUILD_TYPE=Test
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: make test
+
+      - name: Build (Release)
+        run: make BUILD_TYPE=Release
+
+      - name: Smoke test (Release)
+        run: ./build/glisp tests/leak.lisp > /dev/null
+
+  macos:
+    name: macOS (Apple Clang, ASan/UBSan)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          brew install pkg-config
+          python -m pip install --upgrade pip "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.txt') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Build and test (Debug, ASan/UBSan)
+        run: make BUILD_TYPE=Test
+
+      - name: Test
+        env:
+          UBSAN_OPTIONS: halt_on_error=1
+        run: make test
+
+  macos-leaks:
+    name: macOS (leaks)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          brew install pkg-config
+          python -m pip install --upgrade pip "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.txt') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Build (Leaks)
+        run: make BUILD_TYPE=Leaks
+
+      - name: Leak check
+        run: |
+          set -o pipefail
+          if ! leaks --atExit -- ./build/glisp tests/leak.lisp > leaks.log 2>&1; then
+            echo "::error::leaks reported leaked allocations"
+            grep -E "^Process [0-9]+: [0-9]+ leaks for" leaks.log || tail -n 120 leaks.log
+            exit 1
+          fi
+          grep -E "^Process [0-9]+: 0 leaks for 0 total leaked bytes" leaks.log || {
+            echo "::error::unexpected leaks output"
+            tail -n 80 leaks.log
+            exit 1
+          }
+          echo "leak check passed"
+
+      - name: Upload leak report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-leaks
+          path: leaks.log
+          if-no-files-found: ignore
+
+  windows:
+    name: Windows (MSYS2 MinGW-w64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-readline
+
+      - name: Build and test (Debug)
+        run: make USE_CONAN=0 BUILD_TYPE=Test CMAKE_ARGS='-G Ninja -DCMAKE_C_FLAGS=-D__USE_MINGW_ANSI_STDIO=1'
+
+      - name: Test
+        run: make USE_CONAN=0 test
+
+      - name: Build (Release)
+        run: make USE_CONAN=0 BUILD_TYPE=Release BUILD_DIR=build-release CMAKE_ARGS='-G Ninja -DCMAKE_C_FLAGS=-D__USE_MINGW_ANSI_STDIO=1'

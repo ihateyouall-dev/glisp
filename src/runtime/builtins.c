@@ -23,8 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
-#ifdef MSC_VER
+#ifdef _MSC_VER
 #include "utils/strdup.h"
 #endif
 
@@ -831,6 +832,14 @@ static char *__get_directory(const char *path) {
     return dir;
 }
 
+static char *__gl_realpath(const char *path) {
+#ifdef _WIN32
+    return _fullpath(NULL, path, 0);
+#else
+    return realpath(path, NULL);
+#endif
+}
+
 static int __is_absolute_path(const char *path) {
     if (!path) {
         return 0;
@@ -854,7 +863,7 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
     char *target_path = NULL;
 
     if (__is_absolute_path(filepath)) {
-        target_path = realpath(filepath, NULL);
+        target_path = __gl_realpath(filepath);
         if (!target_path) {
             target_path = strdup(filepath);
         }
@@ -865,7 +874,7 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
         snprintf(combined, combined_len, "%s/%s", dir, filepath);
         free(dir);
 
-        target_path = realpath(combined, NULL);
+        target_path = __gl_realpath(combined);
         if (!target_path) {
             target_path = combined;
         } else {
@@ -1347,6 +1356,49 @@ GL_BUILTIN(to_str) {
 }
 
 // Reads one line, strips LF or CRLF, and returns nil at end of file.
+#ifdef _WIN32
+static long long __gl_getline(char **lineptr, size_t *n, FILE *stream) {
+    if (*lineptr == NULL || *n == 0) {
+        *n = 128;
+        *lineptr = malloc(*n);
+        if (*lineptr == NULL) {
+            return -1;
+        }
+    }
+
+    size_t len = 0;
+    int ch = EOF;
+    while ((ch = fgetc(stream)) != EOF) {
+        if (len + 1 >= *n) {
+            size_t new_cap = *n * 2;
+            char *grown = realloc(*lineptr, new_cap);
+            if (grown == NULL) {
+                return -1;
+            }
+            *lineptr = grown;
+            *n = new_cap;
+        }
+        (*lineptr)[len++] = (char)ch;
+        if (ch == '\n') {
+            break;
+        }
+    }
+
+    if (len == 0 && ch == EOF) {
+        return -1;
+    }
+
+    (*lineptr)[len] = '\0';
+    return (long long)len;
+}
+
+#define GL_GETLINE __gl_getline
+#define GL_SSIZE_T long long
+#else
+#define GL_GETLINE getline
+#define GL_SSIZE_T ssize_t
+#endif
+
 GL_BUILTIN(read_line) {
     EXPECT_RVARGS(0, 1);
 
@@ -1370,7 +1422,7 @@ GL_BUILTIN(read_line) {
 
     char *line = NULL;
     size_t cap = 0;
-    ssize_t nread = getline(&line, &cap, stream);
+    GL_SSIZE_T nread = GL_GETLINE(&line, &cap, stream);
 
     if (nread == -1) {
         free(line);

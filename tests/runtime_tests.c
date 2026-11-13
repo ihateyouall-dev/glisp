@@ -6,12 +6,58 @@
 #include "test.h"
 #include "value.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef GLISP_SOURCE_DIR
+#ifdef _WIN32
+#include <direct.h>
+#include <process.h>
+#else
 #include <unistd.h>
 #endif
+
+#ifdef _WIN32
+static int gl_test_setenv(const char *name, const char *value) { return _putenv_s(name, value); }
+
+static void gl_test_unsetenv(const char *name) { _putenv_s(name, ""); }
+#else
+static int gl_test_setenv(const char *name, const char *value) { return setenv(name, value, 1); }
+
+static void gl_test_unsetenv(const char *name) { unsetenv(name); }
+#endif
+
+static int gl_test_chdir(const char *path) {
+#ifdef _WIN32
+    return _chdir(path);
+#else
+    return chdir(path);
+#endif
+}
+
+static int gl_test_make_temp(char *path, size_t size) {
+#ifdef _WIN32
+    const char *dir = getenv("TEMP");
+    if (dir == NULL) {
+        dir = ".";
+    }
+    snprintf(path, size, "%s\\glisp_io_test_%ld.txt", dir, (long)_getpid());
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) {
+        return -1;
+    }
+    fclose(f);
+    return 0;
+#else
+    snprintf(path, size, "/tmp/glisp_io_test_XXXXXX");
+    int fd = mkstemp(path);
+    if (fd == -1) {
+        return -1;
+    }
+    close(fd);
+    return 0;
+#endif
+}
 
 int test_status = 0;
 
@@ -612,37 +658,36 @@ void test_defconst(void) {
 
 void test_autoload_stdlib(void) {
     // 1. Loading from directory path in GLISP_STD_PATH
-    setenv("GLISP_STD_PATH", "std", 1);
+    gl_test_setenv("GLISP_STD_PATH", "std");
     TEST(gl_load_stdlib() == 0, "autoload std from directory in GLISP_STD_PATH");
     TEST(gl_value_get_int(eval_str("(id 42)")) == 42, "id function available after autoload");
 
     // 2. Loading from file path in GLISP_STD_PATH
-    setenv("GLISP_STD_PATH", "std/std.lisp", 1);
+    gl_test_setenv("GLISP_STD_PATH", "std/std.lisp");
     TEST(gl_load_stdlib() == 0, "autoload std from file in GLISP_STD_PATH");
 
     // 3. Fallback to GLISP_STD alias
-    unsetenv("GLISP_STD_PATH");
-    setenv("GLISP_STD", "std", 1);
+    gl_test_unsetenv("GLISP_STD_PATH");
+    gl_test_setenv("GLISP_STD", "std");
     TEST(gl_load_stdlib() == 0, "autoload std from GLISP_STD alias");
 
     // 4. Fallback without env vars (relative path or GLISP_SOURCE_DIR)
-    unsetenv("GLISP_STD");
+    gl_test_unsetenv("GLISP_STD");
     TEST(gl_load_stdlib() == 0, "autoload std from default fallback");
 
     // 5. Invalid path returns failure code (-1)
-    setenv("GLISP_STD_PATH", "nonexistent_dir_12345", 1);
+    gl_test_setenv("GLISP_STD_PATH", "nonexistent_dir_12345");
     TEST(gl_load_stdlib() == -1, "autoload std returns -1 on nonexistent path");
-    unsetenv("GLISP_STD_PATH");
+    gl_test_unsetenv("GLISP_STD_PATH");
 }
 
 void test_io(void) {
-    char path[] = "/tmp/glisp_io_test_XXXXXX";
-    int fd = mkstemp(path);
-    TEST(fd != -1, "create temporary file");
-    if (fd == -1) {
+    char path[512];
+    int created = gl_test_make_temp(path, sizeof(path));
+    TEST(created == 0, "create temporary file");
+    if (created != 0) {
         return;
     }
-    close(fd);
 
     char src[512];
 
@@ -740,7 +785,7 @@ void test_gc_stress(void) {
 
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
-    chdir(GLISP_SOURCE_DIR);
+    gl_test_chdir(GLISP_SOURCE_DIR);
 #endif
     test_derived_envs();
     test_value_copy();

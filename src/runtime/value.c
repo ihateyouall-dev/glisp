@@ -606,6 +606,33 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
 }
 void gl_value_print(gl_value_t *val) { gl_value_fprint(stdout, val); }
 char *gl_value_to_string(gl_value_t *val) {
+#ifdef _WIN32
+    // open_memstream is not available on Windows; render through a temporary
+    // file and copy the result back into memory.
+    FILE *mem = tmpfile();
+    if (mem == NULL) {
+        return strdup("");
+    }
+
+    gl_value_fprint(mem, val);
+    long size = ftell(mem);
+    if (size < 0) {
+        fclose(mem);
+        return strdup("");
+    }
+
+    rewind(mem);
+    char *buf = malloc((size_t)size + 1);
+    if (buf == NULL) {
+        fclose(mem);
+        return strdup("");
+    }
+
+    size_t read = fread(buf, 1, (size_t)size, mem);
+    buf[read] = '\0';
+    fclose(mem);
+    return buf;
+#else
     char *buf = NULL;
     size_t size = 0;
 
@@ -614,6 +641,7 @@ char *gl_value_to_string(gl_value_t *val) {
 
     fclose(mem);
     return buf;
+#endif
 }
 
 int64_t gl_value_get_int(gl_value_t *val) {

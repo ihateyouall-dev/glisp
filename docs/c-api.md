@@ -178,8 +178,11 @@ The collector is mark-and-sweep over a global list of `gl_value_t` nodes.
 
 - `gl_register_value(value)` links a newly allocated value into the heap.
 - `gl_gc_collect()` forces a full collection.
-- `gl_gc_maybe_collect()` collects when the heap exceeds `GL_GC_THRESHOLD`.
-  It is called at the start of `gl_eval`.
+- `gl_gc_maybe_collect()` collects when the heap exceeds the current
+  threshold. The threshold starts at `GL_GC_THRESHOLD` and, after a collection,
+  is raised to twice the live set so that a large but stable heap does not
+  trigger a collection at every safe point. It is called at the start of
+  `gl_eval`.
 - `gl_gc_root_mark()` returns the current temporary-root stack depth.
 - `gl_gc_push_root(value)` protects a value that is only reachable from a C
   local.

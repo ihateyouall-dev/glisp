@@ -62,9 +62,9 @@
   (each (lambda (val) (println-err val)) args)
   nil)
 
-(defun input (&optional (invitation ""))
-  "Print INVITATION and return user's input."
-  (print invitation)
+(defun input (&optional (prompt ""))
+  "Print PROMPT and return user's input."
+  (print prompt)
   (read-line *stdin*))
 
 (defun closed? (file)

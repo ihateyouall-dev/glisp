@@ -9,7 +9,7 @@
 
 #include <string.h>
 
-#ifdef MSC_VER
+#ifdef _MSC_VER
 #include "strdup.h"
 #endif
 

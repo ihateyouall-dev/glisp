@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef MSC_VER
+#ifdef _MSC_VER
 #include "utils/strdup.h"
 #endif
 
