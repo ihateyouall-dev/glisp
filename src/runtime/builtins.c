@@ -741,6 +741,97 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
+// Concatenates every argument into a new string.
+GL_BUILTIN(string_append) {
+    EXPECT_VARGS(0);
+
+    size_t total = 0;
+    for (size_t i = 0; i < ARGC; ++i) {
+        EXPECT_STRING(NTH_VAL(i));
+        total += strlen(gl_value_get_string(NTH_VAL(i)));
+    }
+
+    char *buf = malloc(total + 1);
+    buf[0] = '\0';
+    for (size_t i = 0; i < ARGC; ++i) {
+        strcat(buf, gl_value_get_string(NTH_VAL(i)));
+    }
+
+    gl_value_t *res = gl_value_make_string(buf);
+    free(buf);
+    return res;
+}
+
+// Returns the bytes in [start, end); end defaults to the string length.
+GL_BUILTIN(substring) {
+    EXPECT_RVARGS(2, 3);
+
+    gl_value_t *str_val = NTH_VAL(0);
+    EXPECT_STRING(str_val);
+
+    const char *str = gl_value_get_string(str_val);
+    int64_t len = (int64_t)strlen(str);
+
+    EXPECT_INT(NTH_VAL(1));
+    int64_t start = gl_value_get_int(NTH_VAL(1));
+    int64_t end = len;
+
+    if (ARGC == 3) {
+        EXPECT_INT(NTH_VAL(2));
+        end = gl_value_get_int(NTH_VAL(2));
+    }
+
+    if (start < 0 || start > len) {
+        __emit_index_error(NTH_LOC(1), start, (size_t)len);
+        return NULL;
+    }
+    if (end < start || end > len) {
+        __emit_index_error(NTH_LOC(2), end, (size_t)len);
+        return NULL;
+    }
+
+    size_t size = (size_t)(end - start);
+    char *buf = malloc(size + 1);
+    memcpy(buf, str + start, size);
+    buf[size] = '\0';
+
+    gl_value_t *res = gl_value_make_string(buf);
+    free(buf);
+    return res;
+}
+
+GL_BUILTIN(string_upcase) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+    EXPECT_STRING(val);
+
+    char *buf = strdup(gl_value_get_string(val));
+    for (char *p = buf; *p != '\0'; ++p) {
+        *p = (char)toupper((unsigned char)*p);
+    }
+
+    gl_value_t *res = gl_value_make_string(buf);
+    free(buf);
+    return res;
+}
+
+GL_BUILTIN(string_downcase) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+    EXPECT_STRING(val);
+
+    char *buf = strdup(gl_value_get_string(val));
+    for (char *p = buf; *p != '\0'; ++p) {
+        *p = (char)tolower((unsigned char)*p);
+    }
+
+    gl_value_t *res = gl_value_make_string(buf);
+    free(buf);
+    return res;
+}
+
 // The final argument is a collection whose elements are appended to the call.
 GL_BUILTIN(apply) {
     EXPECT_VARGS(2);
