@@ -37,9 +37,17 @@ Numbers are decimal. Scientific notation (`1e9`), hexadecimal, and digit
 separators are not supported. A leading `-` is recognized only when followed by
 a digit.
 
-Strings currently have **no escape sequences**: `\n` is two characters and a
-double quote cannot be embedded. Consequently the printer emits strings
-verbatim, and `write` cannot produce a form that the reader could read back.
+String literals are copied verbatim up to the next double quote; escapes are
+processed afterwards, when the parser builds the string node. Supported
+escapes are `\n`, `\r`, `\t`, `\a`, `\b`, `\f`, `\v`, `\\`, `\'`, `\?`, `\e`
+and `\E` (0x1B), `\xHH` with one or two hex digits, and octal with one to three
+digits (`\033`). An escape that is not listed keeps the character without the
+backslash: `"\U"` is the one-character string `U`. A `\x` with no hex digit
+after it is kept as `\x`. A trailing backslash is kept, so `"abc\"` is `abc\`.
+The reader stops at the first `"`, so a double quote cannot be embedded and
+`"\""` is a syntax error. A NUL byte from `\0` or `\x00` ends the string. The
+printer emits strings verbatim, so `write` cannot produce a form that the reader
+could read back.
 
 The reader does not recognize dotted-pair syntax (`(a . b)`); improper lists can
 only be built programmatically with `cons`.
@@ -300,7 +308,8 @@ error API is not implemented yet.
 
 ## Known limitations
 
-- No string escape sequences.
+- No `\uXXXX` escape, and a literal `"` cannot be written. Escapes produce
+  single bytes, not code points.
 - No macros or quasiquote.
 - No tail-call optimization; deep recursion consumes the C stack.
 - No module system; `load` evaluates into the global environment.
