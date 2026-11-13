@@ -56,13 +56,33 @@ static void __gl_print_call_frame(gl_call_frame_t frame) {
 
 // Pops and prints every frame from top to bottom. The stack is left empty.
 void gl_call_stack_print_stacktrace() {
-    for (size_t i = gl_call_stack.size; i > 0; --i) {
+    // Unwinding calls this once per failed call, but the first call already
+    // emptied the stack.
+    if (!gl_call_stack_initialized) {
+        return;
+    }
+
+    // Runaway recursion would otherwise print thousands of identical frames.
+    const size_t limit = 20;
+    size_t total = gl_call_stack.size;
+    size_t printed = 0;
+
+    for (size_t i = total; i > 0; --i) {
         gl_call_frame_t frame = __gl_call_stack_pop_back(&gl_call_stack);
-        if (frame.call_node) {
+        if (frame.call_node == NULL) {
+            continue;
+        }
+        if (printed < limit) {
             __gl_print_call_frame(frame);
             gl_diagnostic_show_frame(frame.call_node->location);
+            ++printed;
         }
     }
+
+    if (total > printed) {
+        fprintf(stderr, "... %zu frames omitted\n", total - printed);
+    }
+
     __gl_call_stack_destroy(&gl_call_stack);
     gl_call_stack_initialized = 0;
 }

@@ -7,6 +7,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(GLISP_ENABLE_TESTING "Build tests" OFF)
 
+# The interpreter is a tree walker, so deep Lisp recursion is C recursion. The
+# default 1 MiB stack on MinGW is far smaller than the stack the other targets
+# get, which would make the depth guard in eval.c fire much later than intended.
+if(MINGW)
+  add_link_options(-Wl,--stack,8388608)
+endif()
+
 find_package(readline CONFIG QUIET)
 
 if(TARGET readline::readline)
