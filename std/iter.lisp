@@ -131,3 +131,23 @@
               (set failed t))
           (set i (+ i 1)))
         (not failed))))
+
+(defun sort (coll)
+  "Returns a sorted copy of COLL, in ascending order."
+  (if (nil? coll)
+      nil
+      (let ((arr (to-array coll))
+            (n (len coll))
+            (i 1))
+        (while (< i n)
+          (let ((cur (get arr i))
+                (j (- i 1)))
+            (while (and (>= j 0) (> (get arr j) cur))
+              (set-at arr (+ j 1) (get arr j))
+              (set j (- j 1)))
+            (set-at arr (+ j 1) cur))
+          (set i (+ i 1)))
+        (cond
+          ((list? coll) (to-list arr))
+          ((array? coll) arr)
+          (else (to-vector arr))))))

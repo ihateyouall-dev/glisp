@@ -294,6 +294,18 @@ void test_strings(void) {
          "string-downcase");
 }
 
+void test_sort(void) {
+    TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 0)")) == 1, "sort array");
+    TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 2)")) == 3, "sort array last element");
+    TEST(gl_value_get_int(eval_str("(car (sort '(3 1 2)))")) == 1, "sort list");
+    TEST(gl_value_get_int(eval_str("(get (sort {5 4 6}) 1)")) == 5, "sort vector");
+    TEST(strcmp(gl_value_get_string(eval_str("(get (sort (list \"b\" \"a\" \"c\")) 0)")), "a") == 0,
+         "sort strings");
+    TEST(eval_str("(sort nil)")->type == GL_VAL_NIL, "sort nil");
+    TEST(gl_value_get_int(eval_str("(let ((v {3 1 2})) (sort v) (get v 0))")) == 3,
+         "sort leaves the source collection unchanged");
+}
+
 void test_let(void) {
     TEST(gl_value_get_int(eval_str("(let ((x 10) (y 20)) (+ x y))")) == 30, "Basic let");
 
@@ -830,6 +842,7 @@ int main(void) {
     test_array_vector_gc();
     test_typeid();
     test_strings();
+    test_sort();
     test_let();
     test_let_star();
     test_cons();
