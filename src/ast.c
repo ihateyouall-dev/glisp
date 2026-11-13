@@ -1,3 +1,8 @@
+/**
+ * @file ast.c
+ * @brief Construction, copying, and destruction of AST nodes.
+ */
+
 #include "ast.h"
 
 #include "utils/ansi.h"
@@ -18,9 +23,11 @@ void gl_ast_node_destroy_helper(gl_ast_node_t **node) {
     }
 }
 
+// Typed container instantiations used by AST nodes.
 ARRAY_DEFINE(struct gl_ast_node_t *, gl_ast_array)
 VECTOR_DEFINE(struct gl_ast_node_t *, gl_ast_vector)
 
+// Returns the car of the n-th cons cell; NULL when the list is too short.
 gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n) {
     if (cons->type != GL_AST_CONS) {
         return NULL;
@@ -34,6 +41,7 @@ gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n) {
     return cons->value.cons.car;
 }
 
+// Returns the cdr after skipping n cells; NULL when the list is too short.
 gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n) {
     if (cons->type != GL_AST_CONS) {
         return NULL;
@@ -60,12 +68,14 @@ size_t gl_ast_cons_length(gl_ast_node_t *cons) {
     return res;
 }
 
+// Desugars 'x into (quote x).
 gl_ast_node_t *gl_ast_make_quote(gl_ast_node_t *node) {
     return gl_ast_make_cons(gl_ast_make_symbol("quote", node->location),
                             gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
                             node->location);
 }
 
+// Desugars #'x into (function x).
 gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node) {
     return gl_ast_make_cons(gl_ast_make_symbol("function", node->location),
                             gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),

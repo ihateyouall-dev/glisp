@@ -1,3 +1,8 @@
+/**
+ * @file env.c
+ * @brief Lexical environments and the initial global environment.
+ */
+
 #include "env.h"
 
 #include "runtime/builtins.h"
@@ -13,6 +18,7 @@ HASHMAP_DEFINE(gl_value_t *, gl_value_table)
 
 gl_value_t *gl_global_env = NULL;
 
+// Each frame has separate variable/function tables; constants are created lazily.
 gl_env_t *gl_make_env(gl_value_t *parent) {
     gl_env_t *res = malloc(sizeof(gl_env_t));
     res->parent = parent;
@@ -141,6 +147,8 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("defconstant", defconst);
 }
 
+// The global frame starts with singleton constants, typeids, standard streams,
+// then native builtins and special forms.
 gl_env_t *gl_make_global_env(void) {
     gl_env_t *res = gl_make_env(NULL);
 
@@ -199,6 +207,7 @@ void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
     gl_value_table_insert(env->functions, sym, val);
 }
 
+// Constants are stored both as variables and in the constants table.
 void gl_env_set_const(gl_env_t *env, const char *sym, gl_value_t *val) {
     gl_env_set_var(env, sym, val);
     if (env->constants == NULL) {
@@ -222,6 +231,7 @@ int gl_env_is_const(gl_env_t *env, const char *sym) {
     return 0;
 }
 
+// Lookups walk the parent chain; a NULL result means the name is unbound.
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
     gl_value_t **obj = gl_value_table_get(env->variables, sym);
 

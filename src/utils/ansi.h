@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * @file ansi.h
+ * @brief ANSI SGR escape sequences and in-place ANSI processing helpers.
+ */
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>

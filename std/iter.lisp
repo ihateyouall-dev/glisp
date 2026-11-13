@@ -1,15 +1,19 @@
 ;;; iter.lisp - Higher-order functions: map, filter, reduce, each, any?, all?
 
 (defun to-list (coll)
+  "Converts COLL to a list."
   (apply list coll))
 
 (defun to-array (coll)
+  "Converts COLL to a fixed array."
   (apply array coll))
 
 (defun to-vector (coll)
+  "Converts COLL to a dynamic vector."
   (apply vector coll))
 
 (defun map (f coll)
+  "Applies F to each element of COLL, preserving its collection type."
   (cond
     ((nil? coll)
      nil)
@@ -34,6 +38,7 @@
     (else nil)))
 
 (defun filter (pred coll)
+  "Keeps elements of COLL for which PRED is true, preserving its type."
   (cond
     ((nil? coll)
      nil)
@@ -64,6 +69,7 @@
     (else nil)))
 
 (defun reduce (f coll init)
+  "Left fold of F over COLL starting from INIT."
   (if (or (list? coll) (nil? coll))
       (let ((acc init)
             (cur coll))
@@ -80,6 +86,7 @@
         acc)))
 
 (defun each (f coll)
+  "Calls F for every element of COLL and returns nil."
   (if (or (list? coll) (nil? coll))
       (let ((cur coll))
         (while (not (nil? cur))
@@ -92,6 +99,7 @@
           (set i (+ i 1))))))
 
 (defun any? (pred coll)
+  "Returns t when at least one element of COLL satisfies PRED."
   (if (or (list? coll) (nil? coll))
       (if (nil? coll)
           nil
@@ -108,6 +116,7 @@
         found)))
 
 (defun all? (pred coll)
+  "Returns t when every element of COLL satisfies PRED."
   (if (or (list? coll) (nil? coll))
       (if (nil? coll)
           t

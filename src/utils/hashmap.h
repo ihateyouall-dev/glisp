@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * @file hashmap.h
+ * @brief Generic string-keyed hash map macros.
+ */
+
 #include "vector.h"
 
 #include <string.h>
@@ -8,6 +13,14 @@
 #include "strdup.h"
 #endif
 
+/**
+ * Declares a string-keyed hash map named @p Name with values of type @p T.
+ *
+ * Use HASHMAP_DEFINE(T, Name) in exactly one translation unit. Keys are copied
+ * with strdup, buckets chain on collisions, and the load factor is kept below
+ * 0.75 by doubling the bucket count. Element ownership is controlled by the
+ * destroy callback passed to Name_init.
+ */
 #define HASHMAP_DECLARE(T, Name)                                                                   \
     static void (*Name##_destroy_fn)(T *) = NULL;                                                  \
     static T (*Name##_copy_fn)(T) = NULL;                                                          \

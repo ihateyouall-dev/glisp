@@ -1,3 +1,8 @@
+/**
+ * @file parser.c
+ * @brief Recursive-descent parser that turns tokens into AST nodes.
+ */
+
 #include "parser.h"
 
 #include "ast.h"
@@ -33,6 +38,7 @@ static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {
 
 static void __gl_parser_advance(gl_parser_t *parser) { ++parser->pos; }
 
+// Parses an integer literal; overflow is fatal.
 static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
@@ -62,6 +68,7 @@ static gl_ast_node_t *__gl_parser_parse_string(gl_parser_t *parser) {
     return gl_ast_make_string(token.value, token.location);
 }
 
+// Parses a floating-point literal; overflow is fatal.
 static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
@@ -83,7 +90,8 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
 static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser);
 static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser);
 
-// Decides what parser functions will need to call next.
+// Decides which parser function to call for the current token.
+// Quote and funquote are prefix forms: they wrap the next expression.
 static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
     int quoted = 0;
@@ -148,6 +156,7 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     return res;
 }
 
+// Builds a cons chain terminated by a nil node.
 static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     gl_ast_node_t *list_head = NULL;
     gl_ast_node_t *current_tail = NULL;
@@ -195,6 +204,7 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
     return list_head;
 }
 
+// Collects elements into a temporary vector, then copies them into a fixed array.
 static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser) {
     gl_lex_token_t lsparen = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);
@@ -236,6 +246,7 @@ static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser) {
     return gl_ast_make_array(arr, lsparen.location);
 }
 
+// Collects elements into a growable AST vector.
 static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser) {
     gl_lex_token_t lfparen = __gl_parser_current_token(parser);
     __gl_parser_advance(parser);

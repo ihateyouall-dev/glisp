@@ -1,3 +1,8 @@
+/**
+ * @file specforms.c
+ * @brief Special forms: control flow, binding, definitions, and pragmas.
+ */
+
 #include "specforms.h"
 
 #include "ast.h"
@@ -16,6 +21,7 @@
 #include "utils/strdup.h"
 #endif
 
+// Only the selected branch is evaluated; without an alternate the result is nil.
 GL_SPECIAL_FORM(if) {
     assert(args);
     assert(args->type == GL_AST_CONS);
@@ -32,7 +38,7 @@ GL_SPECIAL_FORM(if) {
     if (gl_value_get_bool(condition_val)) {
         return gl_eval(if_true);
     } else {
-        gl_value_t *res;
+        gl_value_t *res = gl_value_make_nil();
         while (if_false->type != GL_AST_NIL) {
             res = gl_eval(gl_ast_cons_nth_car(if_false, 0));
             if_false = gl_ast_cons_nth_cdr(if_false, 0);
@@ -45,6 +51,7 @@ static void __emit_syntax_error(gl_location_t loc, const char *msg) {
     gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
 }
 
+// Parses a lambda list into required, &optional (with defaults), and &rest params.
 static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_ast_node_t *params) {
     if (!params || params->type == GL_AST_NIL) {
         gl_function_params_t *func_params = malloc(sizeof(gl_function_params_t));
@@ -437,6 +444,7 @@ static gl_value_t *__gl_eval_body(gl_ast_node_t *body) {
     return res;
 }
 
+// let evaluates initializers in the enclosing scope (parallel binding semantics).
 GL_SPECIAL_FORM(let) {
     if (!args || args->type != GL_AST_CONS) {
         __emit_syntax_error(args ? args->location : (gl_location_t){0},
@@ -524,6 +532,7 @@ GL_SPECIAL_FORM(let) {
     return res;
 }
 
+// let* evaluates each initializer with the previous bindings visible.
 GL_SPECIAL_FORM(let_star) {
     if (!args || args->type != GL_AST_CONS) {
         __emit_syntax_error(args ? args->location : (gl_location_t){0},
@@ -670,6 +679,7 @@ GL_SPECIAL_FORM(cond) {
     return gl_value_make_nil();
 }
 
+// for binds a fresh variable in a new frame and copies each element.
 GL_SPECIAL_FORM(for) {
     if (!args || args->type == GL_AST_NIL) {
         return gl_value_make_nil();
@@ -837,6 +847,7 @@ GL_SPECIAL_FORM(or) {
     return gl_value_make_bool(0);
 }
 
+// Mutates the nearest binding of a list variable, avoiding duplicates.
 GL_SPECIAL_FORM(add_to_list) {
     if (!args || args->type != GL_AST_CONS) {
         __emit_syntax_error(args ? args->location : (gl_location_t){0},
@@ -984,6 +995,7 @@ GL_SPECIAL_FORM(add_to_list) {
     return new_list;
 }
 
+// Constants are immutable and live in the global frame.
 GL_SPECIAL_FORM(defconst) {
     if (!args || args->type != GL_AST_CONS) {
         __emit_syntax_error(args ? args->location : (gl_location_t){0},

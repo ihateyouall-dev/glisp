@@ -1,3 +1,8 @@
+/**
+ * @file lexer.c
+ * @brief Implements the tokenizer for GLisp source units.
+ */
+
 #include "lexer.h"
 
 #include "vector.h"
@@ -57,6 +62,7 @@ void gl_lexer_advance(gl_lexer_t *lexer) {
     }
 }
 
+// Advances to the beginning of the next line (or EOF).
 static void __lexer_skip_line(gl_lexer_t *lexer) {
     char current;
     while ((current = gl_lexer_current(lexer)) != '\n' && current != '\0') {
@@ -69,6 +75,7 @@ static void __lexer_skip_line(gl_lexer_t *lexer) {
     }
 }
 
+// Skips whitespace and semicolon line comments.
 static void __lexer_skip_empty(gl_lexer_t *lexer) {
 begin:
     while (isspace(gl_lexer_current(lexer))) {
@@ -82,6 +89,7 @@ begin:
     }
 }
 
+// Characters that terminate a symbol token.
 static int __issymbol(char ch) {
     return !isspace((unsigned char)ch) && ch != '(' && ch != ')' && ch != ';' && ch != '"' &&
            ch != '\0' && ch != '[' && ch != ']' && ch != '{' && ch != '}';
@@ -123,6 +131,7 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         gl_lexer_advance(lexer);
         return res;
     case '"':
+        // Strings are copied verbatim: escape sequences are not interpreted.
         res.type = GL_LEX_STRLITERAL;
         gl_lexer_advance(lexer);
         size_t start_pos = lexer->location.pos;
@@ -158,6 +167,8 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
     const char *start = lexer->location.src + lexer->location.pos;
     const size_t start_pos = lexer->location.pos;
 
+    // Numeric literals: optional '-', decimal digits, and an optional
+    // fractional part. Signed values are only recognized when '-' precedes a digit.
     // Detecting possible numeric literal
     if (isdigit(gl_lexer_current(lexer)) ||
         (gl_lexer_current(lexer) == '-' && isdigit(gl_lexer_peek(lexer)))) {
@@ -188,6 +199,7 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
         return res;
     }
 
+    // Copy the scanned token text into a NUL-terminated buffer.
     // Constructing and assigning value string to result
     const size_t current_pos = lexer->location.pos;
     const size_t length = current_pos - start_pos;

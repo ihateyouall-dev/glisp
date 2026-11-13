@@ -1,3 +1,8 @@
+/**
+ * @file diagnostics.c
+ * @brief Diagnostic rendering: messages, source snippets, and arity errors.
+ */
+
 #include "diagnostics.h"
 
 #include <stddef.h>
@@ -15,6 +20,7 @@ gl_error_t *gl_make_error(gl_error_type_t type, gl_error_severity_t severity,
     return res;
 }
 
+// Extracts a heap-allocated copy of the given 1-based line.
 static char *__get_line(const char *src, int line) {
     int current_line = 1;
     const char *start = src;
@@ -45,6 +51,7 @@ static char *__get_line(const char *src, int line) {
     return res;
 }
 
+// Prints the source line followed by a caret under the offending column.
 void gl_diagnostic_show_frame(gl_location_t loc) {
     char *line = __get_line(loc.src, loc.line);
     fprintf(stderr, "| %s\n", line);

@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * @file strdup.h
+ * @brief Portable strdup shim.
+ */
+
 #include <string.h>
 
 // MSVC has _strdup instead of strdup

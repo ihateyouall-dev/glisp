@@ -1,3 +1,8 @@
+/**
+ * @file value.c
+ * @brief Runtime value constructors, accessors, printing, and comparison.
+ */
+
 #include "value.h"
 
 #include "ast.h"
@@ -108,6 +113,7 @@ gl_value_t *gl_value_make_string(char *str) {
     return res;
 }
 
+// nil and t are process-wide singletons that the collector never frees.
 gl_value_t *gl_value_make_nil(void) {
     if (gl_nil == NULL) {
         gl_value_t *nil = calloc(1, sizeof(gl_value_t));
@@ -144,6 +150,7 @@ gl_value_t *gl_value_make_typeid(gl_value_type_t type) {
     return res;
 }
 
+// File payloads are reference-counted because copies share the same handle.
 gl_value_t *gl_value_make_file(FILE *handle, char *name, int is_open, gl_file_mode_t mode) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_FILE;
@@ -236,6 +243,8 @@ void gl_function_arg_free(gl_function_arg_t **arg) {
     }
 }
 
+// Deep copy: compound values are duplicated recursively; files share a payload
+// and increment its reference count.
 gl_value_t *gl_value_copy(gl_value_t *val) {
     if (!val || val == gl_nil || val->type == GL_VAL_NIL) {
         return gl_value_make_nil();
@@ -333,6 +342,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
     return res;
 }
 
+// Releases the payload. Files are closed when the last reference is dropped.
 void gl_value_destroy(gl_value_t **val) {
     if (val == NULL || *val == NULL)
         return;
@@ -509,6 +519,8 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
     }
 }
 
+// Textual representation used by print/write. Strings and symbols are emitted
+// verbatim; improper lists use dotted-pair notation.
 void gl_value_fprint(FILE *file, gl_value_t *val) {
     if (!val) {
         return;
@@ -757,6 +769,8 @@ static int __gl_value_compare_numbers(gl_value_t *lhs, gl_value_t *rhs) {
     }
 }
 
+// Structural equality: numbers by value (mixed int/float allowed), symbols and
+// strings by content, collections element-wise.
 int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
     if (__gl_value_is_number(lhs)) {
         if (__gl_value_is_number(rhs)) {

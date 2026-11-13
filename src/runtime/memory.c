@@ -1,3 +1,8 @@
+/**
+ * @file memory.c
+ * @brief Mark-and-sweep garbage collector and temporary roots.
+ */
+
 #include "memory.h"
 
 #include "callstack.h"
@@ -20,6 +25,8 @@ int gl_gc_enabled = 1;
 
 static gl_value_vector_t gl_temp_roots;
 
+// Temporary roots form a stack: mark before pushing, release back to the mark
+// once the values are reachable through Lisp structures again.
 size_t gl_gc_root_mark(void) { return gl_temp_roots.size; }
 
 void gl_gc_push_root(gl_value_t *val) {
@@ -42,6 +49,7 @@ void gl_gc_maybe_collect(void) {
     }
 }
 
+// Registration only links the value; collection is deferred to a safe point.
 void gl_register_value(gl_value_t *val) {
     if (!val || val == gl_nil || val == gl_t) {
         return;
@@ -62,6 +70,7 @@ void gl_register_value(gl_value_t *val) {
 static void __gl_trace_env_raw(gl_env_t *raw);
 static void __gl_trace_environment(gl_value_t *env);
 
+// Marks a value and recursively traces its payload.
 static void __gl_trace_value(gl_value_t *val) {
     if (val == NULL || val == gl_nil || val == gl_t || val->gc_marked) {
         return;
@@ -157,6 +166,7 @@ static void __gl_trace_environment(gl_value_t *env) {
     __gl_trace_env_raw(env->val);
 }
 
+// Mark-and-sweep: clear marks, trace roots, then free unmarked nodes.
 void gl_gc_collect(void) {
     if (gl_memory_heap == NULL) {
         return;

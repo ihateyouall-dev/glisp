@@ -1,3 +1,8 @@
+/**
+ * @file eval.c
+ * @brief Tree-walking evaluator and function application.
+ */
+
 #include "eval.h"
 
 #include "ast.h"
@@ -79,6 +84,8 @@ static void __gl_function_arg_destroy(gl_function_arg_t **arg) {
     }
 }
 
+// Evaluates arguments left to right and roots each value for the duration of
+// the call, because a later argument may trigger a collection.
 gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     gl_function_args_t *res = malloc(sizeof(gl_function_args_t));
 
@@ -167,6 +174,7 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     return res;
 }
 
+// Binds parameters in the call frame environment, then evaluates the body.
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
     gl_value_t *env = gl_current_env();
     __gl_define_function_args(function, args, (gl_env_t *)env->val);
@@ -179,6 +187,7 @@ static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_
     return res;
 }
 
+// Resolves the callee, then dispatches on special form, builtin, or function.
 static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     gl_ast_node_t *func_node = node->value.cons.car;
     gl_ast_node_t *args = node->value.cons.cdr;
@@ -358,6 +367,8 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
     if (node == NULL)
         return NULL;
 
+    // Safe point: every value held across evaluation is reachable from an
+    // environment, a call frame, or the temporary-root stack.
     gl_gc_maybe_collect();
 
     gl_value_t *env = gl_global_env;

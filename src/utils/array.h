@@ -1,10 +1,22 @@
 #pragma once
 
+/**
+ * @file array.h
+ * @brief Generic fixed-size array macros.
+ */
+
 #include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * Declares a fixed-size typed array named @p Name with elements of type @p T.
+ *
+ * Use ARRAY_DEFINE(T, Name) in exactly one translation unit. The array does not
+ * own its elements; an optional destroy callback is invoked for each element
+ * when the array is destroyed.
+ */
 #define ARRAY_DECLARE(T, Name)                                                                     \
     typedef struct {                                                                               \
         T *data;                                                                                   \

@@ -1,3 +1,8 @@
+/**
+ * @file callstack.c
+ * @brief Call frames, current-environment resolution, and stack traces.
+ */
+
 #include "callstack.h"
 
 #include "ast.h"
@@ -21,6 +26,7 @@ void gl_init_call_stack() {
     }
 }
 
+// A call frame gets a fresh child environment of the function's closure.
 void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_node) {
     gl_value_t *local_env = gl_value_make_env(gl_make_env(function->closure));
     __gl_call_stack_push_back(&gl_call_stack, (gl_call_frame_t){.call_node = function_node,
@@ -48,6 +54,7 @@ static void __gl_print_call_frame(gl_call_frame_t frame) {
             frame.call_node->location.line, frame.call_node->location.column, frame.func_name);
 }
 
+// Pops and prints every frame from top to bottom. The stack is left empty.
 void gl_call_stack_print_stacktrace() {
     for (size_t i = gl_call_stack.size; i > 0; --i) {
         gl_call_frame_t frame = __gl_call_stack_pop_back(&gl_call_stack);
@@ -64,6 +71,7 @@ gl_call_frame_t gl_call_stack_current_frame() {
     return *__gl_call_stack_at(&gl_call_stack, gl_call_stack.size - 1);
 }
 
+// The current environment is the top frame, or the global environment.
 gl_value_t *gl_current_env(void) {
     gl_value_t *res = gl_global_env;
     if (gl_call_stack.size > 0) {

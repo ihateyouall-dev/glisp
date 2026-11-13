@@ -1,3 +1,8 @@
+/**
+ * @file pragma.c
+ * @brief Runtime pragma directives (garbage-collector control).
+ */
+
 #include "pragma.h"
 
 #include "diagnostics.h"
@@ -23,6 +28,7 @@
         }                                                                                          \
     } while (0)
 
+// Returns the current number of registered GC values.
 GL_PRAGMA(gc_allocated) {
     EXPECT_ARGS(0);
     return gl_value_make_int(gl_memory_heap ? (int64_t)gl_memory_heap->allocated : 0);
@@ -34,6 +40,7 @@ GL_PRAGMA(gc_collect) {
     return gl_value_make_nil();
 }
 
+// With no argument, toggles automatic collection; with one, sets it explicitly.
 GL_PRAGMA(gc_toggle) {
     if (args->size == 0) {
         gl_gc_enabled = !gl_gc_enabled;
@@ -51,6 +58,7 @@ GL_PRAGMA(gc_enabled_p) {
     return gl_value_make_bool(gl_gc_enabled);
 }
 
+// Pragma names are matched as symbols by string comparison.
 gl_value_t *gl_dispatch_pragma(gl_location_t called_at, const char *name,
                                gl_function_args_t *args) {
     if (strcmp(name, "gc-allocated") == 0) {

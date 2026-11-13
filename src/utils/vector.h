@@ -1,9 +1,21 @@
 #pragma once
 
+/**
+ * @file vector.h
+ * @brief Generic growable vector macros.
+ */
+
 #include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
 
+/**
+ * Declares a growable typed vector named @p Name with elements of type @p T.
+ *
+ * Use VECTOR_DEFINE(T, Name) in exactly one translation unit. Capacity grows
+ * geometrically on push. Elements are stored by value; an optional destroy
+ * callback is invoked for each element on clear/destroy.
+ */
 #define VECTOR_DECLARE(T, Name)                                                                    \
     typedef struct {                                                                               \
         T *data;                                                                                   \

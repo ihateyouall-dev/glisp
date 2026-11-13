@@ -5,10 +5,12 @@
 (defconst PHI 1.618033988749895)
 
 (defun 1+ (x)
+  "Returns X plus one."
   (assert (number? x) "X must be number")
   (+ x 1))
 
 (defun 1- (x)
+  "Returns X minus one."
   (assert (number? x) "X must be number")
   (- x 1))
 
@@ -21,16 +23,19 @@
   (not (even? x)))
 
 (defun abs (x)
+  "Returns the absolute value of X."
   (if (< x 0)
       (- 0 x)
       x))
 
 (defun min (a b)
+  "Returns the smaller of A and B."
   (if (< a b)
       a
       b))
 
 (defun max (a b)
+  "Returns the larger of A and B."
   (if (> a b)
       a
       b))
@@ -43,12 +48,14 @@
     (else       x)))
 
 (defun factorial (x)
+  "Returns X factorial for a non-negative integer X."
   (assert (and (int? x) (>= x 0)) "X must be non-negative integer")
   (if (= x 0)
       1
       (* x (factorial (1- x)))))
 
 (defun cbrt (x)
+  "Returns the cube root of X."
   (assert (number? x) "X must be number")
   (copysign (pow (abs x) (/ 1.0 3.0)) x))
 
@@ -63,6 +70,7 @@
   (* rad (/ 180.0 PI)))
 
 (defun trunc (x)
+  "Truncates X toward zero and returns a float."
   (assert (number? x) "X must be number")
   (float (int x)))
 
@@ -75,10 +83,12 @@
     ((> x 0)  1)))
 
 (defun rem (a b)
+  "Returns the remainder of A divided by B, truncated toward zero."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
   (- a (* b (trunc (/ a b)))))
 
 (defun mod (a b)
+  "Returns the floored modulo of A by B; the sign follows B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
   (- a (* b (floor (/ a b)))))
 
@@ -92,6 +102,7 @@
         (<= diff tolerance))))
 
 (defun gcd (a b)
+  "Returns the greatest common divisor of A and B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
   (let ((x (abs (int a)))
         (y (abs (int b))))
@@ -100,12 +111,14 @@
         (gcd y (% x y)))))
 
 (defun lcm (a b)
+  "Returns the least common multiple of A and B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
   (if (or (= a 0) (= b 0))
       0
       (abs (* (/ (int a) (gcd a b)) (int b)))))
 
 (defun hypot (x y)
+  "Returns sqrt(X^2 + Y^2) without intermediate overflow."
   (assert (and (number? x) (number? y)) "X and Y must be numbers")
   (let ((ax (abs (float x)))
         (ay (abs (float y))))
@@ -119,6 +132,7 @@
            (* max-val (sqrt (+ 1.0 (* ratio ratio))))))))))
 
 (defun lerp (a b t-val)
+  "Linearly interpolates between A and B by T-VAL."
   (assert (and (number? a) (number? b) (number? t-val)) "All arguments must be numbers")
   (let ((ft (* 1.0 t-val)))
     (+ (* (- 1.0 ft) a) (* ft b))))

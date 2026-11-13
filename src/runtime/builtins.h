@@ -1,8 +1,19 @@
 #pragma once
 
+/**
+ * @file builtins.h
+ * @brief Declarations of native builtins.
+ */
+
 #include "location.h"
 #include "value.h"
 
+/**
+ * Declares a native builtin.
+ *
+ * Builtins receive already-evaluated arguments and the source location of the
+ * call. They return NULL after reporting a diagnostic to signal an error.
+ */
 #define GL_BUILTIN(Name)                                                                           \
     gl_value_t *gl_builtin_##Name(gl_location_t called_at, gl_function_args_t *args)
 
@@ -13,6 +24,8 @@ GL_BUILTIN(car);
 GL_BUILTIN(cdr);
 
 GL_BUILTIN(cons);
+
+// Arithmetic
 
 // Arithmetic operator +
 GL_BUILTIN(add);
@@ -29,6 +42,8 @@ GL_BUILTIN(div);
 // Arithmetic operator % (mod)
 GL_BUILTIN(mod);
 
+// Comparison
+
 // Logical equation
 GL_BUILTIN(eq);
 
@@ -43,6 +58,8 @@ GL_BUILTIN(ge);
 
 // Logical <=
 GL_BUILTIN(le);
+
+// Type inspection and construction
 
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
@@ -59,6 +76,8 @@ GL_BUILTIN(array_con);
 
 GL_BUILTIN(vector_con);
 
+// Sequences
+
 // Array and vector operations
 
 GL_BUILTIN(len);
@@ -72,6 +91,8 @@ GL_BUILTIN(set_at);
 GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
+
+// Function application and source loading
 
 GL_BUILTIN(apply);
 
@@ -87,6 +108,8 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit);
 int gl_load_stdlib(void);
 
 GL_BUILTIN(assert);
+
+// Math
 
 GL_BUILTIN(sqrt);
 
@@ -116,6 +139,8 @@ GL_BUILTIN(atan2);
 
 GL_BUILTIN(pow);
 
+// I/O
+
 GL_BUILTIN(open);
 
 GL_BUILTIN(close);
@@ -133,6 +158,8 @@ GL_BUILTIN(file_mode);
 GL_BUILTIN(eof_p);
 
 GL_BUILTIN(flush);
+
+// Bitwise operations
 
 GL_BUILTIN(logand);
 

@@ -1,3 +1,8 @@
+/**
+ * @file main.c
+ * @brief Command-line entry point: environment setup, file execution, and the REPL.
+ */
+
 #include "parser.h"
 #include "runtime/builtins.h"
 #include "runtime/callstack.h"
@@ -22,6 +27,7 @@ int main(int argc, char **argv) {
     int load_stdlib = 1;
     const char *file_to_run = NULL;
 
+    // Parse CLI flags; the first non-option argument is the script to run.
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--no-stdlib") == 0) {
             load_stdlib = 0;
@@ -44,12 +50,14 @@ int main(int argc, char **argv) {
         }
     }
 
+    // Build the runtime and, unless disabled, evaluate the standard library.
     gl_init_global_env();
 
     if (load_stdlib) {
         gl_load_stdlib();
     }
 
+    // Batch mode: evaluate the given file and exit.
     // Evaluating a file if given
     if (file_to_run) {
         gl_value_t *res = gl_load_file(file_to_run, NULL);
@@ -65,6 +73,7 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    // Interactive mode: read one line, parse all forms on it, print the last value.
     // Launching REPL otherwise
     puts("GLisp REPL version 0");
 

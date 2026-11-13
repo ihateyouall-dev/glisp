@@ -1,3 +1,8 @@
+/**
+ * @file builtins.c
+ * @brief Native (C) functions callable from GLisp.
+ */
+
 #include "builtins.h"
 
 #include "callstack.h"
@@ -153,6 +158,7 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
 #define ARGC args->size
 
+// Shared argument validation and diagnostic helpers.
 static void __emit_type_error(gl_location_t location, const char *expected, const char *got) {
     const char *fmt = "Argument type mismatch. Expected %s, got %s";
     char buf[1024] = "";
@@ -254,6 +260,7 @@ GL_BUILTIN(cons) {
     return gl_value_make_cons_raw(NTH_VAL(0), NTH_VAL(1));
 }
 
+// Arithmetic promotes to float as soon as one operand is a float.
 GL_BUILTIN(add) {
     if (ARGC == 0) {
         return gl_value_make_int(0);
@@ -324,7 +331,7 @@ GL_BUILTIN(sub) {
 
 GL_BUILTIN(mul) {
     if (ARGC == 0) {
-        return gl_value_make_int(0);
+        return gl_value_make_int(1);
     }
 
     gl_value_t *first = NTH_VAL(0);
@@ -603,6 +610,7 @@ GL_BUILTIN(len) {
     }
 }
 
+// get accepts both (coll index) and (index coll).
 GL_BUILTIN(get) {
     EXPECT_ARGS(2);
 
@@ -732,6 +740,7 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
+// The final argument is a collection whose elements are appended to the call.
 GL_BUILTIN(apply) {
     EXPECT_VARGS(2);
     gl_value_t *fn = NTH_VAL(0);
@@ -1175,6 +1184,7 @@ static gl_file_mode_t __gl_parse_file_mode(const char *mode) {
     return res;
 }
 
+// Maps a permission bitmask to the corresponding fopen mode string.
 static const char *__gl_file_mode_to_fopen(gl_file_mode_t mode) {
     int can_read = (mode & GL_FILE_READ) != 0;
     int can_write = (mode & GL_FILE_WRITE) != 0;
@@ -1336,6 +1346,7 @@ GL_BUILTIN(to_str) {
     return res;
 }
 
+// Reads one line, strips LF or CRLF, and returns nil at end of file.
 GL_BUILTIN(read_line) {
     EXPECT_RVARGS(0, 1);
 
