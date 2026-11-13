@@ -272,6 +272,28 @@ void test_typeid(void) {
     TEST(gl_value_get_bool(eval_str("(= (typeof 42) 42)")) == 0, "typeid != number");
 }
 
+void test_strings(void) {
+    TEST(strcmp(gl_value_get_string(eval_str("(string-append \"foo\" \"bar\" \"baz\")")),
+                "foobarbaz") == 0,
+         "string-append concatenates every argument");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-append)")), "") == 0,
+         "string-append with no arguments");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-append \"a\" (to-string 12))")), "a12") == 0,
+         "string-append with to-string");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(substring \"abcdef\" 2 4)")), "cd") == 0,
+         "substring with end");
+    TEST(strcmp(gl_value_get_string(eval_str("(substring \"abcdef\" 3)")), "def") == 0,
+         "substring defaults to end of string");
+    TEST(strcmp(gl_value_get_string(eval_str("(substring \"abcdef\" 0 0)")), "") == 0,
+         "substring of empty range");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-upcase \"aBc1\")")), "ABC1") == 0,
+         "string-upcase");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-downcase \"aBc1\")")), "abc1") == 0,
+         "string-downcase");
+}
+
 void test_let(void) {
     TEST(gl_value_get_int(eval_str("(let ((x 10) (y 20)) (+ x y))")) == 30, "Basic let");
 
@@ -807,6 +829,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_typeid();
+    test_strings();
     test_let();
     test_let_star();
     test_cons();

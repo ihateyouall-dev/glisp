@@ -92,6 +92,16 @@ GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
 
+// String operations
+
+GL_BUILTIN(string_append);
+
+GL_BUILTIN(substring);
+
+GL_BUILTIN(string_upcase);
+
+GL_BUILTIN(string_downcase);
+
 // Function application and source loading
 
 GL_BUILTIN(apply);

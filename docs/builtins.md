@@ -254,6 +254,10 @@ argument is always equal to itself.
 | :--- | :--- |
 | `(to-string value)` | Returns a string representation. Strings are returned as-is. |
 | `(write-string string [file])` | Writes bytes to `file` (default `*stdout*`) and returns the number written. |
+| `(string-append string ...)` | Returns a new string with every argument concatenated. |
+| `(substring string start [end])` | Returns the bytes in `[start, end)`; `end` defaults to the string length. Raises when the range is out of bounds. |
+| `(string-upcase string)` | Returns a copy with ASCII letters uppercased. |
+| `(string-downcase string)` | Returns a copy with ASCII letters lowercased. |
 
 ### I/O
 

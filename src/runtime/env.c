@@ -89,6 +89,11 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("pop", vector_pop);
     DEFINE_BUILTIN("vector-pop", vector_pop);
 
+    DEFINE_BUILTIN("string-append", string_append);
+    DEFINE_BUILTIN("substring", substring);
+    DEFINE_BUILTIN("string-upcase", string_upcase);
+    DEFINE_BUILTIN("string-downcase", string_downcase);
+
     DEFINE_BUILTIN("apply", apply);
     DEFINE_BUILTIN("load", load);
 
