@@ -381,9 +381,8 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
     }
 
     if (gl_eval_depth == GL_MAX_EVAL_DEPTH) {
-        gl_diagnostic_report_error(
-            gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
-                          "Maximum recursion depth exceeded"));
+        gl_diagnostic_report_error(gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
+                                                 "Maximum recursion depth exceeded"));
         return NULL;
     }
 
