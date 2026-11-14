@@ -177,6 +177,9 @@ Dispatches a runtime directive.
 | `(load path)` | Evaluates a source file relative to the current unit and returns its last value. |
 | `(assert condition [message])` | Returns `nil`; aborts the current form with a diagnostic if `condition` is nil. |
 
+A failing `load` prints a diagnostic and aborts the current form instead of
+terminating the interpreter.
+
 ### Arithmetic
 
 | Signature | Description |

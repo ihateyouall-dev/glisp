@@ -166,7 +166,8 @@ environment and producing stack traces.
 
 - `gl_eval(node)` evaluates one AST node. It is the only safe point at which the
   collector may run automatically.
-- `gl_parse_and_eval(parser, abort_on_error)` loops over top-level forms.
+- `gl_parse_and_eval(parser)` loops over top-level forms and returns the last
+  value, or `NULL` when the unit is empty or a form fails.
 - `gl_eval_args(args)` evaluates a list of argument AST nodes into a
   `gl_function_args_t`. It pushes each evaluated value as a temporary GC root.
 - `gl_call_function(loc, callable, argv)` invokes a callable with an existing

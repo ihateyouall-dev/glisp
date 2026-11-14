@@ -1,4 +1,5 @@
 #include "builtins.h"
+#include "callstack.h"
 #include "env.h"
 #include "memory.h"
 #include "parser.h"
@@ -70,7 +71,7 @@ int test_status = 0;
 
 static gl_value_t *eval_str(const char *src) {
     gl_parser_t parser = gl_make_parser(src, "");
-    gl_value_t *res = gl_parse_and_eval(&parser, 0);
+    gl_value_t *res = gl_parse_and_eval(&parser);
     gl_parser_destroy(&parser);
     return res;
 }
@@ -507,6 +508,42 @@ void test_load_relative(void) {
     TEST(r2 != NULL, "load relative_up.lisp succeeds");
     TEST(gl_value_get_int(eval_str("(sibling-marker)")) == 999,
          "relative_up.lisp successfully loaded ../sibling.lisp relatively");
+}
+
+void test_load_failure(void) {
+    char path[512];
+    int created = gl_test_make_temp(path, sizeof(path));
+    TEST(created == 0, "create temporary load file");
+    if (created != 0) {
+        return;
+    }
+
+    FILE *file = fopen(path, "w");
+    TEST(file != NULL, "write temporary load file");
+    if (!file) {
+        remove(path);
+        return;
+    }
+    fputs("(undefined-function 1)", file);
+    fclose(file);
+
+    char src[512];
+    snprintf(src, sizeof(src), "(load \"%s\")", path);
+    TEST(eval_str(src) == NULL, "failed load returns NULL");
+    TEST(!gl_call_stack_initialized || gl_call_stack.size == 0,
+         "failed load leaves no call frame");
+    TEST(gl_value_get_int(eval_str("(+ 1 2)")) == 3, "evaluation after failed load");
+
+    file = fopen(path, "w");
+    TEST(file != NULL, "rewrite temporary load file");
+    if (file) {
+        fputs("(set after-load 7)", file);
+        fclose(file);
+    }
+    TEST(eval_str(src) != NULL, "load after failed load");
+    TEST(gl_value_get_int(eval_str("after-load")) == 7, "later load evaluated");
+
+    remove(path);
 }
 
 void test_stdlib(void) {
@@ -999,6 +1036,7 @@ int main(void) {
     test_apply();
     test_read_eval();
     test_load_relative();
+    test_load_failure();
     test_stdlib();
     test_autoload_stdlib();
     test_pragma();

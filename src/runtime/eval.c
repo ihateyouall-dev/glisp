@@ -431,21 +431,29 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
     }
 }
 
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error) {
-    gl_ast_node_t *current = gl_parser_parse(parser);
-
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
     gl_value_t *res = NULL;
+    int failed = 0;
 
-    while (current) {
-        res = gl_eval(current);
-        // Aborting if got error during parsing
-        if (!res && abort_on_error) {
-            exit(-1);
+    while (1) {
+        size_t start = parser->pos;
+        gl_ast_node_t *current = gl_parser_parse(parser);
+
+        if (!current) {
+            // Reaching EOF here is the normal end of the unit; a NULL tree before
+            // that means the parser reported a syntax error.
+            if (gl_lex_token_vector_at(&parser->tokens, start)->type != GL_LEX_EOF) {
+                failed = 1;
+            }
+            break;
         }
-        gl_ast_node_t *next = gl_parser_parse(parser);
+
+        res = gl_eval(current);
+        if (!res) {
+            failed = 1;
+        }
         gl_ast_destroy(current);
-        current = next;
     }
 
-    return res;
+    return failed ? NULL : res;
 }
