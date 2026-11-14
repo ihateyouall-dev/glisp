@@ -76,6 +76,7 @@ void gl_register_value(gl_value_t *val) {
 
 static void __gl_trace_env_raw(gl_env_t *raw);
 static void __gl_trace_environment(gl_value_t *env);
+static void __gl_trace_hashmap(gl_value_hashmap_t *map);
 
 // Marks a value and recursively traces its payload.
 static void __gl_trace_value(gl_value_t *val) {
@@ -124,8 +125,28 @@ static void __gl_trace_value(gl_value_t *val) {
         }
         break;
     }
+    case GL_VAL_HASHMAP: {
+        __gl_trace_hashmap(val->val);
+        break;
+    }
     default:
         break;
+    }
+}
+
+static void __gl_trace_hashmap(gl_value_hashmap_t *map) {
+    if (map == NULL || map->buckets == NULL) {
+        return;
+    }
+    for (size_t i = 0; i < map->buckets_count; ++i) {
+        gl_value_hashmapBucket_t *bucket = &map->buckets[i];
+
+        for (size_t j = 0; j < bucket->size; ++j) {
+            gl_value_hashmapEntry_t *entry = gl_value_hashmapBucket_at(bucket, j);
+            if (entry && entry->value) {
+                __gl_trace_value(entry->value);
+            }
+        }
     }
 }
 

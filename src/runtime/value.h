@@ -8,6 +8,7 @@
 #include "ast.h"
 #include "utils/array.h"
 #include "utils/cons.h"
+#include "utils/hashmap.h"
 #include "utils/location.h"
 #include "utils/vector.h"
 
@@ -29,7 +30,8 @@ typedef enum {
     GL_VAL_ARRAY,
     GL_VAL_VECTOR,
     GL_VAL_TYPEID,
-    GL_VAL_FILE
+    GL_VAL_FILE,
+    GL_VAL_HASHMAP
 } gl_value_type_t;
 
 /**
@@ -55,6 +57,7 @@ extern gl_value_t *gl_t;
 CONS_DECLARE(gl_value_t *, gl_value_cons);
 ARRAY_DECLARE(gl_value_t *, gl_value_array);
 VECTOR_DECLARE(gl_value_t *, gl_value_vector);
+HASHMAP_DECLARE(gl_value_t *, gl_value_hashmap)
 
 /** Frees a value and its payload. Intended for the collector and shutdown. */
 void gl_value_destroy(gl_value_t **val);
@@ -157,6 +160,8 @@ gl_value_t *gl_value_make_array_from(gl_value_array_t *arr);
 gl_value_t *gl_value_make_vector(void);
 gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec);
 
+gl_value_t *gl_value_make_hashmap(void);
+
 /** Prints a value's textual representation to @p file. */
 void gl_value_fprint(FILE *file, gl_value_t *val);
 
@@ -179,6 +184,8 @@ gl_value_cons_t *gl_value_get_cons(gl_value_t *val);
 gl_value_array_t *gl_value_get_array(gl_value_t *val);
 
 gl_value_vector_t *gl_value_get_vector(gl_value_t *val);
+
+gl_value_hashmap_t *gl_value_get_hashmap(gl_value_t *val);
 
 gl_value_type_t gl_value_get_typeid(gl_value_t *val);
 
@@ -210,6 +217,6 @@ void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform);
  * @return 0 if equal, a positive value if @p lhs sorts after @p rhs, or a
  *         negative value otherwise. Numbers are compared numerically (mixed
  *         int/float allowed); symbols and strings by content; lists, arrays,
- *         and vectors element-wise.
+ *         and vectors element-wise. Hash maps are equal only to themselves.
  */
 int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs);

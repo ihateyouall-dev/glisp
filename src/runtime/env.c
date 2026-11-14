@@ -89,6 +89,13 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("pop", vector_pop);
     DEFINE_BUILTIN("vector-pop", vector_pop);
 
+    DEFINE_BUILTIN("hash", hash);
+    DEFINE_BUILTIN("hash-set", hash_set);
+    DEFINE_BUILTIN("hash-get", hash_get);
+    DEFINE_BUILTIN("hash-has?", hash_has_p);
+    DEFINE_BUILTIN("hash-delete", hash_delete);
+    DEFINE_BUILTIN("hash-keys", hash_keys);
+
     DEFINE_BUILTIN("string-append", string_append);
     DEFINE_BUILTIN("substring", substring);
     DEFINE_BUILTIN("string-upcase", string_upcase);
@@ -173,6 +180,7 @@ gl_env_t *gl_make_global_env(void) {
     DEFINE_TYPEID("list-t", GL_VAL_CONS);
     DEFINE_TYPEID("array-t", GL_VAL_ARRAY);
     DEFINE_TYPEID("vector-t", GL_VAL_VECTOR);
+    DEFINE_TYPEID("hashmap-t", GL_VAL_HASHMAP);
     DEFINE_TYPEID("file-t", GL_VAL_FILE);
     DEFINE_TYPEID("typeid-t", GL_VAL_TYPEID);
 

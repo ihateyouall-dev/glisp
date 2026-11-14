@@ -127,6 +127,14 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
         }                                                                                          \
     } while (0)
 
+#define EXPECT_HASHMAP(val)                                                                        \
+    do {                                                                                           \
+        if (val->type != GL_VAL_HASHMAP) {                                                         \
+            __emit_type_error(called_at, "hashmap", __gl_value_get_type_name(val));                \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
 #define EXPECT_CALLABLE(val)                                                                       \
     do {                                                                                           \
         if (val->type != GL_VAL_FUNCTION && val->type != GL_VAL_BUILTIN) {                         \
@@ -212,9 +220,20 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "vector";
     case GL_VAL_FILE:
         return "file";
+    case GL_VAL_HASHMAP:
+        return "hashmap";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
+}
+
+// Keys are strings or symbols; both payloads are NUL-terminated buffers.
+static const char *__gl_hashmap_key(gl_location_t location, gl_value_t *val) {
+    if (val->type != GL_VAL_SYMBOL && val->type != GL_VAL_STRING) {
+        __emit_type_error(location, "string or symbol", __gl_value_get_type_name(val));
+        return NULL;
+    }
+    return (char *)val->val;
 }
 
 GL_BUILTIN(exit) {
@@ -592,6 +611,9 @@ GL_BUILTIN(len) {
     } else if (val->type == GL_VAL_VECTOR) {
         gl_value_vector_t *vec = val->val;
         return gl_value_make_int((int64_t)vec->size);
+    } else if (val->type == GL_VAL_HASHMAP) {
+        gl_value_hashmap_t *map = val->val;
+        return gl_value_make_int((int64_t)map->size);
     } else if (val->type == GL_VAL_STRING) {
         return gl_value_make_int((int64_t)strlen((char *)val->val));
     } else if (val->type == GL_VAL_CONS) {
@@ -739,6 +761,89 @@ GL_BUILTIN(vector_pop) {
     }
 
     return gl_value_vector_pop_back(vec);
+}
+
+GL_BUILTIN(hash) {
+    EXPECT_ARGS(0);
+
+    return gl_value_make_hashmap();
+}
+
+GL_BUILTIN(hash_set) {
+    EXPECT_ARGS(3);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    gl_value_hashmap_insert(map_val->val, key, NTH_VAL(2));
+    return map_val;
+}
+
+// The optional third argument is returned when the key is missing.
+GL_BUILTIN(hash_get) {
+    EXPECT_RVARGS(2, 3);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    gl_value_t **entry = gl_value_hashmap_get(map_val->val, key);
+    if (entry != NULL) {
+        return *entry;
+    }
+    return ARGC == 3 ? NTH_VAL(2) : gl_value_make_nil();
+}
+
+GL_BUILTIN(hash_has_p) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    return gl_value_make_bool(gl_value_hashmap_get(map_val->val, key) != NULL);
+}
+
+GL_BUILTIN(hash_delete) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    return gl_value_make_bool(gl_value_hashmap_remove(map_val->val, key));
+}
+
+// Keys come out in bucket order, so the order is not the insertion order.
+GL_BUILTIN(hash_keys) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    gl_value_hashmap_t *map = map_val->val;
+
+    gl_value_t *res = gl_value_make_nil();
+    for (size_t i = 0; i < map->buckets_count; ++i) {
+        gl_value_hashmapBucket_t *bucket = &map->buckets[i];
+        for (size_t j = 0; j < bucket->size; ++j) {
+            gl_value_hashmapEntry_t *entry = gl_value_hashmapBucket_at(bucket, j);
+            res = gl_value_make_cons_raw(gl_value_make_string(entry->key), res);
+        }
+    }
+    return res;
 }
 
 // Concatenates every argument into a new string.

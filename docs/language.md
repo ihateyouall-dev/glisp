@@ -67,6 +67,7 @@ reader macro that composes with other forms.
 | list | `list-t` | `'(1 2 3)` | cons cells; may be improper |
 | array | `array-t` | `[1 2 3]` | fixed size, O(1) index |
 | vector | `vector-t` | `{1 2 3}` | growable, amortized O(1) push |
+| hashmap | `hashmap-t` | `(hash)` | string keys, values of any type; identity equality |
 | function | `function-t` | `(lambda (x) x)` | closure |
 | builtin | — | `+`, `car` | implemented in C |
 | special form | — | `if`, `let` | implemented in C |
