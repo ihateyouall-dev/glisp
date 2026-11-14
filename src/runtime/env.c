@@ -96,6 +96,8 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
     DEFINE_BUILTIN("apply", apply);
     DEFINE_BUILTIN("load", load);
+    DEFINE_BUILTIN("read", read);
+    DEFINE_BUILTIN("eval", eval);
 
     DEFINE_BUILTIN("assert", assert);
 

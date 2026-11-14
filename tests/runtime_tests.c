@@ -368,6 +368,43 @@ void test_apply(void) {
          "apply user function on list");
 }
 
+void test_read_eval(void) {
+    TEST(gl_value_get_int(eval_str("(eval '(+ 1 2))")) == 3, "Eval of quoted form");
+
+    TEST(gl_value_get_int(eval_str("(eval (read \"(+ 1 2)\"))")) == 3, "Eval of read form");
+
+    char *printed = gl_value_to_string(eval_str("(read \"'(1 2)\")"));
+    TEST(strcmp(printed, "(quote (1 2))") == 0, "Read keeps quote as data");
+    free(printed);
+
+    printed = gl_value_to_string(eval_str("(read \"#'f\")"));
+    TEST(strcmp(printed, "(function f)") == 0, "Read keeps function sugar as data");
+    free(printed);
+
+    gl_value_t *arr = eval_str("(read \"[1 2]\")");
+    TEST(arr->type == GL_VAL_ARRAY, "Read array type");
+    TEST(gl_value_get_array(arr)->size == 2, "Read array size");
+    TEST(gl_value_get_int(gl_value_get_array(arr)->data[1]) == 2, "Read array element");
+
+    TEST(eval_str("(read \"{1 2}\")")->type == GL_VAL_VECTOR, "Read vector type");
+
+    TEST(eval_str("(eval (read \"(defun sq (x) (* x x))\"))") != NULL, "Eval defines a function");
+    TEST(gl_value_get_int(eval_str("(eval (read \"(sq 5)\"))")) == 25,
+         "Eval calls a defined function");
+
+    TEST(gl_value_get_int(eval_str("(let ((x 4)) (eval (read \"(* x x)\")))")) == 16,
+         "Eval sees let binding");
+
+    TEST(gl_value_get_bool(eval_str("(eq (eval \"a\\\\b\") \"a\\\\b\")")) == 1,
+         "Eval preserves string contents");
+
+    TEST(eval_str("(read \"\")")->type == GL_VAL_NIL, "Empty input reads as nil");
+    TEST(gl_value_get_int(eval_str("(read \"1 2\")")) == 1, "Trailing text is ignored");
+
+    TEST(eval_expr("(read \"(1 2\")") == NULL, "Read reports a syntax error");
+    TEST(eval_expr("(eval sq)") == NULL, "Eval rejects a function");
+}
+
 void test_load_relative(void) {
     gl_value_t *r1 = eval_str("(load \"tests/load_test/top.lisp\")");
     TEST(r1 != NULL, "load top.lisp succeeds");
@@ -866,6 +903,7 @@ int main(void) {
     test_let_star();
     test_cons();
     test_apply();
+    test_read_eval();
     test_load_relative();
     test_stdlib();
     test_autoload_stdlib();
