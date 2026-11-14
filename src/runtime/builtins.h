@@ -92,6 +92,8 @@ GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
 
+GL_BUILTIN(sort);
+
 // Hashmaps
 
 GL_BUILTIN(hash);

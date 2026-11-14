@@ -763,6 +763,124 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
+// Stable merge sort over a temporary array; gl_value_compare orders values the
+// same way the language does.
+static void __gl_sort_merge(gl_value_t **data, gl_value_t **tmp, size_t left, size_t mid,
+                            size_t right) {
+    size_t i = left;
+    size_t j = mid;
+    size_t k = left;
+
+    while (i < mid && j < right) {
+        // The right half wins only when strictly smaller, which keeps equal
+        // elements in their original order.
+        if (gl_value_compare(data[j], data[i]) < 0) {
+            tmp[k++] = data[j++];
+        } else {
+            tmp[k++] = data[i++];
+        }
+    }
+    while (i < mid) {
+        tmp[k++] = data[i++];
+    }
+    while (j < right) {
+        tmp[k++] = data[j++];
+    }
+    for (size_t n = left; n < right; ++n) {
+        data[n] = tmp[n];
+    }
+}
+
+static void __gl_sort_range(gl_value_t **data, gl_value_t **tmp, size_t left, size_t right) {
+    if (right - left < 2) {
+        return;
+    }
+
+    size_t mid = left + (right - left) / 2;
+    __gl_sort_range(data, tmp, left, mid);
+    __gl_sort_range(data, tmp, mid, right);
+    __gl_sort_merge(data, tmp, left, mid, right);
+}
+
+// Sorting in C rather than in Lisp: the interpreter deep-copies every argument
+// on a call, so a Lisp sort spends most of its time duplicating sublists.
+GL_BUILTIN(sort) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *coll = NTH_VAL(0);
+    if (coll->type == GL_VAL_NIL) {
+        return gl_value_make_nil();
+    }
+
+    size_t size = 0;
+    if (coll->type == GL_VAL_CONS) {
+        gl_value_t *cur = coll;
+        while (cur->type == GL_VAL_CONS) {
+            ++size;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    } else if (coll->type == GL_VAL_ARRAY) {
+        size = gl_value_get_array(coll)->size;
+    } else if (coll->type == GL_VAL_VECTOR) {
+        size = gl_value_get_vector(coll)->size;
+    } else {
+        __emit_type_error(NTH_LOC(0), "list, array, or vector", __gl_value_get_type_name(coll));
+        return NULL;
+    }
+
+    gl_value_t **data = size > 0 ? malloc(sizeof(gl_value_t *) * size) : NULL;
+    gl_value_t **tmp = size > 0 ? malloc(sizeof(gl_value_t *) * size) : NULL;
+
+    if (coll->type == GL_VAL_CONS) {
+        gl_value_t *cur = coll;
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = gl_value_get_cons(cur)->car;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    } else if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = gl_value_get_array(coll);
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = arr->data[i];
+        }
+    } else {
+        gl_value_vector_t *vec = gl_value_get_vector(coll);
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = *gl_value_vector_at(vec, i);
+        }
+    }
+
+    __gl_sort_range(data, tmp, 0, size);
+    free(tmp);
+
+    gl_value_t *res = NULL;
+    if (coll->type == GL_VAL_CONS) {
+        size_t root_mark = gl_gc_root_mark();
+        res = gl_value_make_nil();
+        for (size_t i = size; i > 0; --i) {
+            res = gl_value_make_cons_raw(data[i - 1], res);
+            gl_gc_push_root(res);
+        }
+        gl_gc_roots_release(root_mark);
+    } else if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, size, NULL);
+        for (size_t i = 0; i < size; ++i) {
+            arr->data[i] = data[i];
+        }
+        res = gl_value_make_array_from(arr);
+    } else {
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+        for (size_t i = 0; i < size; ++i) {
+            gl_value_vector_push_back(vec, data[i]);
+        }
+        res = gl_value_make_vector_from(vec);
+    }
+
+    free(data);
+    return res;
+}
+
 GL_BUILTIN(hash) {
     EXPECT_ARGS(0);
 

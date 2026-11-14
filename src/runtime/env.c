@@ -88,6 +88,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("vector-push", vector_push);
     DEFINE_BUILTIN("pop", vector_pop);
     DEFINE_BUILTIN("vector-pop", vector_pop);
+    DEFINE_BUILTIN("sort", sort);
 
     DEFINE_BUILTIN("hash", hash);
     DEFINE_BUILTIN("hash-set", hash_set);
