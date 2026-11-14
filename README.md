@@ -111,12 +111,16 @@ cmake --build build
 Usage: glisp [options] [file]
 
 Options:
-  --no-stdlib    Do not autoload the standard library
-  -h, --help     Show help
+  --no-stdlib      Do not autoload the standard library
+  -e, --eval EXPR  Evaluate an expression and exit; may be repeated
+  -h, --help       Show help
+  -v, --version    Show the version and exit
 ```
 
 - With a `file`, GLisp evaluates it and exits.
-- Without a file, GLisp starts the interactive REPL.
+- With `-e`/`--eval`, GLisp evaluates each `EXPR` in order and exits. A non-nil
+  result is printed. `-e` cannot be combined with a file.
+- Without a file or an expression, GLisp starts the interactive REPL.
 - Scripts may start with a shebang:
 
 ```lisp
