@@ -1227,11 +1227,13 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
 
     gl_call_stack_push_env(gl_global_env, NULL, "load");
     gl_parser_t parser = gl_make_parser(buf, target_path);
-    gl_value_t *res = gl_parse_and_eval(&parser, 1);
+    int empty = gl_lex_token_vector_at(&parser.tokens, 0)->type == GL_LEX_EOF;
+    gl_value_t *res = gl_parse_and_eval(&parser);
     gl_parser_destroy(&parser);
     gl_call_stack_pop_env();
 
-    if (!res) {
+    // Empty files have no last value; they still load as t.
+    if (!res && empty) {
         res = gl_value_make_bool(1);
     }
     return res;

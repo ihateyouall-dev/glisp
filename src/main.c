@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     if (file_to_run) {
         gl_value_t *res = gl_load_file(file_to_run, NULL);
         if (!res) {
-            perror(file_to_run);
+            fprintf(stderr, "Cannot load file '%s'\n", file_to_run);
             gl_call_stack_cleanup();
             gl_destroy_memory_heap();
             return -1;
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
 
         gl_parser_t parser = gl_make_parser(buffer, "<repl>");
 
-        gl_value_t *res = gl_parse_and_eval(&parser, 0);
+        gl_value_t *res = gl_parse_and_eval(&parser);
 
         gl_parser_destroy(&parser);
 
