@@ -23,6 +23,38 @@
 #include "utils/strdup.h"
 #endif
 
+// Counts unclosed brackets, skipping string literals and line comments, so the
+// REPL knows whether a form is complete. A negative result means the line closed
+// more than it opened; the parser then reports the real error.
+static int __gl_bracket_balance(const char *line) {
+    int balance = 0;
+    int in_string = 0;
+
+    for (const char *p = line; *p != '\0'; ++p) {
+        if (in_string) {
+            if (*p == '\\' && p[1] != '\0') {
+                ++p;
+            } else if (*p == '"') {
+                in_string = 0;
+            }
+            continue;
+        }
+
+        if (*p == ';') {
+            break;
+        }
+        if (*p == '"') {
+            in_string = 1;
+        } else if (*p == '(' || *p == '[' || *p == '{') {
+            ++balance;
+        } else if (*p == ')' || *p == ']' || *p == '}') {
+            --balance;
+        }
+    }
+
+    return balance;
+}
+
 int main(int argc, char **argv) {
     int load_stdlib = 1;
     const char *file_to_run = NULL;
@@ -73,21 +105,70 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    // Interactive mode: read one line, parse all forms on it, print the last value.
-    // Launching REPL otherwise
+    // Interactive mode: accumulate lines until the brackets balance, then
+    // evaluate the whole form. Launching REPL otherwise
     puts("GLisp REPL version 0");
 
     while (1) {
-        char *input = readline("\nglisp> ");
-        if (!input) {
-            break;
+        char *buffer = NULL;
+        size_t buffer_len = 0;
+        size_t buffer_cap = 0;
+        int balance = 0;
+        int discard = 0;
+
+        int need_more = 1;
+
+        while (need_more) {
+            char *input = readline(buffer == NULL ? "\nglisp> " : "... ");
+
+            if (input == NULL) {
+                // Ctrl-D drops a pending form and exits from the main prompt.
+                if (buffer != NULL) {
+                    discard = 1;
+                }
+                break;
+            }
+
+            if (input[0] != '\0') {
+                add_history(input);
+            } else if (buffer != NULL) {
+                // An empty line abandons the unfinished form.
+                discard = 1;
+                free(input);
+                break;
+            }
+
+            size_t line_len = strlen(input);
+            size_t needed = buffer_len + line_len + 2;
+            if (needed > buffer_cap) {
+                buffer_cap = needed;
+                buffer = realloc(buffer, buffer_cap);
+            }
+            if (buffer_len > 0) {
+                buffer[buffer_len++] = '\n';
+            }
+            memcpy(buffer + buffer_len, input, line_len + 1);
+            buffer_len += line_len;
+
+            int empty_line = input[0] == '\0';
+            balance += __gl_bracket_balance(input);
+            free(input);
+
+            if (empty_line) {
+                break;
+            }
+            need_more = balance > 0;
         }
 
-        if (input[0] != '\0') {
-            add_history(input);
+        if (discard || buffer == NULL) {
+            free(buffer);
+            if (discard == 0) {
+                break;
+            }
+            continue;
         }
 
-        gl_parser_t parser = gl_make_parser(input, "<repl>");
+        gl_parser_t parser = gl_make_parser(buffer, "<repl>");
 
         gl_value_t *res = gl_parse_and_eval(&parser, 0);
 
@@ -95,7 +176,7 @@ int main(int argc, char **argv) {
 
         gl_value_print(res);
 
-        free(input);
+        free(buffer);
     }
     gl_call_stack_cleanup();
     gl_destroy_memory_heap();
