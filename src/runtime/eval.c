@@ -14,15 +14,56 @@
 #include "runtime/env.h"
 #include "value.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Deeper nesting than this is reported as an error: the C stack is finite, so
-// a runaway Lisp call has to end with a diagnostic instead of a crash.
-const size_t GL_MAX_EVAL_DEPTH = 2000;
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
+
+// The evaluator is recursive, and stack frames differ in size. A fixed
+// eval-depth limit is therefore only a backstop: the primary check watches the
+// real stack pointer and leaves a safety margin for diagnostics and unwinding.
+static const size_t GL_MAX_EVAL_DEPTH = 10000;
 
 static size_t gl_eval_depth = 0;
+static uintptr_t gl_stack_base = 0;
+static size_t gl_stack_budget = 0;
+
+static size_t __gl_stack_budget(void) {
+    if (gl_stack_budget != 0) {
+        return gl_stack_budget;
+    }
+
+    size_t budget = (size_t)6 * 1024 * 1024;
+#ifndef _WIN32
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY) {
+        size_t stack = (size_t)limit.rlim_cur;
+        size_t margin = (size_t)1024 * 1024;
+        budget = stack > margin ? stack - margin : stack / 2;
+    }
+#endif
+
+    gl_stack_budget = budget;
+    return budget;
+}
+
+static int __gl_stack_exhausted(void) {
+    volatile unsigned char probe = 0;
+    uintptr_t current = (uintptr_t)&probe;
+
+    if (gl_stack_base == 0) {
+        gl_stack_base = current;
+        return 0;
+    }
+
+    size_t used = current > gl_stack_base ? (size_t)(current - gl_stack_base)
+                                          : (size_t)(gl_stack_base - current);
+    return used > __gl_stack_budget();
+}
 
 static gl_value_t *__gl_eval_int(gl_ast_node_t *node) {
     return gl_value_make_int(node->value.integral);
@@ -223,19 +264,19 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         }
     } else {
         const char *func_name = func_node->value.symbol;
-        func_val = gl_env_get_fun((gl_env_t *)env->val, func_name);
-        // Evaluating variable value if function is undefined. We trying it because variables can
-        // also store functions
-        if (func_val == NULL) {
-            func_val = gl_env_get_var((gl_env_t *)env->val, func_name);
-        }
-        // Emmiting error if function still not found
+        func_val = gl_env_get_callable((gl_env_t *)env->val, func_name);
         if (!func_val || !func_val->val) {
             const char *fmt = "undefined function '%s'";
             char buf[1024];
             snprintf(buf, sizeof(buf), fmt, func_name);
             gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func_node->location, buf);
             gl_diagnostic_report_error(err);
+            return NULL;
+        }
+        if (func_val->type != GL_VAL_FUNCTION && func_val->type != GL_VAL_BUILTIN &&
+            func_val->type != GL_VAL_SPFORM) {
+            gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, func_node->location,
+                                                     "Expression result cannot be called"));
             return NULL;
         }
         gl_gc_push_root(func_val);
@@ -380,10 +421,9 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
         return NULL;
     }
 
-    if (gl_eval_depth == GL_MAX_EVAL_DEPTH) {
-        gl_diagnostic_report_error(
-            gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
-                          "Maximum recursion depth exceeded"));
+    if (__gl_stack_exhausted() || gl_eval_depth >= GL_MAX_EVAL_DEPTH) {
+        gl_diagnostic_report_error(gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
+                                                 "Maximum recursion depth exceeded"));
         return NULL;
     }
 
@@ -432,6 +472,14 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
 }
 
 gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error) {
+    // Start each independent top-level unit from the current stack position, so
+    // the recursion budget is measured from the caller, not from the first
+    // nested evaluation (for example, while loading the standard library).
+    if (gl_eval_depth == 0) {
+        volatile unsigned char probe = 0;
+        gl_stack_base = (uintptr_t)&probe;
+    }
+
     gl_ast_node_t *current = gl_parser_parse(parser);
 
     gl_value_t *res = NULL;

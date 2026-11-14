@@ -30,21 +30,25 @@
 (defun reverse (lst)
   "Returns a new list with the elements of LST in reverse order."
   (let ((acc nil))
-    (while (not (nil? lst))
+    (while lst
       (set acc (cons (car lst) acc))
       (set lst (cdr lst)))
     acc))
 
 (defun append (a b)
   "Returns the concatenation of lists A and B."
-  (if (nil? a)
-      b
-      (cons (car a) (append (cdr a) b))))
+  (let ((rev nil))
+    (while a
+      (set rev (cons (car a) rev))
+      (set a (cdr a)))
+    (while rev
+      (set b (cons (car rev) b))
+      (set rev (cdr rev)))
+    b))
 
 (defun member (item lst)
   "Returns the sublist starting at ITEM, or nil when ITEM is absent."
-  (if (nil? lst)
-      nil
-      (if (= (car lst) item)
-          lst
-          (member item (cdr lst)))))
+  (let ((cur lst))
+    (while (and cur (not (= (car cur) item)))
+      (set cur (cdr cur)))
+    cur))

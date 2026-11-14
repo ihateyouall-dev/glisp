@@ -88,17 +88,29 @@ static void __gl_trace_value(gl_value_t *val) {
         return;
     }
 
+    if (val->type == GL_VAL_CONS) {
+        // Walk the spine iteratively: long flat lists must not recurse once per
+        // cell. Each car may still recurse into nested structures.
+        gl_value_t *cur = val;
+        while (cur != NULL && cur->type == GL_VAL_CONS) {
+            cur->gc_marked = 1;
+            gl_value_cons_t *cons = cur->val;
+            if (cons == NULL) {
+                break;
+            }
+            __gl_trace_value(cons->car);
+            cur = cons->cdr;
+            if (cur != NULL && cur->gc_marked) {
+                return;
+            }
+        }
+        __gl_trace_value(cur);
+        return;
+    }
+
     val->gc_marked = 1;
 
     switch (val->type) {
-    case GL_VAL_CONS: {
-        gl_value_cons_t *cons = val->val;
-        if (cons) {
-            __gl_trace_value(cons->car);
-            __gl_trace_value(cons->cdr);
-        }
-        break;
-    }
     case GL_VAL_FUNCTION: {
         gl_function_t *func = val->val;
         if (func && func->closure) {

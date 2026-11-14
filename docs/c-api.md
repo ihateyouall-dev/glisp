@@ -145,6 +145,7 @@ optional, and rest parameters.
   in `gl_global_env`.
 - `gl_env_set_var` / `gl_env_set_fun` / `gl_env_set_const` insert bindings.
 - `gl_env_get_var` / `gl_env_get_fun` search the frame chain.
+- `gl_env_get_callable` resolves a callable using the nearest lexical binding.
 - `gl_env_is_const` reports whether a name is protected.
 
 ### `callstack.h`
@@ -165,7 +166,8 @@ environment and producing stack traces.
 ### `eval.h`
 
 - `gl_eval(node)` evaluates one AST node. It is the only safe point at which the
-  collector may run automatically.
+  collector may run automatically. It also enforces the recursion limit by
+  watching the remaining C stack.
 - `gl_parse_and_eval(parser, abort_on_error)` loops over top-level forms.
 - `gl_eval_args(args)` evaluates a list of argument AST nodes into a
   `gl_function_args_t`. It pushes each evaluated value as a temporary GC root.

@@ -837,9 +837,44 @@ void test_gc_stress(void) {
     TEST(gl_value_get_int(eval_str("(gc-default)")) == 7, "optional default survives GC");
 }
 
+void test_call_resolution(void) {
+    TEST(gl_value_get_int(eval_str("(let ((f (lambda (x) (* x 2)))) (f 21))")) == 42,
+         "local variable is callable");
+
+    eval_str("(defun shadow-target (x) (+ x 1))");
+    TEST(gl_value_get_int(
+             eval_str("(let ((shadow-target (lambda (x) (* x 2)))) (shadow-target 21))")) == 42,
+         "local variable shadows a global function");
+    TEST(gl_value_get_int(eval_str("(shadow-target 41)")) == 42, "global function still works");
+
+    eval_str("(defun f (x) x)");
+    TEST(gl_value_get_int(eval_str("(car (map 1+ '(1 2)))")) == 2,
+         "stdlib parameters shadow a global function with the same name");
+}
+
+void test_list_hofs_large(void) {
+    TEST(eval_str("(set hof-list nil)") != NULL, "initialize large HOF list");
+    TEST(eval_str("(set hof-i 0)") != NULL, "initialize large HOF counter");
+    TEST(eval_str("(while (< hof-i 1000) (set hof-list (cons hof-i hof-list)) "
+                  "(set hof-i (+ hof-i 1)))") != NULL,
+         "build large HOF list");
+
+    TEST(gl_value_get_int(eval_str("(len (map 1+ hof-list))")) == 1000, "map on 1000 elements");
+    TEST(gl_value_get_int(eval_str("(len (filter even? hof-list))")) == 500,
+         "filter on 1000 elements");
+    TEST(gl_value_get_int(eval_str("(len (append hof-list '(99)))")) == 1001,
+         "append on 1000 elements");
+    TEST(gl_value_get_int(eval_str("(len (member 0 hof-list))")) == 1, "member on 1000 elements");
+}
+
 void test_recursion(void) {
     eval_str("(defun endless (n) (endless (+ n 1)))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
+
+    eval_str("(defun countdown (n) (if (= n 0) 0 (countdown (- n 1))))");
+    TEST(gl_value_get_int(eval_str("(countdown 100)")) == 0, "bounded recursion works");
+    TEST(eval_str("(countdown 1000000)") == NULL, "deep recursion reports an error");
+
     TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");
 }
 
@@ -878,6 +913,8 @@ int main(void) {
     test_io();
     test_string_escapes();
     test_gc_stress();
+    test_call_resolution();
+    test_list_hofs_large();
     test_recursion();
 
     gl_destroy_memory_heap();

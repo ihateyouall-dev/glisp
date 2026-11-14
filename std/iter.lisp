@@ -18,7 +18,11 @@
     ((nil? coll)
      nil)
     ((list? coll)
-     (cons (f (car coll)) (map f (cdr coll))))
+     (let ((acc nil))
+       (while coll
+         (set acc (cons (f (car coll)) acc))
+         (set coll (cdr coll)))
+       (reverse acc)))
     ((vector? coll)
      (let ((res {})
            (i 0)
@@ -43,9 +47,12 @@
     ((nil? coll)
      nil)
     ((list? coll)
-     (if (pred (car coll))
-         (cons (car coll) (filter pred (cdr coll)))
-         (filter pred (cdr coll))))
+     (let ((acc nil))
+       (while coll
+         (if (pred (car coll))
+             (set acc (cons (car coll) acc)))
+         (set coll (cdr coll)))
+       (reverse acc)))
     ((vector? coll)
      (let ((res {})
            (i 0)
@@ -73,7 +80,7 @@
   (if (or (list? coll) (nil? coll))
       (let ((acc init)
             (cur coll))
-        (while (not (nil? cur))
+        (while cur
           (set acc (f acc (car cur)))
           (set cur (cdr cur)))
         acc)
@@ -89,7 +96,7 @@
   "Calls F for every element of COLL and returns nil."
   (if (or (list? coll) (nil? coll))
       (let ((cur coll))
-        (while (not (nil? cur))
+        (while cur
           (f (car cur))
           (set cur (cdr cur))))
       (let ((i 0)
@@ -101,11 +108,12 @@
 (defun any? (pred coll)
   "Returns t when at least one element of COLL satisfies PRED."
   (if (or (list? coll) (nil? coll))
-      (if (nil? coll)
-          nil
+      (let ((found nil))
+        (while (and coll (not found))
           (if (pred (car coll))
-              t
-              (any? pred (cdr coll))))
+              (set found t))
+          (set coll (cdr coll)))
+        found)
       (let ((i 0)
             (n (len coll))
             (found nil))
@@ -118,11 +126,12 @@
 (defun all? (pred coll)
   "Returns t when every element of COLL satisfies PRED."
   (if (or (list? coll) (nil? coll))
-      (if (nil? coll)
-          t
-          (if (pred (car coll))
-              (all? pred (cdr coll))
-              nil))
+      (let ((failed nil))
+        (while (and coll (not failed))
+          (if (not (pred (car coll)))
+              (set failed t))
+          (set coll (cdr coll)))
+        (not failed))
       (let ((i 0)
             (n (len coll))
             (failed nil))

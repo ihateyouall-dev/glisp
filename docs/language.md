@@ -106,11 +106,10 @@ A variable holding a function can be called directly:
 
 ### Namespaces and lookup
 
-Functions and variables live in separate tables. When the head of a form is a
-symbol, GLisp searches the **function** namespace first and only then the
-**variable** namespace. This means a global function shadows a local variable of
-the same name in call position. Avoid naming local parameters after global
-functions.
+Functions and variables live in separate tables, but call resolution uses the
+nearest lexical binding. Frames are searched from innermost to outermost; within
+one frame a function binding wins over a variable binding. A local variable can
+therefore hold a function and shadow a global function of the same name.
 
 ## Scoping and binding
 
@@ -308,12 +307,14 @@ error API is not implemented yet.
 
 ## Known limitations
 
-- No `\uXXXX` escape, and a literal `"` cannot be written. Escapes produce
-  single bytes, not code points.
+- No `\uXXXX` escape; write a double quote as `\x22` because the tokenizer
+  ends a string at the first raw `"`. Escapes produce single bytes, not code
+  points.
 - No macros or quasiquote.
-- No tail-call optimization; deep recursion consumes the C stack.
+- No tail-call optimization. Recursion is limited by the available C stack;
+  exceeding the limit reports a recursion error. The exact depth is
+  platform-dependent.
 - No module system; `load` evaluates into the global environment.
 - No exception handling.
-- Function namespace takes precedence over variables in call position.
 - `len` and `get` are linear for lists.
 - Collections are mutable by reference through `set-at`, `push`, and `pop`.

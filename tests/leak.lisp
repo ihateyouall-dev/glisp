@@ -13,7 +13,7 @@
 (set i 0)
 (while (< i 1000)
   (set acc (cons (cons i (* i 2)) acc))
-  (set i (+ i 1)))
+  (set i (1+ i)))
 
 (assert (= (len acc) 1000))
 (assert (= (car (car acc)) 999))
