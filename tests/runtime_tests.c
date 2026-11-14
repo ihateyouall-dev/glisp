@@ -357,10 +357,10 @@ void test_std_strings(void) {
          "string-contains? absent needle");
 
     TEST(gl_value_get_bool(eval_str("(= (string-split \"a,b,c\" \",\") "
-                                     "(list \"a\" \"b\" \"c\"))")) == 1,
+                                    "(list \"a\" \"b\" \"c\"))")) == 1,
          "string-split single character separator");
     TEST(gl_value_get_bool(eval_str("(= (string-split \"a::b::c\" \"::\") "
-                                     "(list \"a\" \"b\" \"c\"))")) == 1,
+                                    "(list \"a\" \"b\" \"c\"))")) == 1,
          "string-split multi-character separator");
     TEST(gl_value_get_bool(eval_str("(= (string-split \"a,\" \",\") (list \"a\" \"\"))")) == 1,
          "string-split trailing separator");
@@ -369,19 +369,18 @@ void test_std_strings(void) {
     TEST(gl_value_get_bool(eval_str("(= (string-split \"\" \",\") (list \"\"))")) == 1,
          "string-split empty string");
 
-    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\" \"b\") \"-\")")),
-                "a-b") == 0,
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\" \"b\") \"-\")")), "a-b") ==
+             0,
          "string-join with separator");
-    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list 1 2 3) \"-\")")),
-                "1-2-3") == 0,
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list 1 2 3) \"-\")")), "1-2-3") == 0,
          "string-join converts with to-string");
     TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\") \"-\")")), "a") == 0,
          "string-join single element");
     TEST(strcmp(gl_value_get_string(eval_str("(string-join nil \"-\")")), "") == 0,
          "string-join empty list");
-    TEST(strcmp(gl_value_get_string(
-                    eval_str("(string-join (string-split \"a::b::c\" \"::\") \"-\")")),
-                "a-b-c") == 0,
+    TEST(strcmp(
+             gl_value_get_string(eval_str("(string-join (string-split \"a::b::c\" \"::\") \"-\")")),
+             "a-b-c") == 0,
          "string-join of string-split result");
 
     TEST(eval_str("(string-split \"a,b\" \"\")") == NULL, "string-split empty separator");
@@ -530,8 +529,7 @@ void test_load_failure(void) {
     char src[512];
     snprintf(src, sizeof(src), "(load \"%s\")", path);
     TEST(eval_str(src) == NULL, "failed load returns NULL");
-    TEST(!gl_call_stack_initialized || gl_call_stack.size == 0,
-         "failed load leaves no call frame");
+    TEST(!gl_call_stack_initialized || gl_call_stack.size == 0, "failed load leaves no call frame");
     TEST(gl_value_get_int(eval_str("(+ 1 2)")) == 3, "evaluation after failed load");
 
     file = fopen(path, "w");
