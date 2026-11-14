@@ -338,6 +338,21 @@ void test_strings(void) {
          "string-upcase");
     TEST(strcmp(gl_value_get_string(eval_str("(string-downcase \"aBc1\")")), "abc1") == 0,
          "string-downcase");
+
+    TEST(gl_value_get_int(eval_str("(string->number \"42\")")) == 42, "string->number int");
+    TEST(gl_value_get_int(eval_str("(string->number \"-7\")")) == -7, "string->number negative");
+    TEST(gl_value_get_bool(eval_str("(= (typeof (string->number \"2.5\")) float-t)")) == 1,
+         "string->number float type");
+    TEST(gl_value_get_bool(eval_str("(approx= (string->number \"2.5\") 2.5)")) == 1,
+         "string->number float value");
+    TEST(eval_str("(string->number \"\")")->type == GL_VAL_NIL, "string->number empty");
+    TEST(eval_str("(string->number \"abc\")")->type == GL_VAL_NIL, "string->number text");
+    TEST(eval_str("(string->number \"12abc\")")->type == GL_VAL_NIL,
+         "string->number trailing text");
+    TEST(eval_str("(string->number \"1e9\")")->type == GL_VAL_NIL, "string->number exponent");
+    TEST(eval_str("(string->number \"1.\")")->type == GL_VAL_NIL, "string->number bare dot");
+    TEST(eval_str("(string->number \"99999999999999999999999\")")->type == GL_VAL_NIL,
+         "string->number overflow");
 }
 
 void test_std_strings(void) {

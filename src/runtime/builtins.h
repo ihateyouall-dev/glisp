@@ -118,6 +118,8 @@ GL_BUILTIN(string_upcase);
 
 GL_BUILTIN(string_downcase);
 
+GL_BUILTIN(string_to_number);
+
 // Function application and source loading
 
 GL_BUILTIN(apply);

@@ -1055,6 +1055,52 @@ GL_BUILTIN(string_downcase) {
     return res;
 }
 
+// Follows the reader's number syntax: an optional '-', digits, and an optional
+// fractional part. Anything else, including a value out of range, reads as nil.
+GL_BUILTIN(string_to_number) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+    EXPECT_STRING(val);
+
+    const char *str = gl_value_get_string(val);
+    const char *cur = str;
+
+    if (*cur == '-') {
+        ++cur;
+    }
+    if (!isdigit((unsigned char)*cur)) {
+        return gl_value_make_nil();
+    }
+    while (isdigit((unsigned char)*cur)) {
+        ++cur;
+    }
+
+    int is_float = 0;
+    if (*cur == '.') {
+        is_float = 1;
+        ++cur;
+        if (!isdigit((unsigned char)*cur)) {
+            return gl_value_make_nil();
+        }
+        while (isdigit((unsigned char)*cur)) {
+            ++cur;
+        }
+    }
+    if (*cur != '\0') {
+        return gl_value_make_nil();
+    }
+
+    errno = 0;
+    if (is_float) {
+        long double num = strtold(str, NULL);
+        return errno == ERANGE ? gl_value_make_nil() : gl_value_make_float(num);
+    }
+
+    long long num = strtoll(str, NULL, 10);
+    return errno == ERANGE ? gl_value_make_nil() : gl_value_make_int((int64_t)num);
+}
+
 // The final argument is a collection whose elements are appended to the call.
 GL_BUILTIN(apply) {
     EXPECT_VARGS(2);
