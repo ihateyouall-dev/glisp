@@ -5,10 +5,46 @@
 
 #include "diagnostics.h"
 
+#include "utils/ansi.h"
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
+// Decides once whether diagnostics may emit color: stderr has to be a terminal
+// and NO_COLOR has to be unset or empty.
+static int __gl_use_color(void) {
+    static int cached = -1;
+    const char *no_color = NULL;
+
+    if (cached >= 0) {
+        return cached;
+    }
+
+    no_color = getenv("NO_COLOR");
+
+#ifdef _WIN32
+    cached = _isatty(_fileno(stderr));
+#else
+    cached = isatty(fileno(stderr));
+#endif
+
+    if (no_color != NULL && no_color[0] != '\0') {
+        cached = 0;
+    }
+
+    return cached;
+}
+
+// Returns the escape when color is allowed, an empty string otherwise.
+static const char *__gl_color(const char *escape) { return __gl_use_color() ? escape : ""; }
 
 gl_error_t *gl_make_error(gl_error_type_t type, gl_error_severity_t severity,
                           gl_location_t location, char *msg) {
@@ -54,23 +90,37 @@ static char *__get_line(const char *src, int line) {
 // Prints the source line followed by a caret under the offending column.
 void gl_diagnostic_show_frame(gl_location_t loc) {
     char *line = __get_line(loc.src, loc.line);
-    fprintf(stderr, "| %s\n", line);
+    const char *gutter = __gl_color(GL_ANSI_FG_BLUE);
+    const char *caret = __gl_color(GL_ANSI_BOLD GL_ANSI_FG_RED);
+    const char *reset = __gl_color(GL_ANSI_RESET);
+
+    fprintf(stderr, "%s|%s %s\n", gutter, reset, line);
     free(line);
-    fprintf(stderr, "| ");
+    fprintf(stderr, "%s|%s %s", gutter, reset, caret);
     for (size_t i = 1; i < loc.column; ++i) {
         fprintf(stderr, "~");
     }
-    fprintf(stderr, "^\n");
+    fprintf(stderr, "^%s\n", reset);
 }
 
 void gl_diagnostic_syntax_error(const char *src, gl_location_t loc, const char *msg,
                                 const char *name) {
+    const char *bold = __gl_color(GL_ANSI_BOLD);
+    const char *red = __gl_color(GL_ANSI_FG_RED);
+    const char *reset = __gl_color(GL_ANSI_RESET);
+
     fprintf(stderr, "%s:%zu:%zu:\n", name, loc.line, loc.column);
     gl_diagnostic_show_frame(loc);
-    fprintf(stderr, "Syntax error: %s\n", msg);
+    fprintf(stderr, "%s%sSyntax error:%s %s\n", bold, red, reset, msg);
 }
 
 void gl_diagnostic_report_error(gl_error_t *err) {
+    const char *bold = __gl_color(GL_ANSI_BOLD);
+    const char *accent =
+        __gl_color(err->severity == GL_WARNING ? GL_ANSI_FG_YELLOW : GL_ANSI_FG_RED);
+    const char *reset = __gl_color(GL_ANSI_RESET);
+
+    fprintf(stderr, "%s%s", bold, accent);
     switch (err->severity) {
     case GL_WARNING:
         fprintf(stderr, "WARNING: ");
@@ -82,10 +132,12 @@ void gl_diagnostic_report_error(gl_error_t *err) {
         fprintf(stderr, "FATAL: ");
         break;
     }
+    fprintf(stderr, "%s", reset);
 
     fprintf(stderr, "%s:%zu:%zu:\n", err->location.unit_name, err->location.line,
             err->location.column);
 
+    fprintf(stderr, "%s%s", bold, accent);
     switch (err->type) {
     case GL_SYNTAX_ERROR:
         fprintf(stderr, "Syntax error: ");
@@ -114,6 +166,7 @@ void gl_diagnostic_report_error(gl_error_t *err) {
         fprintf(stderr, "Recursion error: ");
         break;
     }
+    fprintf(stderr, "%s", reset);
 
     fprintf(stderr, "%s\n", (err->msg ? err->msg : ""));
     gl_diagnostic_show_frame(err->location);
