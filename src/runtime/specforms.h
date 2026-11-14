@@ -19,6 +19,10 @@ typedef struct gl_env_t gl_env_t;
 
 GL_SPECIAL_FORM(if);
 
+GL_SPECIAL_FORM(when);
+
+GL_SPECIAL_FORM(unless);
+
 GL_SPECIAL_FORM(defun);
 
 // Same as defun, but does not define function in environment
@@ -45,7 +49,11 @@ GL_SPECIAL_FORM(pragma);
 
 GL_SPECIAL_FORM(cond);
 
+GL_SPECIAL_FORM(case);
+
 GL_SPECIAL_FORM(for);
+
+GL_SPECIAL_FORM(dotimes);
 
 GL_SPECIAL_FORM(and);
 
