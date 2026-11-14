@@ -101,6 +101,7 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("substring", substring);
     DEFINE_BUILTIN("string-upcase", string_upcase);
     DEFINE_BUILTIN("string-downcase", string_downcase);
+    DEFINE_BUILTIN("string->number", string_to_number);
 
     DEFINE_BUILTIN("apply", apply);
     DEFINE_BUILTIN("load", load);

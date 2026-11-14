@@ -291,6 +291,7 @@ equal.
 | `(substring string start [end])` | Returns the bytes in `[start, end)`; `end` defaults to the string length. Raises when the range is out of bounds. |
 | `(string-upcase string)` | Returns a copy with ASCII letters uppercased. |
 | `(string-downcase string)` | Returns a copy with ASCII letters lowercased. |
+| `(string->number string)` | Parses the reader's number syntax: an optional `-`, digits, and an optional fractional part. Returns `nil` for anything else, including out-of-range values. |
 
 ### I/O
 
