@@ -43,3 +43,33 @@
 (pragma gc-collect)
 
 (println "leak-check-ok")
+
+;; Exercise the newer value kinds so the leak check covers their allocation and
+;; collection paths too.
+(set table (hash))
+(set i 0)
+(while (< i 200)
+  (hash-set table (to-string i) (cons i (list i (* i 2))))
+  (set i (+ i 1)))
+(assert (= (len table) 200))
+(assert (= (car (hash-get table "199")) 199))
+(hash-delete table "0")
+(assert (= (len table) 199))
+
+(set sorted (sort (map (lambda (x) (mod (* x 7919) 1000)) {1 2 3 4 5 6 7 8 9 10})))
+(assert (= (len sorted) 10))
+(assert (= (sort (list "b" "a" "c")) (list "a" "b" "c")))
+(assert (= (sort nil) nil))
+
+(set text (string-append "a" (substring "xxbcxx" 2 4) "c"))
+(assert (= text "abcc"))
+(assert (= (string-join (string-split "a::b::c" "::") "-") "a-b-c"))
+(assert (= (string-upcase "abc") "ABC"))
+(assert (string-contains? "hello" "ell"))
+(assert (= (string-index "hello" "ll") 2))
+
+(assert (= (eval (read "(+ 20 22)")) 42))
+(assert (= (read "(quote x)") '(quote x)))
+
+(pragma gc-collect)
+(pragma gc-collect)
