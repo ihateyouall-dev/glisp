@@ -108,6 +108,10 @@ GL_BUILTIN(apply);
 
 GL_BUILTIN(load);
 
+GL_BUILTIN(read);
+
+GL_BUILTIN(eval);
+
 // Loads and executes a Lisp file.
 // If caller_unit is provided, relative paths resolve relative to caller_unit's directory.
 // Returns evaluated value or NULL on error.

@@ -243,6 +243,8 @@ argument is always equal to itself.
 | Signature | Description |
 | :--- | :--- |
 | `(apply function arg ... collection)` | Calls `function` with the leading arguments followed by the elements of `collection` (list, array, vector, or nil). |
+| `(read string)` | Parses the first expression as data, without evaluating it. Trailing text is ignored, empty input reads as `nil`, and a syntax error raises. |
+| `(eval data)` | Converts `data` to code and evaluates it in the current environment. Accepts atoms, proper lists, arrays, and vectors; other values raise a type error. |
 
 ```lisp
 (apply + 1 2 '(3 4)) ; => 10
