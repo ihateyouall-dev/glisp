@@ -253,6 +253,23 @@ gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
     return res;
 }
 
+gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym) {
+    while (env != NULL) {
+        gl_value_t **fun = gl_value_table_get(env->functions, sym);
+        if (fun != NULL && *fun != NULL) {
+            return *fun;
+        }
+
+        gl_value_t **var = gl_value_table_get(env->variables, sym);
+        if (var != NULL && *var != NULL) {
+            return *var;
+        }
+
+        env = env->parent ? (gl_env_t *)env->parent->val : NULL;
+    }
+    return NULL;
+}
+
 gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
     gl_value_t **obj = gl_value_table_get(env->functions, sym);
 

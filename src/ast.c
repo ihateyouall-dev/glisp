@@ -155,8 +155,37 @@ gl_ast_node_t *gl_ast_make_vector(gl_ast_vector_t vector, gl_location_t location
 }
 
 gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
-    if (!node)
+    if (!node) {
         return NULL;
+    }
+
+    if (node->type == GL_AST_CONS) {
+        // Copy the spine iteratively; the car may still recurse into nested
+        // structures, but flat lists of any length are safe.
+        gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
+        assert(res);
+
+        gl_ast_node_t *dst = res;
+        gl_ast_node_t *cur = node;
+        while (cur != NULL && cur->type == GL_AST_CONS) {
+            dst->type = GL_AST_CONS;
+            dst->location = cur->location;
+            dst->value.cons.car = gl_ast_copy(cur->value.cons.car);
+
+            gl_ast_node_t *next = cur->value.cons.cdr;
+            if (next != NULL && next->type == GL_AST_CONS) {
+                gl_ast_node_t *cell = malloc(sizeof(gl_ast_node_t));
+                assert(cell);
+                dst->value.cons.cdr = cell;
+                dst = cell;
+                cur = next;
+            } else {
+                dst->value.cons.cdr = gl_ast_copy(next);
+                break;
+            }
+        }
+        return res;
+    }
 
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
@@ -174,10 +203,6 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
         break;
     case GL_AST_STRING:
         res->value.string = strdup(node->value.string);
-        break;
-    case GL_AST_CONS:
-        res->value.cons.car = gl_ast_copy(node->value.cons.car);
-        res->value.cons.cdr = gl_ast_copy(node->value.cons.cdr);
         break;
     case GL_AST_ARRAY: {
         gl_ast_array_init(&res->value.array, node->value.array.size, gl_ast_node_destroy_helper);
@@ -197,6 +222,8 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     }
     case GL_AST_NIL:
         break;
+    case GL_AST_CONS:
+        break;
     }
     return res;
 }
@@ -206,11 +233,20 @@ void gl_ast_destroy(gl_ast_node_t *node) {
         return;
     }
 
+    if (node->type == GL_AST_CONS) {
+        // Free the spine iteratively; nested cars are destroyed recursively.
+        gl_ast_node_t *cur = node;
+        while (cur != NULL && cur->type == GL_AST_CONS) {
+            gl_ast_node_t *next = cur->value.cons.cdr;
+            gl_ast_destroy(cur->value.cons.car);
+            free(cur);
+            cur = next;
+        }
+        gl_ast_destroy(cur);
+        return;
+    }
+
     switch (node->type) {
-    case GL_AST_CONS:
-        gl_ast_destroy(node->value.cons.car);
-        gl_ast_destroy(node->value.cons.cdr);
-        break;
     case GL_AST_ARRAY:
         gl_ast_array_destroy(&node->value.array);
         break;

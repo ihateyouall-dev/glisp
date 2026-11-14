@@ -49,47 +49,71 @@ gl_value_t *gl_value_make_symbol(const char *sym) {
     return res;
 }
 
-// Create literal cons of values
+// Converts one AST literal node into a runtime value.
+static gl_value_t *__gl_ast_value(gl_ast_node_t *node) {
+    if (node == NULL) {
+        return gl_value_make_nil();
+    }
+
+    switch (node->type) {
+    case GL_AST_INT:
+        return gl_value_make_int(node->value.integral);
+    case GL_AST_FLOAT:
+        return gl_value_make_float(node->value.floating);
+    case GL_AST_SYMBOL:
+        return gl_value_make_symbol(node->value.symbol);
+    case GL_AST_STRING:
+        return gl_value_make_string(node->value.string);
+    case GL_AST_NIL:
+        return gl_value_make_nil();
+    case GL_AST_CONS:
+        return gl_value_make_cons(node->value.cons);
+    case GL_AST_ARRAY: {
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, node->value.array.size, NULL);
+        for (size_t i = 0; i < node->value.array.size; ++i) {
+            arr->data[i] = __gl_ast_value(node->value.array.data[i]);
+        }
+        return gl_value_make_array_from(arr);
+    }
+    case GL_AST_VECTOR: {
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+        for (size_t i = 0; i < node->value.vector.size; ++i) {
+            gl_value_vector_push_back(vec,
+                                      __gl_ast_value(*gl_ast_vector_at(&node->value.vector, i)));
+        }
+        return gl_value_make_vector_from(vec);
+    }
+    }
+
+    return gl_value_make_nil();
+}
+
+// Create literal cons of values. The spine is converted iteratively so that
+// large quoted lists do not consume the C stack.
 gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_CONS;
-    res->val = malloc(sizeof(gl_value_cons_t));
-    // Constructing car
-    gl_value_t *car;
-    switch (cons.car->type) {
-    case GL_AST_NIL:
-        car = gl_value_make_nil();
-        break;
-    case GL_AST_INT:
-        car = gl_value_make_int(cons.car->value.integral);
-        break;
-    case GL_AST_FLOAT:
-        car = gl_value_make_float(cons.car->value.floating);
-        break;
-    case GL_AST_SYMBOL:
-        car = gl_value_make_symbol(cons.car->value.symbol);
-        break;
-    case GL_AST_STRING:
-        car = gl_value_make_string(cons.car->value.string);
-        break;
-    case GL_AST_CONS:
-        car = gl_value_make_cons(cons.car->value.cons);
-        break;
-    case GL_AST_ARRAY:
-        break;
-    case GL_AST_VECTOR:
-        break;
-    }
-    ((gl_value_cons_t *)res->val)->car = car;
+    res->val = calloc(1, sizeof(gl_value_cons_t));
 
-    if (cons.cdr->type == GL_AST_NIL) {
-        ((gl_value_cons_t *)res->val)->cdr = gl_value_make_nil();
-    } else if (cons.cdr->type == GL_AST_CONS) {
-        ((gl_value_cons_t *)res->val)->cdr = gl_value_make_cons(cons.cdr->value.cons);
-    } else {
-        assert(0 && "CDR of CONS can be only other CONS or NIL");
+    gl_value_cons_t *dst = res->val;
+    dst->car = __gl_ast_value(cons.car);
+
+    gl_ast_node_t *cur = cons.cdr;
+    while (cur != NULL && cur->type == GL_AST_CONS) {
+        gl_value_t *cell = malloc(sizeof(gl_value_t));
+        cell->type = GL_VAL_CONS;
+        cell->val = calloc(1, sizeof(gl_value_cons_t));
+        gl_register_value(cell);
+
+        dst->cdr = cell;
+        dst = cell->val;
+        dst->car = __gl_ast_value(cur->value.cons.car);
+        cur = cur->value.cons.cdr;
     }
 
+    dst->cdr = __gl_ast_value(cur);
     gl_register_value(res);
     return res;
 }
@@ -271,11 +295,31 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = malloc(sizeof(gl_value_type_t));
         *(gl_value_type_t *)res->val = *(gl_value_type_t *)val->val;
         break;
-    case GL_VAL_CONS:
-        res->val = malloc(sizeof(gl_value_cons_t));
-        ((gl_value_cons_t *)res->val)->car = gl_value_copy(((gl_value_cons_t *)val->val)->car);
-        ((gl_value_cons_t *)res->val)->cdr = gl_value_copy(((gl_value_cons_t *)val->val)->cdr);
+    case GL_VAL_CONS: {
+        // Copy the spine iteratively: long flat lists are common (argument
+        // lists, stdlib HOFs) and must not consume the C stack.
+        gl_value_cons_t *src = val->val;
+        gl_value_cons_t *dst = malloc(sizeof(gl_value_cons_t));
+        res->val = dst;
+        dst->car = gl_value_copy(src->car);
+
+        gl_value_t *src_cur = src->cdr;
+        while (src_cur != NULL && src_cur->type == GL_VAL_CONS) {
+            gl_value_t *cell = malloc(sizeof(gl_value_t));
+            cell->type = GL_VAL_CONS;
+            cell->val = calloc(1, sizeof(gl_value_cons_t));
+            gl_register_value(cell);
+
+            dst->cdr = cell;
+            src = src_cur->val;
+            dst = cell->val;
+            dst->car = gl_value_copy(src->car);
+            src_cur = src->cdr;
+        }
+
+        dst->cdr = gl_value_copy(src_cur);
         break;
+    }
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
         res->val = strdup((char *)val->val);

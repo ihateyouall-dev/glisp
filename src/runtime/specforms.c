@@ -370,12 +370,7 @@ GL_SPECIAL_FORM(function) {
     if (func->type == GL_AST_SYMBOL) {
         const char *func_name = func->value.symbol;
 
-        gl_value_t *res = gl_env_get_fun(env, func_name);
-
-        if (res == NULL) {
-            return gl_env_get_var(env, func_name);
-        }
-        return res;
+        return gl_env_get_callable(env, func_name);
     }
 
     gl_value_t *res = gl_eval(func);
