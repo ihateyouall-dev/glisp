@@ -5,7 +5,7 @@ automatically at startup unless `--no-stdlib` is given. `std/std.lisp` loads the
 modules in this order:
 
 ```
-core.lisp -> math.lisp -> list.lisp -> iter.lisp -> types.lisp -> io.lisp
+core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> io.lisp
 ```
 
 All definitions are installed in the global environment. Because `types.lisp`
@@ -104,6 +104,25 @@ Domain errors are reported with `assert` and abort the current form.
 | `(reverse lst)` | Reverses a list (iterative) |
 | `(append a b)` | Concatenates two lists (recursive) |
 | `(member item lst)` | Returns the sublist starting at `item`, or `nil`; compares with `=` |
+
+## strings.lisp
+
+| Signature | Description |
+| :--- | :--- |
+| `(string-index haystack needle)` | First index of `needle`, or `nil`; empty `needle` gives `0` |
+| `(string-contains? haystack needle)` | `t` when `needle` occurs in `haystack`, otherwise `nil` |
+| `(string-split string separator)` | Pieces between separators; an empty `separator` raises an error |
+| `(string-join list separator)` | Elements converted with `to-string`, joined with `separator` |
+
+A trailing separator produces a trailing empty string, and a string without
+separators produces a one-element list.
+
+```lisp
+(string-index "hello" "ll")      ; => 2
+(string-contains? "hello" "z")   ; => nil
+(string-split "a::b::c" "::")    ; => ("a" "b" "c")
+(string-join (list 1 2 3) "-")   ; => "1-2-3"
+```
 
 ## iter.lisp
 

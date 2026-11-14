@@ -294,6 +294,53 @@ void test_strings(void) {
          "string-downcase");
 }
 
+void test_std_strings(void) {
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"ll\")")) == 2, "string-index match");
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"h\")")) == 0,
+         "string-index at start");
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"\")")) == 0,
+         "string-index empty needle");
+    TEST(eval_str("(string-index \"hello\" \"z\")")->type == GL_VAL_NIL,
+         "string-index absent needle");
+    TEST(eval_str("(string-index \"he\" \"hello\")")->type == GL_VAL_NIL,
+         "string-index needle longer than haystack");
+
+    TEST(gl_value_get_bool(eval_str("(string-contains? \"hello\" \"ell\")")) == 1,
+         "string-contains? match");
+    TEST(gl_value_get_bool(eval_str("(string-contains? \"hello\" \"z\")")) == 0,
+         "string-contains? absent needle");
+
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a,b,c\" \",\") "
+                                     "(list \"a\" \"b\" \"c\"))")) == 1,
+         "string-split single character separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a::b::c\" \"::\") "
+                                     "(list \"a\" \"b\" \"c\"))")) == 1,
+         "string-split multi-character separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a,\" \",\") (list \"a\" \"\"))")) == 1,
+         "string-split trailing separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"abc\" \",\") (list \"abc\"))")) == 1,
+         "string-split without separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"\" \",\") (list \"\"))")) == 1,
+         "string-split empty string");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\" \"b\") \"-\")")),
+                "a-b") == 0,
+         "string-join with separator");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list 1 2 3) \"-\")")),
+                "1-2-3") == 0,
+         "string-join converts with to-string");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\") \"-\")")), "a") == 0,
+         "string-join single element");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join nil \"-\")")), "") == 0,
+         "string-join empty list");
+    TEST(strcmp(gl_value_get_string(
+                    eval_str("(string-join (string-split \"a::b::c\" \"::\") \"-\")")),
+                "a-b-c") == 0,
+         "string-join of string-split result");
+
+    TEST(eval_str("(string-split \"a,b\" \"\")") == NULL, "string-split empty separator");
+}
+
 void test_sort(void) {
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 0)")) == 1, "sort array");
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 2)")) == 3, "sort array last element");
@@ -861,6 +908,7 @@ int main(void) {
     test_array_vector_gc();
     test_typeid();
     test_strings();
+    test_std_strings();
     test_sort();
     test_let();
     test_let_star();
