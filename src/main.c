@@ -23,6 +23,9 @@
 #include "utils/strdup.h"
 #endif
 
+// Single source of truth for the CLI version and the REPL banner.
+#define GLISP_VERSION "0"
+
 // Counts unclosed brackets, skipping string literals and line comments, so the
 // REPL knows whether a form is complete. A negative result means the line closed
 // more than it opened; the parser then reports the real error.
@@ -55,8 +58,28 @@ static int __gl_bracket_balance(const char *line) {
     return balance;
 }
 
+// Evaluates one -e expression in the global environment. Returns 0 on success.
+static int __gl_eval_expression(const char *expr) {
+    gl_parser_t parser = gl_make_parser(expr, "<eval>");
+    gl_value_t *res = gl_parse_and_eval(&parser);
+
+    gl_parser_destroy(&parser);
+
+    if (!res) {
+        return 1;
+    }
+
+    if (res->type != GL_VAL_NIL) {
+        gl_value_print(res);
+        printf("\n");
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     int load_stdlib = 1;
+    int eval_count = 0;
     const char *file_to_run = NULL;
 
     // Parse CLI flags; the first non-option argument is the script to run.
@@ -66,9 +89,21 @@ int main(int argc, char **argv) {
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: %s [options] [file]\n\n", argv[0]);
             printf("Options:\n");
-            printf("  --no-stdlib    Do not autoload standard library\n");
-            printf("  -h, --help     Show this help message\n");
+            printf("  --no-stdlib      Do not autoload standard library\n");
+            printf("  -e, --eval EXPR  Evaluate an expression and exit; may be repeated\n");
+            printf("  -h, --help       Show this help message\n");
+            printf("  -v, --version    Show version and exit\n");
             return 0;
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            printf("glisp %s\n", GLISP_VERSION);
+            return 0;
+        } else if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--eval") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Option %s requires an expression\n", argv[i]);
+                return 1;
+            }
+            ++eval_count;
+            ++i;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             return 1;
@@ -82,11 +117,35 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (eval_count > 0 && file_to_run) {
+        fprintf(stderr, "Cannot combine -e with a script file '%s'\n", file_to_run);
+        return 1;
+    }
+
     // Build the runtime and, unless disabled, evaluate the standard library.
     gl_init_global_env();
 
     if (load_stdlib) {
         gl_load_stdlib();
+    }
+
+    // Eval mode: evaluate each -e expression in order and exit.
+    // Evaluating expressions if given
+    if (eval_count > 0) {
+        int status = 0;
+
+        for (int i = 1; i < argc; ++i) {
+            if (strcmp(argv[i], "-e") != 0 && strcmp(argv[i], "--eval") != 0) {
+                continue;
+            }
+            if (__gl_eval_expression(argv[++i]) != 0) {
+                status = 1;
+            }
+        }
+
+        gl_call_stack_cleanup();
+        gl_destroy_memory_heap();
+        return status;
     }
 
     // Batch mode: evaluate the given file and exit.
@@ -107,7 +166,7 @@ int main(int argc, char **argv) {
 
     // Interactive mode: accumulate lines until the brackets balance, then
     // evaluate the whole form. Launching REPL otherwise
-    puts("GLisp REPL version 0");
+    printf("GLisp REPL version %s\n", GLISP_VERSION);
 
     while (1) {
         char *buffer = NULL;
