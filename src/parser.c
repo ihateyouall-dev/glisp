@@ -94,21 +94,31 @@ static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser);
 // Quote and funquote are prefix forms: they wrap the next expression.
 static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
-    int quoted = 0;
-    int funquoted = 0;
 
     if (token.type == GL_LEX_QUOTE) {
+        gl_location_t quote_location = token.location;
         __gl_parser_advance(parser);
-        token = __gl_parser_current_token(parser);
-        quoted = 1;
-        return gl_ast_make_quote(__gl_parser_parse_expression(parser));
+
+        gl_ast_node_t *operand = __gl_parser_parse_expression(parser);
+        if (operand == NULL) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, quote_location,
+                                                     "Expected an expression after '"));
+            return NULL;
+        }
+        return gl_ast_make_quote(operand);
     }
 
     if (token.type == GL_LEX_FUNQUOTE) {
+        gl_location_t quote_location = token.location;
         __gl_parser_advance(parser);
-        token = __gl_parser_current_token(parser);
-        funquoted = 1;
-        return gl_ast_make_funquote(__gl_parser_parse_expression(parser));
+
+        gl_ast_node_t *operand = __gl_parser_parse_expression(parser);
+        if (operand == NULL) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, quote_location,
+                                                     "Expected an expression after #'"));
+            return NULL;
+        }
+        return gl_ast_make_funquote(operand);
     }
 
     if (token.type == GL_LEX_LPAREN) {
