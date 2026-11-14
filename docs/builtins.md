@@ -225,7 +225,7 @@ argument is always equal to itself.
 | `(cdr list)` | Tail of a non-empty list. |
 | `(cons a b)` | New cons cell. |
 | `(list ...)` | See [stdlib](stdlib.md#listlisp); implemented in Lisp. |
-| `(len sequence)` | Length. O(1) for arrays, vectors, strings; O(n) for lists. `nil` has length 0. |
+| `(len sequence)` | Length. O(1) for arrays, vectors, strings and maps; O(n) for lists. `nil` has length 0. |
 | `(get sequence index)` or `(get index sequence)` | Element access. Also `nth` and `aref`. O(1) for arrays/vectors/strings, O(n) for lists. Strings yield one-character strings. |
 
 ### Arrays and vectors
@@ -237,6 +237,33 @@ argument is always equal to itself.
 | `(set-at collection index value)` / `(aset ...)` | Replaces an element of an array or vector and returns the new value. |
 | `(push vector value ...)` / `(vector-push ...)` | Appends values and returns the vector. |
 | `(pop vector)` / `(vector-pop vector)` | Removes and returns the last element; an empty vector is an error. |
+
+### Hashmaps
+
+Hash maps associate string keys with arbitrary values. Symbols are accepted as
+keys and stored by name, so `'name` and `"name"` are the same key.
+
+| Signature | Description |
+| :--- | :--- |
+| `(hash)` | Returns a new empty map. |
+| `(hash-set map key value)` | Inserts or replaces `key` and returns `map`. |
+| `(hash-get map key [default])` | Stored value; `default` when missing, else `nil`. |
+| `(hash-has? map key)` | `t` when `key` is present, `nil` otherwise. |
+| `(hash-delete map key)` | Removes `key`; `t` if it was there, else `nil`. |
+| `(hash-keys map)` | List of keys in no particular order. |
+| `(len map)` | Number of entries. |
+
+```lisp
+(set h (hash))
+(hash-set h "name" "glisp")
+(hash-get h "name")      ; => "glisp"
+(hash-get h "missing" 0) ; => 0
+(len h)                  ; => 1
+```
+
+Maps print as `#hashmap(N)`, where `N` is the entry count. They compare equal
+only to themselves: two separately built maps with the same contents are not
+equal.
 
 ### Functions
 

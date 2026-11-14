@@ -247,6 +247,51 @@ void test_array_vector_gc(void) {
     TEST(gl_value_get_array(a)->size == 3, "Array size after GC");
 }
 
+void test_hashmap(void) {
+    gl_value_t *empty = eval_str("(hash)");
+    TEST(empty->type == GL_VAL_HASHMAP, "hash creates a hashmap");
+    TEST(gl_value_get_hashmap(empty)->size == 0, "New hashmap is empty");
+    TEST(gl_value_get_int(eval_str("(len (hash))")) == 0, "Empty hashmap len");
+
+    eval_str("(set hm (hash))");
+    eval_str("(hash-set hm \"name\" \"glisp\")");
+    TEST(strcmp(gl_value_get_string(eval_str("(hash-get hm \"name\")")), "glisp") == 0,
+         "get returns stored value");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 1, "len after set");
+
+    TEST(eval_str("(hash-get hm \"missing\")")->type == GL_VAL_NIL, "get missing key is nil");
+    TEST(gl_value_get_int(eval_str("(hash-get hm \"missing\" 7)")) == 7, "get default value");
+
+    TEST(gl_value_get_bool(eval_str("(hash-has? hm \"name\")")) == 1, "has? on present key");
+    TEST(gl_value_get_bool(eval_str("(hash-has? hm \"missing\")")) == 0, "has? on missing key");
+
+    eval_str("(hash-set hm \"name\" \"other\")");
+    TEST(strcmp(gl_value_get_string(eval_str("(hash-get hm \"name\")")), "other") == 0,
+         "set replaces existing key");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 1, "len after replacement");
+
+    TEST(gl_value_get_bool(eval_str("(hash-delete hm \"name\")")) == 1, "delete returns t");
+    TEST(gl_value_get_bool(eval_str("(hash-delete hm \"name\")")) == 0, "delete of missing key");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 0, "len after delete");
+
+    TEST(gl_value_get_int(eval_str("(let ((m (hash))) (hash-set m \"a\" 1) (hash-set m \"b\" 2) "
+                                   "(len (hash-keys m)))")) == 2,
+         "keys length");
+
+    TEST(gl_value_get_int(eval_str("(let ((m (hash))) (hash-set m \"a\" 1) "
+                                   "(hash-get m \"a\"))")) == 1,
+         "hashmap in let binding");
+
+    eval_str("(set gc-hm (hash))");
+    eval_str("(hash-set gc-hm \"k\" (list 1 2 3))");
+    eval_str("(pragma gc-collect)");
+    gl_value_t *gc_hm = eval_str("gc-hm");
+    TEST(gc_hm->type == GL_VAL_HASHMAP, "Hashmap survives GC");
+    TEST(gl_value_get_int(eval_str("(len gc-hm)")) == 1, "Hashmap len after GC");
+    TEST(gl_value_get_int(eval_str("(car (hash-get gc-hm \"k\"))")) == 1,
+         "Hashmap contents after GC");
+}
+
 void test_typeid(void) {
     TEST(gl_value_get_bool(eval_str("(= (typeof 42) int-t)")) == 1, "typeof int");
     TEST(gl_value_get_bool(eval_str("(= (typeof 3.14) float-t)")) == 1, "typeof float");
@@ -943,6 +988,7 @@ int main(void) {
     test_array_vector_operations();
     test_array_vector_comparison();
     test_array_vector_gc();
+    test_hashmap();
     test_typeid();
     test_strings();
     test_std_strings();

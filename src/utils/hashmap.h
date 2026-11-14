@@ -38,6 +38,7 @@
     void Name##_init(Name##_t *map, void (*destroy_fn)(T *), T (*copy_fn)(T));                     \
     void Name##_insert(Name##_t *map, const char *key, T value);                                   \
     T *Name##_get(Name##_t *map, const char *key);                                                 \
+    int Name##_remove(Name##_t *map, const char *key);                                             \
     void Name##_destroy(Name##_t *map);
 
 #define HASHMAP_DEFINE(T, Name)                                                                    \
@@ -123,6 +124,22 @@
             }                                                                                      \
         }                                                                                          \
         return NULL;                                                                               \
+    }                                                                                              \
+    int Name##_remove(Name##_t *map, const char *key) {                                            \
+        Name##Bucket_t *bucket = &map->buckets[__##Name##_fnv1a(key) % map->buckets_count];        \
+        for (size_t i = 0; i < bucket->size; ++i) {                                                \
+            Name##Entry_t *entry = Name##Bucket_at(bucket, i);                                     \
+            if (strcmp(key, entry->key) == 0) {                                                    \
+                free(entry->key);                                                                  \
+                for (size_t j = i + 1; j < bucket->size; ++j) {                                    \
+                    bucket->data[j - 1] = bucket->data[j];                                         \
+                }                                                                                  \
+                --bucket->size;                                                                    \
+                --map->size;                                                                       \
+                return 1;                                                                          \
+            }                                                                                      \
+        }                                                                                          \
+        return 0;                                                                                  \
     }                                                                                              \
     void Name##_destroy(Name##_t *map) {                                                           \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \

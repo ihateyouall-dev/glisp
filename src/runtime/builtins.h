@@ -92,6 +92,20 @@ GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
 
+// Hashmaps
+
+GL_BUILTIN(hash);
+
+GL_BUILTIN(hash_set);
+
+GL_BUILTIN(hash_get);
+
+GL_BUILTIN(hash_has_p);
+
+GL_BUILTIN(hash_delete);
+
+GL_BUILTIN(hash_keys);
+
 // String operations
 
 GL_BUILTIN(string_append);
