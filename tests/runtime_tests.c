@@ -789,6 +789,57 @@ void test_for(void) {
     TEST(gl_value_get_int(eval_str("i")) == 999, "for variable does not leak");
 }
 
+void test_control_forms(void) {
+    TEST(gl_value_get_int(eval_str("(when t 1 2 3)")) == 3, "When returns last body value");
+    gl_value_t *when_nil = eval_str("(when nil 1)");
+    TEST(when_nil != NULL && when_nil->type == GL_VAL_NIL, "When false returns nil");
+
+    eval_str("(set when_ran 0)");
+    eval_str("(when nil (set when_ran 1))");
+    TEST(gl_value_get_int(eval_str("when_ran")) == 0, "When false skips body");
+
+    TEST(gl_value_get_int(eval_str("(unless nil 1 2 3)")) == 3, "Unless returns last body value");
+    gl_value_t *unless_nil = eval_str("(unless t 1)");
+    TEST(unless_nil != NULL && unless_nil->type == GL_VAL_NIL, "Unless true returns nil");
+
+    eval_str("(set unless_ran 0)");
+    eval_str("(unless t (set unless_ran 1))");
+    TEST(gl_value_get_int(eval_str("unless_ran")) == 0, "Unless true skips body");
+
+    TEST(gl_value_get_int(eval_str("(case 2 (1 10) (2 20) (3 30))")) == 20, "Case matching key");
+    TEST(gl_value_get_int(eval_str("(case 9 (1 10) (else 99))")) == 99, "Case else clause");
+    gl_value_t *case_nil = eval_str("(case 9 (1 10) (2 20))");
+    TEST(case_nil != NULL && case_nil->type == GL_VAL_NIL, "Case no match returns nil");
+    TEST(gl_value_get_int(eval_str("(case 1 (1 10) (1 20))")) == 10, "Case first match wins");
+    TEST(gl_value_get_int(eval_str("(case 2 ((+ 1 1) 20) (else 99))")) == 20, "Case evaluated key");
+
+    eval_str("(set case_ran 0)");
+    eval_str("(case 1 (1 (set case_ran 1)) (2 (set case_ran 2)))");
+    TEST(gl_value_get_int(eval_str("case_ran")) == 1, "Case skips other bodies");
+
+    eval_str("(set dot_seq nil)");
+    eval_str("(dotimes (i 3) (set dot_seq (cons i dot_seq)))");
+    TEST(gl_value_get_bool(eval_str("(= dot_seq (list 2 1 0))")) == 1, "Dotimes counter values");
+    TEST(gl_value_get_int(eval_str("(dotimes (i 4 i))")) == 3, "Dotimes result sees final binding");
+
+    eval_str("(set dot_ran 0)");
+    gl_value_t *dot_nil = eval_str("(dotimes (i 0) (set dot_ran 1))");
+    TEST(gl_value_get_int(eval_str("dot_ran")) == 0, "Dotimes zero count skips body");
+    TEST(dot_nil != NULL && dot_nil->type == GL_VAL_NIL, "Dotimes zero count returns nil");
+    TEST(gl_value_get_int(eval_str("(dotimes (i 0 i))")) == 0,
+         "Dotimes zero count result sees binding");
+
+    TEST(eval_str("(dotimes (i 1.5) nil)") == NULL, "Dotimes non-integer count fails");
+    TEST(eval_str("(dotimes (i -1) nil)") == NULL, "Dotimes negative count fails");
+    TEST(eval_str("(dotimes (t 1) nil)") == NULL, "Dotimes does not shadow constants");
+
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (when t n))")) == 10, "When sees let binding");
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (dotimes (i 1 n)))")) == 10,
+         "Dotimes sees let binding");
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (dotimes (i 1) (set n (+ n 1))) n)")) == 11,
+         "Dotimes body sees let binding");
+}
+
 void test_add_to_list(void) {
     // 1. Add to uninitialized / nil variable
     eval_str("(set my_l nil)");
@@ -1056,6 +1107,7 @@ int main(void) {
     test_cond();
     test_optional_and_rest();
     test_for();
+    test_control_forms();
     test_add_to_list();
     test_defconst();
     test_io();

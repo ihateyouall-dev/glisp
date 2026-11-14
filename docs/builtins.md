@@ -26,6 +26,26 @@ alternate expressions in order. With no alternate the result is `nil`.
 (if (> 3 2) "yes" "no") ; => "yes"
 ```
 
+### `when`
+
+```
+(when test body ...)
+```
+
+Evaluates `test` once, then evaluates the unevaluated body forms in order when
+it is true and returns the last value. Returns `nil` and leaves the body
+untouched when `test` is false.
+
+### `unless`
+
+```
+(unless test body ...)
+```
+
+The inverse of `when`: evaluates `test` once, then evaluates the unevaluated
+body forms in order when it is false and returns the last value. Returns `nil`
+and leaves the body untouched when `test` is true.
+
 ### `cond`
 
 ```
@@ -35,6 +55,19 @@ alternate expressions in order. With no alternate the result is `nil`.
 Tests clauses in order. The first true clause is selected and its body is
 evaluated. A clause with an empty body returns the test value. `else` is a
 constant that is always true. Returns `nil` when nothing matches.
+
+### `case`
+
+```
+(case value (key body ...) ... [(else body ...)])
+```
+
+Evaluates `value` once, then evaluates clause keys in order and selects the
+first one that compares equal with `=`. Keys are evaluated expressions, so
+`(+ 1 2)` may be used as a key; `else` is the fallback and is not evaluated.
+Only the selected clause's unevaluated body forms are evaluated, in order, and
+the last value is returned. Other clause bodies are untouched. Returns `nil`
+when no clause matches.
 
 ### `and` / `or`
 
@@ -64,6 +97,18 @@ Repeats `body` while `test` is true. Returns `nil`.
 Iterates over a list, array, vector, nil, or string. Strings yield
 one-character strings. The variable is bound in a fresh lexical frame to a copy
 of each element. Returns `nil`.
+
+### `dotimes`
+
+```
+(dotimes (variable count [result]) body ...)
+```
+
+Evaluates `count` once, which must be a non-negative integer, then evaluates the
+unevaluated body forms in order with `variable` bound in a fresh lexical frame
+to `0` through `count - 1`. Returns the value of `result`, evaluated in the loop
+frame so it sees the final binding, or `nil` when `result` is absent. Raises a
+type error when `count` is not a non-negative integer.
 
 ### `progn`
 
