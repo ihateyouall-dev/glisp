@@ -3,6 +3,7 @@
 (load "core.lisp")
 (load "math.lisp")
 (load "list.lisp")
+(load "strings.lisp")
 (load "iter.lisp")
 (load "types.lisp")
 (load "io.lisp")
