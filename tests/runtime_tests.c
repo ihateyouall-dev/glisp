@@ -451,6 +451,18 @@ void test_std_strings(void) {
          "string-pad-left keeps longer strings");
 }
 
+void test_range(void) {
+    TEST(gl_value_get_int(eval_str("(len (range 0 5))")) == 5, "range length");
+    TEST(gl_value_get_int(eval_str("(car (range 0 5))")) == 0, "range starts at the first bound");
+    TEST(gl_value_get_int(eval_str("(car (range 1 4))")) == 1, "range with a non-zero start");
+    TEST(gl_value_get_int(eval_str("(len (range 0 10 3))")) == 4, "range with a step");
+    TEST(gl_value_get_int(eval_str("(car (range 0 10 3))")) == 0, "range step starts correctly");
+    TEST(gl_value_get_bool(eval_str("(= (range 5 0 -2) (list 5 3 1))")) == 1, "range counts down");
+    TEST(eval_str("(range 0 0)")->type == GL_VAL_NIL, "empty range");
+    TEST(eval_expr("(range 0 5 0)") == NULL, "range rejects a zero step");
+    TEST(gl_value_get_int(eval_str("(len (map 1+ (range 0 100)))")) == 100, "range feeds map");
+}
+
 void test_list_helpers(void) {
     TEST(gl_value_get_int(eval_str("(len (take (list 1 2 3 4) 2))")) == 2, "take length");
     TEST(gl_value_get_int(eval_str("(car (take (list 1 2 3) 5))")) == 1, "take clamps to length");
@@ -1252,6 +1264,7 @@ int main(void) {
     test_typeid();
     test_strings();
     test_std_strings();
+    test_range();
     test_list_helpers();
     test_long_lists();
     test_alist();
