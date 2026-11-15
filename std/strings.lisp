@@ -129,3 +129,40 @@
 (defun string-trim (string)
   "Returns STRING without leading or trailing whitespace."
   (string-trim-right (string-trim-left string)))
+
+(defun format (template &rest args)
+  "Returns TEMPLATE with each {} replaced by the next argument converted with to-string."
+  (assert (string? template) "TEMPLATE must be string")
+  (let* ((acc "")
+         (rest-template template)
+         (remaining args)
+         (at (string-index rest-template "{}")))
+    (while (not (nil? at))
+      (assert (not (nil? remaining)) "Not enough arguments for format")
+      (set acc (string-append acc (substring rest-template 0 at) (to-string (car remaining))))
+      (set rest-template (substring rest-template (+ at 2)))
+      (set remaining (cdr remaining))
+      (set at (string-index rest-template "{}")))
+    (string-append acc rest-template)))
+
+(defun string-pad-left (string width)
+  "Returns STRING right-aligned in WIDTH characters, padded with spaces on the left."
+  (assert (string? string) "STRING must be string")
+  (assert (int? width) "WIDTH must be integer")
+  (let ((gap (- width (len string)))
+        (acc ""))
+    (while (> gap 0)
+      (set acc (string-append acc " "))
+      (set gap (- gap 1)))
+    (string-append acc string)))
+
+(defun string-pad-right (string width)
+  "Returns STRING left-aligned in WIDTH characters, padded with spaces on the right."
+  (assert (string? string) "STRING must be string")
+  (assert (int? width) "WIDTH must be integer")
+  (let ((gap (- width (len string)))
+        (acc string))
+    (while (> gap 0)
+      (set acc (string-append acc " "))
+      (set gap (- gap 1)))
+    acc))

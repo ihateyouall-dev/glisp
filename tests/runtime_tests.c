@@ -433,6 +433,22 @@ void test_std_strings(void) {
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim-right \"  hi  \")")), "  hi") == 0,
          "string-trim-right");
     TEST(gl_value_get_int(eval_str("(len (string-trim \"   \"))")) == 0, "string-trim blank");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"{} has {}\" \"cart\" 3)")), "cart has 3") ==
+             0,
+         "format substitutes placeholders");
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"plain\")")), "plain") == 0,
+         "format without placeholders");
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"{}{}\" 1 2)")), "12") == 0,
+         "format adjacent placeholders");
+    TEST(eval_expr("(format \"{}\")") == NULL, "format with too few arguments");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-left \"7\" 3)")), "  7") == 0,
+         "string-pad-left");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-right \"7\" 3)")), "7  ") == 0,
+         "string-pad-right");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-left \"abcd\" 2)")), "abcd") == 0,
+         "string-pad-left keeps longer strings");
 }
 
 void test_list_helpers(void) {
