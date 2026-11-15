@@ -454,6 +454,29 @@ void test_long_lists(void) {
          "all? over a long list");
 }
 
+void test_hash_helpers(void) {
+    eval_str("(set helper-map (hash))");
+    eval_str("(hash-set helper-map \"a\" 1)");
+    eval_str("(hash-set helper-map \"b\" 2)");
+
+    TEST(gl_value_get_bool(eval_str("(hash? helper-map)")) == 1, "hash? on a map");
+    TEST(gl_value_get_bool(eval_str("(hash? (list 1))")) == 0, "hash? on a list");
+
+    TEST(gl_value_get_int(eval_str("(len (hash-values helper-map))")) == 2, "hash-values length");
+    TEST(gl_value_get_int(eval_str("(len (hash->alist helper-map))")) == 2, "hash->alist length");
+    TEST(gl_value_get_int(eval_str("(cdr (car (hash->alist helper-map)))")) >= 1,
+         "hash->alist pairs hold values");
+
+    eval_str("(set helper-sum 0)");
+    eval_str("(hash-each (lambda (k v) (set helper-sum (+ helper-sum v))) helper-map)");
+    TEST(gl_value_get_int(eval_str("helper-sum")) == 3, "hash-each visits every value");
+    TEST(eval_str("(hash-each (lambda (k v) v) helper-map)")->type == GL_VAL_NIL,
+         "hash-each returns nil");
+
+    TEST(gl_value_get_int(eval_str("(len (sort-by car (hash->alist helper-map)))")) == 2,
+         "hash entries can be sorted");
+}
+
 void test_sort(void) {
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 0)")) == 1, "sort array");
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 2)")) == 3, "sort array last element");
@@ -1171,6 +1194,7 @@ int main(void) {
     test_strings();
     test_std_strings();
     test_long_lists();
+    test_hash_helpers();
     test_sort();
     test_let();
     test_let_star();

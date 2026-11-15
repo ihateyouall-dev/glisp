@@ -40,6 +40,9 @@
 (defun vector? (x)
   (instanceof? vector-t x))
 
+(defun hash? (x)
+  (instanceof? hashmap-t x))
+
 (defun collection? (x)
   (or
    (instanceof? list-t x)
