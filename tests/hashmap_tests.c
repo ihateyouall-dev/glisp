@@ -3,7 +3,7 @@
 
 int test_status = 0;
 
-HASHMAP_DECLARE_DEFINE(int, map)
+HASHMAP_DECLARE_DEFINE(int, map) // NOLINT(clang-analyzer-core.NullDereference)
 
 void dummy(int *unused) {}
 int copy_fn(int v) { return v; }

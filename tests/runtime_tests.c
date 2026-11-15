@@ -134,6 +134,9 @@ void test_derived_envs(void) {
 void test_array_and_vector_eval(void) {
     gl_value_t *arr = eval_str("[1 (+ 2 3) 6]");
     TEST(arr != NULL, "Eval array not null");
+    if (arr == NULL) {
+        return;
+    }
     TEST(arr->type == GL_VAL_ARRAY, "Eval array type");
     gl_value_array_t *a = gl_value_get_array(arr);
     TEST(a->size == 3, "Array size");
@@ -143,6 +146,9 @@ void test_array_and_vector_eval(void) {
 
     gl_value_t *vec = eval_str("{10 (* 2 3) 30}");
     TEST(vec != NULL, "Eval vector not null");
+    if (vec == NULL) {
+        return;
+    }
     TEST(vec->type == GL_VAL_VECTOR, "Eval vector type");
     gl_value_vector_t *v = gl_value_get_vector(vec);
     TEST(v->size == 3, "Vector size");
@@ -664,11 +670,10 @@ void test_let_star(void) {
 
 void test_cons(void) {
     gl_value_t *c1 = eval_str("(cons 1 2)");
-    TEST(c1->type == GL_VAL_CONS, "cons creates cons cell");
+    TEST(c1 != NULL && c1->type == GL_VAL_CONS, "cons creates cons cell");
     TEST(gl_value_get_int(eval_str("(car (cons 1 2))")) == 1, "car of cons");
     TEST(gl_value_get_int(eval_str("(cdr (cons 1 2))")) == 2, "cdr of cons");
 
-    gl_value_t *c2 = eval_str("(cons 42 nil)");
     TEST(gl_value_get_int(eval_str("(car (cons 42 nil))")) == 42, "car of cons with nil");
     TEST(eval_str("(cdr (cons 42 nil))")->type == GL_VAL_NIL, "cdr of cons with nil is nil");
 }

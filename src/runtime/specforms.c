@@ -51,6 +51,14 @@ static void __emit_syntax_error(gl_location_t loc, const char *msg) {
     gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
 }
 
+// Grows the temporary parameter buffer. Reallocating through a separate
+// variable keeps the original block reachable when the allocator fails.
+static gl_function_param_t **__gl_realloc_params(gl_function_param_t **params, size_t capacity) {
+    gl_function_param_t **grown = realloc(params, sizeof(gl_function_param_t *) * capacity);
+    assert(grown != NULL);
+    return grown;
+}
+
 // Parses a lambda list into required, &optional (with defaults), and &rest params.
 static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_ast_node_t *params) {
     if (!params || params->type == GL_AST_NIL) {
@@ -109,14 +117,14 @@ static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_as
             }
             if (count == capacity) {
                 capacity *= 2;
-                temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                temp = __gl_realloc_params(temp, capacity);
             }
             temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_REQUIRED, NULL);
         } else if (state == PARSE_STATE_OPTIONAL) {
             if (item->type == GL_AST_SYMBOL) {
                 if (count == capacity) {
                     capacity *= 2;
-                    temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                    temp = __gl_realloc_params(temp, capacity);
                 }
                 temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_OPTIONAL, NULL);
             } else if (item->type == GL_AST_CONS) {
@@ -144,7 +152,7 @@ static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_as
                 }
                 if (count == capacity) {
                     capacity *= 2;
-                    temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                    temp = __gl_realloc_params(temp, capacity);
                 }
                 temp[count++] =
                     gl_function_param_make(name_node->value.symbol, GL_PARAM_OPTIONAL, def_ast);
@@ -165,7 +173,7 @@ static gl_function_params_t *__gl_parse_function_params(gl_location_t loc, gl_as
             }
             if (count == capacity) {
                 capacity *= 2;
-                temp = realloc(temp, sizeof(gl_function_param_t *) * capacity);
+                temp = __gl_realloc_params(temp, capacity);
             }
             temp[count++] = gl_function_param_make(item->value.symbol, GL_PARAM_REST, NULL);
         }

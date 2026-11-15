@@ -551,15 +551,17 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
     }
     case GL_VAL_FUNCTION: {
         gl_function_t *function = func_val->val;
-        if (argv->size < function->min_args ||
-            (!function->has_rest && argv->size > function->max_args)) {
+        // A caller may pass no argument array at all, which counts as zero
+        // arguments instead of dereferencing NULL.
+        size_t argc = argv != NULL ? argv->size : 0;
+        if (argc < function->min_args || (!function->has_rest && argc > function->max_args)) {
             if (function->has_rest) {
-                gl_diagnostic_report_variadic_arity_error(loc, function->min_args, argv->size);
+                gl_diagnostic_report_variadic_arity_error(loc, function->min_args, argc);
             } else if (function->min_args == function->max_args) {
-                gl_diagnostic_report_arity_error(loc, function->min_args, argv->size);
+                gl_diagnostic_report_arity_error(loc, function->min_args, argc);
             } else {
                 gl_diagnostic_report_range_arity_error(loc, function->min_args, function->max_args,
-                                                       argv->size);
+                                                       argc);
             }
             gl_gc_roots_release(root_mark);
             return NULL;
@@ -610,14 +612,6 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
     // Safe point: every value held across evaluation is reachable from an
     // environment, a call frame, or the temporary-root stack.
     gl_gc_maybe_collect();
-
-    gl_value_t *env = gl_global_env;
-
-    // If got recent calls, using environment of last call
-    if (gl_call_stack.size != 0) {
-        gl_call_frame_t current_frame = gl_call_stack_current_frame();
-        env = current_frame.env;
-    }
 
     switch (node->type) {
     case GL_AST_INT:
