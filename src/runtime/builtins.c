@@ -29,6 +29,11 @@
 #include "utils/strdup.h"
 #endif
 
+// Not every C library exposes the S_ISDIR spelling of this test.
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & S_IFDIR) == S_IFDIR)
+#endif
+
 ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
 #define EXPECT_ARGS(n)                                                                             \
@@ -224,7 +229,9 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "hashmap";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
+        return "environment";
     }
+    return "unknown";
 }
 
 // Keys are strings or symbols; both payloads are NUL-terminated buffers.
