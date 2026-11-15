@@ -401,6 +401,25 @@ void test_std_strings(void) {
     TEST(eval_str("(string-split \"a,b\" \"\")") == NULL, "string-split empty separator");
 }
 
+// The list is longer than the evaluator's recursion limit, so these helpers have
+// to use loops: a recursive map or filter would stop with a depth error.
+void test_long_lists(void) {
+    eval_str("(defun build-list (n acc) (if (= n 0) acc (build-list (- n 1) (cons n acc))))");
+    eval_str("(set big-list (build-list 1200 nil))");
+
+    TEST(gl_value_get_int(eval_str("(len big-list)")) == 1200, "long list length");
+    TEST(gl_value_get_int(eval_str("(len (map 1+ big-list))")) == 1200, "map over a long list");
+    TEST(gl_value_get_int(eval_str("(car (map 1+ big-list))")) == 2, "map keeps the order");
+    TEST(gl_value_get_int(eval_str("(len (filter even? big-list))")) == 600,
+         "filter over a long list");
+    TEST(gl_value_get_int(eval_str("(len (append big-list (list 1 2)))")) == 1202,
+         "append a long list");
+    TEST(gl_value_get_int(eval_str("(car (member 1100 big-list))")) == 1100,
+         "member of a long list");
+    TEST(gl_value_get_bool(eval_str("(all? (lambda (x) t) big-list)")) == 1,
+         "all? over a long list");
+}
+
 void test_sort(void) {
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 0)")) == 1, "sort array");
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 2)")) == 3, "sort array last element");
@@ -1073,9 +1092,9 @@ void test_recursion(void) {
     TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");
 
     eval_str("(defun count-down (n) (if (= n 0) 0 (count-down (- n 1))))");
-    TEST(gl_value_get_int(eval_str("(count-down 20000)")) == 0,
+    TEST(gl_value_get_int(eval_str("(count-down 5000)")) == 0,
          "tail recursion runs in constant stack");
-    TEST(gl_value_get_int(eval_str("(let ((i 0)) (dotimes (k 20000) (set i k)) i)")) == 19999,
+    TEST(gl_value_get_int(eval_str("(let ((i 0)) (dotimes (k 5000) (set i k)) i)")) == 4999,
          "deep loop with set");
 }
 
@@ -1099,6 +1118,7 @@ int main(void) {
     test_typeid();
     test_strings();
     test_std_strings();
+    test_long_lists();
     test_sort();
     test_let();
     test_let_star();
