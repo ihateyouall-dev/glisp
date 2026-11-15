@@ -131,6 +131,7 @@ Domain errors are reported with `assert` and abort the current form.
 | `(format template arg ...)` | Replaces each `{}` in `template` with the next argument converted by `to-string`; too few arguments raise an error |
 | `(string-pad-left string width)` | Right-aligns `string` in `width` characters with spaces |
 | `(string-pad-right string width)` | Left-aligns `string` in `width` characters with spaces |
+| `(string-lines text)` | Splits `text` into lines, accepts `\r\n`, drops one trailing empty line, and returns `nil` for an empty string |
 
 A trailing separator produces a trailing empty string, and a string without
 separators produces a one-element list.
