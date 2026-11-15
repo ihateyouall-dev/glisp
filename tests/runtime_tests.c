@@ -428,6 +428,20 @@ void test_std_strings(void) {
 
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim \"  hi  \")")), "hi") == 0,
          "string-trim removes both ends");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \" \")")) == 1,
+         "string-whitespace? space");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\t\")")) == 1,
+         "string-whitespace? tab");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\n\")")) == 1,
+         "string-whitespace? newline");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\r\")")) == 1,
+         "string-whitespace? carriage return");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"x\")")) == 0,
+         "string-whitespace? letter");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"  \")")) == 0,
+         "string-whitespace? rejects two characters");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\")")) == 0,
+         "string-whitespace? rejects the empty string");
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim-left \"  hi  \")")), "hi  ") == 0,
          "string-trim-left");
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim-right \"  hi  \")")), "  hi") == 0,
