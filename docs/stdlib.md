@@ -125,6 +125,9 @@ Domain errors are reported with `assert` and abort the current form.
 | `(string-trim-left string)` | `string` without leading whitespace |
 | `(string-trim-right string)` | `string` without trailing whitespace |
 | `(string-trim string)` | `string` without leading or trailing whitespace |
+| `(format template arg ...)` | Replaces each `{}` in `template` with the next argument converted by `to-string`; too few arguments raise an error |
+| `(string-pad-left string width)` | Right-aligns `string` in `width` characters with spaces |
+| `(string-pad-right string width)` | Left-aligns `string` in `width` characters with spaces |
 
 A trailing separator produces a trailing empty string, and a string without
 separators produces a one-element list.
@@ -136,7 +139,12 @@ separators produces a one-element list.
 (string-join (list 1 2 3) "-")   ; => "1-2-3"
 (string-trim "  hi  ")           ; => "hi"
 (string-replace "a-b-c" "-" "+") ; => "a+b+c"
+(format "{} has {} items" "cart" 3) ; => "cart has 3 items"
 ```
+
+`format` has no escape for a literal `{}`: the template `"{{}}"` with one
+argument gives `"{1}"`, because the first `{}` starts at the second character.
+Build such text by concatenation instead.
 
 ## iter.lisp
 
