@@ -104,6 +104,10 @@ Domain errors are reported with `assert` and abort the current form.
 | `(reverse lst)` | Reverses a list (iterative) |
 | `(append a b)` | Concatenates two lists (recursive) |
 | `(member item lst)` | Returns the sublist starting at `item`, or `nil`; compares with `=` |
+| `(take lst count)` | Returns the first `count` elements as a new list |
+| `(drop lst count)` | Returns `lst` without its first `count` elements |
+| `(zip a b)` | Returns two-element lists pairing the elements of `a` and `b` |
+| `(flatten x)` | Returns a flat list of the atoms in `x`, descending into nested lists |
 
 ## strings.lisp
 

@@ -435,6 +435,28 @@ void test_std_strings(void) {
     TEST(gl_value_get_int(eval_str("(len (string-trim \"   \"))")) == 0, "string-trim blank");
 }
 
+void test_list_helpers(void) {
+    TEST(gl_value_get_int(eval_str("(len (take (list 1 2 3 4) 2))")) == 2, "take length");
+    TEST(gl_value_get_int(eval_str("(car (take (list 1 2 3) 5))")) == 1, "take clamps to length");
+    TEST(eval_str("(take (list 1 2) 0)")->type == GL_VAL_NIL, "take of zero");
+    TEST(eval_str("(take nil 3)")->type == GL_VAL_NIL, "take of nil");
+
+    TEST(gl_value_get_int(eval_str("(car (drop (list 1 2 3 4) 2))")) == 3, "drop first element");
+    TEST(gl_value_get_int(eval_str("(len (drop (list 1 2 3 4) 2))")) == 2, "drop length");
+    TEST(eval_str("(drop (list 1 2) 5)")->type == GL_VAL_NIL, "drop past the end");
+
+    TEST(gl_value_get_int(eval_str("(len (zip (list 1 2 3) (list \"a\" \"b\")))")) == 2,
+         "zip stops at the shorter list");
+    TEST(gl_value_get_int(eval_str("(car (car (zip (list 1 2) (list 3 4))))")) == 1,
+         "zip first of the first pair");
+    TEST(gl_value_get_int(eval_str("(car (cdr (car (zip (list 1 2) (list 3 4)))))")) == 3,
+         "zip second of the first pair");
+
+    TEST(gl_value_get_int(eval_str("(len (flatten (list 1 (list 2 (list 3 4)) 5)))")) == 5,
+         "flatten nested lists");
+    TEST(gl_value_get_int(eval_str("(car (flatten (list (list 1 2) 3)))")) == 1,
+         "flatten keeps order");
+}
 // The list is longer than the evaluator's recursion limit, so these helpers have
 // to use loops: a recursive map or filter would stop with a depth error.
 void test_long_lists(void) {
@@ -1170,6 +1192,7 @@ int main(void) {
     test_typeid();
     test_strings();
     test_std_strings();
+    test_list_helpers();
     test_long_lists();
     test_sort();
     test_let();
