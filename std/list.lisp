@@ -37,14 +37,16 @@
 
 (defun append (a b)
   "Returns the concatenation of lists A and B."
-  (if (nil? a)
-      b
-      (cons (car a) (append (cdr a) b))))
+  (let ((rev (reverse a))
+        (acc b))
+    (while (not (nil? rev))
+      (set acc (cons (car rev) acc))
+      (set rev (cdr rev)))
+    acc))
 
 (defun member (item lst)
   "Returns the sublist starting at ITEM, or nil when ITEM is absent."
-  (if (nil? lst)
-      nil
-      (if (= (car lst) item)
-          lst
-          (member item (cdr lst)))))
+  (let ((cur lst))
+    (while (and (not (nil? cur)) (not (= (car cur) item)))
+      (set cur (cdr cur)))
+    cur))
