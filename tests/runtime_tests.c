@@ -1140,12 +1140,12 @@ void test_gc_stress(void) {
 
 void test_call_resolution(void) {
     TEST(gl_value_get_int(eval_str("(let ((f (lambda (x) (* x 2)))) (f 21))")) == 42,
-         "local variable is callable");
+         "local binding is callable");
 
     eval_str("(defun shadow-target (x) (+ x 1))");
     TEST(gl_value_get_int(
              eval_str("(let ((shadow-target (lambda (x) (* x 2)))) (shadow-target 21))")) == 42,
-         "local variable shadows a global function");
+         "local binding shadows a global function");
     TEST(gl_value_get_int(eval_str("(shadow-target 41)")) == 42, "global function still works");
 
     eval_str("(defun f (x) x)");

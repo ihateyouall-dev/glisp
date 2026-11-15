@@ -318,7 +318,6 @@ error API is not implemented yet.
   body or of an `if`, `cond`, `when`, `unless` or `progn` branch. A call inside
   `let`, `let*`, `and`, `or`, `while` or `for` still consumes the C stack, and a
   self-recursive call there reaches the depth limit instead of looping forever.
->>>>>>> main
 - No module system; `load` evaluates into the global environment.
 - No exception handling.
 - `len` and `get` are linear for lists.

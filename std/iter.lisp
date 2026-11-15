@@ -135,7 +135,6 @@
           (if (not (pred (car cur)))
               (set failed t))
           (set cur (cdr cur)))
->>>>>>> main
         (not failed))
       (let ((i 0)
             (n (len coll))

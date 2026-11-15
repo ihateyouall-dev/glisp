@@ -183,7 +183,7 @@ Returns `expr` as data. Symbols become symbol values; lists become lists.
 #'name
 ```
 
-Returns the callable bound to `name` in the function namespace.
+Returns the callable bound to `name`, using the nearest lexical binding.
 
 ### `add-to-list`
 

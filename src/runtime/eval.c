@@ -19,14 +19,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef _WIN32
-#include <sys/resource.h>
-#endif
-
-// The evaluator is recursive, and stack frames differ in size. A fixed
-// eval-depth limit is therefore only a backstop: the primary check watches the
-// real stack pointer and leaves a safety margin for diagnostics and unwinding.
-static const size_t GL_MAX_EVAL_DEPTH = 10000;
+// Deeper nesting than this is reported as an error: the C stack is finite, so
+// a runaway Lisp call has to end with a diagnostic instead of a crash.
+const size_t GL_MAX_EVAL_DEPTH = 1000;
 
 static size_t gl_eval_depth = 0;
 static uintptr_t gl_stack_base = 0;
@@ -286,100 +281,106 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
         gl_ast_node_t *head = node->value.cons.car;
         gl_ast_node_t *body = node->value.cons.cdr;
 
+        gl_value_t *env = gl_current_env();
+        gl_value_t *callee = NULL;
+
         if (head->type == GL_AST_SYMBOL) {
             const char *name = head->value.symbol;
+            callee = gl_env_get_callable((gl_env_t *)env->val, name);
 
-            if (strcmp(name, "if") == 0) {
-                gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
-                if (test == NULL) {
-                    return NULL;
-                }
-
-                gl_ast_node_t *consequent = gl_ast_cons_nth_car(body, 1);
-                gl_ast_node_t *alternates = gl_ast_cons_nth_cdr(body, 1);
-
-                if (gl_value_get_bool(test)) {
-                    node = consequent;
-                    continue;
-                }
-                if (alternates == NULL || alternates->type == GL_AST_NIL) {
-                    return gl_value_make_nil();
-                }
-
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(alternates, &last);
-                if (res == NULL) {
-                    return NULL;
-                }
-                node = last;
-                continue;
-            }
-
-            if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
-                strcmp(name, "unless") == 0) {
-                gl_ast_node_t *forms = body;
-
-                if (strcmp(name, "progn") != 0) {
+            if (callee != NULL && callee->type == GL_VAL_SPFORM) {
+                if (strcmp(name, "if") == 0) {
                     gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
                     if (test == NULL) {
                         return NULL;
                     }
 
-                    int taken = gl_value_get_bool(test);
-                    if (strcmp(name, "unless") == 0) {
-                        taken = !taken;
+                    gl_ast_node_t *consequent = gl_ast_cons_nth_car(body, 1);
+                    gl_ast_node_t *alternates = gl_ast_cons_nth_cdr(body, 1);
+
+                    if (gl_value_get_bool(test)) {
+                        node = consequent;
+                        continue;
                     }
-                    if (!taken) {
+                    if (alternates == NULL || alternates->type == GL_AST_NIL) {
                         return gl_value_make_nil();
                     }
-                    forms = gl_ast_cons_nth_cdr(body, 1);
-                }
-                if (forms == NULL || forms->type == GL_AST_NIL) {
-                    return gl_value_make_nil();
-                }
 
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(forms, &last);
-                if (res == NULL) {
-                    return NULL;
-                }
-                node = last;
-                continue;
-            }
-
-            if (strcmp(name, "cond") == 0) {
-                gl_ast_node_t *clause = body;
-                gl_value_t *matched = NULL;
-
-                while (clause != NULL && clause->type == GL_AST_CONS) {
-                    gl_ast_node_t *entry = clause->value.cons.car;
-                    gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
-                    if (test == NULL) {
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(alternates, &last);
+                    if (res == NULL) {
                         return NULL;
                     }
-                    if (gl_value_get_bool(test)) {
-                        matched = test;
-                        break;
+                    node = last;
+                    continue;
+                }
+
+                if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
+                    strcmp(name, "unless") == 0) {
+                    gl_ast_node_t *forms = body;
+
+                    if (strcmp(name, "progn") != 0) {
+                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
+                        if (test == NULL) {
+                            return NULL;
+                        }
+
+                        int taken = gl_value_get_bool(test);
+                        if (strcmp(name, "unless") == 0) {
+                            taken = !taken;
+                        }
+                        if (!taken) {
+                            return gl_value_make_nil();
+                        }
+                        forms = gl_ast_cons_nth_cdr(body, 1);
                     }
-                    clause = clause->value.cons.cdr;
+                    if (forms == NULL || forms->type == GL_AST_NIL) {
+                        return gl_value_make_nil();
+                    }
+
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(forms, &last);
+                    if (res == NULL) {
+                        return NULL;
+                    }
+                    node = last;
+                    continue;
                 }
 
-                if (matched == NULL) {
-                    return gl_value_make_nil();
-                }
+                if (strcmp(name, "cond") == 0) {
+                    gl_ast_node_t *clause = body;
+                    gl_value_t *matched = NULL;
 
-                gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
-                if (clause_body->type == GL_AST_NIL) {
-                    return matched;
-                }
+                    while (clause != NULL && clause->type == GL_AST_CONS) {
+                        gl_ast_node_t *entry = clause->value.cons.car;
+                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
+                        if (test == NULL) {
+                            return NULL;
+                        }
+                        if (gl_value_get_bool(test)) {
+                            matched = test;
+                            break;
+                        }
+                        clause = clause->value.cons.cdr;
+                    }
 
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
-                if (res == NULL) {
-                    return NULL;
+                    if (matched == NULL) {
+                        return gl_value_make_nil();
+                    }
+
+                    gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
+                    if (clause_body->type == GL_AST_NIL) {
+                        return matched;
+                    }
+
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
+                    if (res == NULL) {
+                        return NULL;
+                    }
+                    node = last;
+                    continue;
                 }
-                node = last;
-                continue;
             }
         }
 
@@ -389,15 +390,11 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
             return gl_eval(node);
         }
 
-        gl_value_t *env = gl_current_env();
-        gl_value_t *func_val = gl_env_get_fun((gl_env_t *)env->val, head->value.symbol);
-        if (func_val == NULL) {
-            func_val = gl_env_get_var((gl_env_t *)env->val, head->value.symbol);
-        }
-        if (func_val == NULL || func_val->type != GL_VAL_FUNCTION) {
+        if (callee == NULL || callee->type != GL_VAL_FUNCTION) {
             return gl_eval(node);
         }
 
+        gl_value_t *func_val = callee;
         gl_function_t *function = func_val->val;
         size_t root_mark = gl_gc_root_mark();
 
@@ -476,7 +473,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
     } else {
         const char *func_name = func_node->value.symbol;
         func_val = gl_env_get_callable((gl_env_t *)env->val, func_name);
-        if (!func_val || !func_val->val) {
+        if (!func_val) {
             const char *fmt = "undefined function '%s'";
             char buf[1024];
             snprintf(buf, sizeof(buf), fmt, func_name);
@@ -683,7 +680,6 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
 }
 
 gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
->>>>>>> main
     gl_value_t *res = NULL;
     int failed = 0;
 

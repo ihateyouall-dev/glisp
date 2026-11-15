@@ -48,6 +48,5 @@
   "Returns the sublist starting at ITEM, or nil when ITEM is absent."
   (let ((cur lst))
     (while (and (not (nil? cur)) (not (= (car cur) item)))
->>>>>>> main
       (set cur (cdr cur)))
     cur))
