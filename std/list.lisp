@@ -93,3 +93,30 @@
             (set pending (append cur pending))
             (set acc (cons cur acc)))))
     (reverse acc)))
+
+(defun assoc (key alist)
+  "Returns the first pair in ALIST whose car is KEY, or nil when there is none."
+  (let ((cur alist)
+        (found nil))
+    (while (and (not (nil? cur)) (nil? found))
+      (if (= (car (car cur)) key)
+          (set found (car cur)))
+      (set cur (cdr cur)))
+    found))
+
+(defun alist-get (key alist &optional default)
+  "Returns the value paired with KEY in ALIST, or DEFAULT when KEY is absent."
+  (let ((pair (assoc key alist)))
+    (if (nil? pair)
+        default
+        (cdr pair))))
+
+(defun alist-delete (key alist)
+  "Returns ALIST without the pairs whose car is KEY."
+  (let ((acc nil)
+        (cur alist))
+    (while (not (nil? cur))
+      (if (not (= (car (car cur)) key))
+          (set acc (cons (car cur) acc)))
+      (set cur (cdr cur)))
+    (reverse acc)))

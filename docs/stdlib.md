@@ -108,6 +108,9 @@ Domain errors are reported with `assert` and abort the current form.
 | `(drop lst count)` | Returns `lst` without its first `count` elements |
 | `(zip a b)` | Returns two-element lists pairing the elements of `a` and `b` |
 | `(flatten x)` | Returns a flat list of the atoms in `x`, descending into nested lists |
+| `(assoc key alist)` | First pair whose car is `key`, or `nil` |
+| `(alist-get key alist [default])` | Cdr of that pair, or `default` (or `nil`) |
+| `(alist-delete key alist)` | `alist` without the pairs whose car is `key` |
 
 ## strings.lisp
 

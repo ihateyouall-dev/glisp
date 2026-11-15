@@ -492,6 +492,27 @@ void test_long_lists(void) {
          "all? over a long list");
 }
 
+void test_alist(void) {
+    eval_str("(set sample-alist (list (cons \"a\" 1) (cons \"b\" 2)))");
+
+    TEST(gl_value_get_int(eval_str("(cdr (assoc \"a\" sample-alist))")) == 1, "assoc finds a key");
+    TEST(eval_str("(assoc \"z\" sample-alist)")->type == GL_VAL_NIL, "assoc miss is nil");
+    TEST(gl_value_get_int(eval_str("(alist-get \"b\" sample-alist)")) == 2, "alist-get value");
+    TEST(gl_value_get_int(eval_str("(alist-get \"z\" sample-alist 99)")) == 99,
+         "alist-get default");
+    TEST(eval_str("(alist-get \"z\" sample-alist)")->type == GL_VAL_NIL,
+         "alist-get without default");
+    TEST(gl_value_get_int(eval_str("(len (alist-delete \"a\" sample-alist))")) == 1,
+         "alist-delete removes the pair");
+    TEST(strcmp(gl_value_get_string(eval_str("(car (car (alist-delete \"a\" sample-alist)))")),
+                "b") == 0,
+         "alist-delete keeps the rest");
+    TEST(strcmp(gl_value_get_string(
+                    eval_str("(car (cdr (assoc 2 (list (list 1 \"one\") (list 2 \"two\")))))")),
+                "two") == 0,
+         "assoc compares with the language equality");
+}
+
 void test_hash_helpers(void) {
     eval_str("(set helper-map (hash))");
     eval_str("(hash-set helper-map \"a\" 1)");
@@ -1233,6 +1254,7 @@ int main(void) {
     test_std_strings();
     test_list_helpers();
     test_long_lists();
+    test_alist();
     test_hash_helpers();
     test_sort();
     test_let();
