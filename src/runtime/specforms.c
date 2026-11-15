@@ -332,12 +332,23 @@ GL_SPECIAL_FORM(while) {
     assert(args->type == GL_AST_CONS);
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
     gl_value_t *condition_val = gl_eval(condition);
+    if (condition_val == NULL) {
+        return NULL;
+    }
 
     gl_ast_node_t *body = gl_ast_cons_nth_cdr(args, 0);
 
+    // A failing body ends the loop: continuing would re-report the same error
+    // for every iteration, and would never stop when the condition depends on
+    // a form that already failed.
     while (gl_value_get_bool(condition_val)) {
-        gl_specform_progn(env, body);
+        if (gl_specform_progn(env, body) == NULL) {
+            return NULL;
+        }
         condition_val = gl_eval(condition);
+        if (condition_val == NULL) {
+            return NULL;
+        }
     }
     return gl_value_make_nil();
 }

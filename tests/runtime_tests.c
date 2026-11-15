@@ -843,6 +843,11 @@ void test_for(void) {
 }
 
 void test_control_forms(void) {
+    TEST(eval_expr("(let ((i 0)) (while (< i 3) (len 5)))") == NULL,
+         "While stops when the body fails");
+    TEST(eval_expr("(while (len 5) 0)") == NULL, "While stops when the condition fails");
+    TEST(gl_value_get_int(eval_str("(let ((i 0)) (while (< i 3) (set i (+ i 1))) i)")) == 3,
+         "While still runs normally");
     TEST(gl_value_get_int(eval_str("(when t 1 2 3)")) == 3, "When returns last body value");
     gl_value_t *when_nil = eval_str("(when nil 1)");
     TEST(when_nil != NULL && when_nil->type == GL_VAL_NIL, "When false returns nil");
