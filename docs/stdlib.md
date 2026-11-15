@@ -184,6 +184,8 @@ Build such text by concatenation instead.
 | `(hash-values map)` | List of the values, in no particular order |
 | `(hash-each f map)` | Calls `(f key value)` for every entry; returns `nil` |
 | `(hash->alist map)` | List of `(key . value)` pairs |
+| `(hash-merge &rest maps)` | New map with every entry; later maps win on a shared key |
+| `(hash-copy map)` | Shallow copy of `map` |
 
 Ordering is unspecified for all three, because a hash map has none. `hash->alist`
 is the way to sort entries: `(sort-by car (hash->alist map))`.

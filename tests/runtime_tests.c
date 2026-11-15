@@ -558,6 +558,31 @@ void test_hash_helpers(void) {
 
     TEST(gl_value_get_int(eval_str("(len (sort-by car (hash->alist helper-map)))")) == 2,
          "hash entries can be sorted");
+
+    eval_str("(set merge-left (hash))");
+    eval_str("(hash-set merge-left \"x\" 1)");
+    eval_str("(hash-set merge-left \"y\" 2)");
+    eval_str("(set merge-right (hash))");
+    eval_str("(hash-set merge-right \"y\" 20)");
+    eval_str("(hash-set merge-right \"z\" 3)");
+    eval_str("(set merged (hash-merge merge-left merge-right))");
+
+    TEST(gl_value_get_int(eval_str("(len merged)")) == 3, "hash-merge entry count");
+    TEST(gl_value_get_int(eval_str("(alist-get \"y\" (hash->alist merged))")) == 20,
+         "hash-merge prefers the later map");
+    TEST(gl_value_get_int(eval_str("(alist-get \"x\" (hash->alist merged))")) == 1,
+         "hash-merge keeps earlier keys");
+    TEST(gl_value_get_int(eval_str("(len merge-left)")) == 2, "hash-merge leaves its inputs alone");
+    TEST(gl_value_get_int(eval_str("(len (hash-merge))")) == 0, "hash-merge of nothing");
+
+    eval_str("(set copy-source (hash))");
+    eval_str("(hash-set copy-source \"k\" 1)");
+    eval_str("(set copy-target (hash-copy copy-source))");
+    eval_str("(hash-set copy-target \"extra\" 2)");
+    TEST(gl_value_get_int(eval_str("(len copy-source)")) == 1,
+         "hash-copy does not alias the source");
+    TEST(gl_value_get_int(eval_str("(len copy-target)")) == 2,
+         "hash-copy is independently mutable");
 }
 
 void test_sort(void) {
