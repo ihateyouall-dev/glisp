@@ -200,8 +200,16 @@ int main(int argc, char **argv) {
             size_t line_len = strlen(input);
             size_t needed = buffer_len + line_len + 2;
             if (needed > buffer_cap) {
+                char *grown = realloc(buffer, needed);
+                if (grown == NULL) {
+                    free(input);
+                    free(buffer);
+                    gl_call_stack_cleanup();
+                    gl_destroy_memory_heap();
+                    return -1;
+                }
+                buffer = grown;
                 buffer_cap = needed;
-                buffer = realloc(buffer, buffer_cap);
             }
             if (buffer_len > 0) {
                 buffer[buffer_len++] = '\n';

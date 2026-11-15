@@ -1,4 +1,43 @@
-Checks: '-*,bugprone-*,performance-*,readability-*,clang-analyzer-*'
-Diagnostics:
-  - warning: "unused-variable"
-  - warning: "unused-function"
+# Checks run by CI in the `tidy` job and by `clang-tidy -p build <files>`.
+#
+# The previous contents used a `Diagnostics:` key, which clang-tidy does not
+# recognize, so the whole file failed to parse and the tool silently fell back
+# to its default checks.
+#
+# Disabled on purpose, with the reason next to each:
+#   bugprone-reserved-identifier      the `__gl_` prefix is the project's
+#                                     convention for file-private symbols
+#   bugprone-easily-swappable-parameters
+#                                     reported on ordinary two-int helpers
+#   bugprone-narrowing-conversions    reported on `int` -> `size_t` counters
+#   bugprone-macro-parentheses        the container macros already parenthesize
+#                                     their arguments
+#   bugprone-unsafe-functions         recommends C11 Annex K `_s` functions
+#                                     that MinGW and glibc do not provide
+#   bugprone-switch-missing-default-case
+#                                     the lexer switches over characters
+#   performance-no-int-to-ptr         a Windows readline header mismatch
+#   readability-identifier-length     short locals (`i`, `n`, `val`) are the
+#                                     house style
+#   readability-magic-numbers         numeric constants are the point here
+#   readability-else-after-return     the tree-walker uses early returns
+#   readability-function-cognitive-complexity
+#                                     the evaluator is a switch on purpose
+#   readability-braces-around-statements
+#                                     single-line `if` bodies are the style
+Checks: >
+  -*,clang-analyzer-*,bugprone-*,performance-*,
+  readability-duplicate-include,
+  -bugprone-reserved-identifier,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-macro-parentheses,
+  -bugprone-unsafe-functions,
+  -bugprone-switch-missing-default-case,
+  -performance-no-int-to-ptr,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  -clang-diagnostic-deprecated-declarations
+
+HeaderFilterRegex: 'src/.*'
+WarningsAsErrors: '*'

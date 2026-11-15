@@ -5,7 +5,7 @@ automatically at startup unless `--no-stdlib` is given. `std/std.lisp` loads the
 modules in this order:
 
 ```
-core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> io.lisp
+core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> hash.lisp -> io.lisp
 ```
 
 All definitions are installed in the global environment. Because `types.lisp`
@@ -104,6 +104,13 @@ Domain errors are reported with `assert` and abort the current form.
 | `(reverse lst)` | Reverses a list (iterative) |
 | `(append a b)` | Concatenates two lists (recursive) |
 | `(member item lst)` | Returns the sublist starting at `item`, or `nil`; compares with `=` |
+| `(take lst count)` | Returns the first `count` elements as a new list |
+| `(drop lst count)` | Returns `lst` without its first `count` elements |
+| `(zip a b)` | Returns two-element lists pairing the elements of `a` and `b` |
+| `(flatten x)` | Returns a flat list of the atoms in `x`, descending into nested lists |
+| `(assoc key alist)` | First pair whose car is `key`, or `nil` |
+| `(alist-get key alist [default])` | Cdr of that pair, or `default` (or `nil`) |
+| `(alist-delete key alist)` | `alist` without the pairs whose car is `key` |
 
 ## strings.lisp
 
@@ -121,6 +128,10 @@ Domain errors are reported with `assert` and abort the current form.
 | `(string-trim-left string)` | `string` without leading whitespace |
 | `(string-trim-right string)` | `string` without trailing whitespace |
 | `(string-trim string)` | `string` without leading or trailing whitespace |
+| `(format template arg ...)` | Replaces each `{}` in `template` with the next argument converted by `to-string`; too few arguments raise an error |
+| `(string-pad-left string width)` | Right-aligns `string` in `width` characters with spaces |
+| `(string-pad-right string width)` | Left-aligns `string` in `width` characters with spaces |
+| `(string-lines text)` | Splits `text` into lines, accepts `\r\n`, drops one trailing empty line, and returns `nil` for an empty string |
 
 A trailing separator produces a trailing empty string, and a string without
 separators produces a one-element list.
@@ -132,7 +143,12 @@ separators produces a one-element list.
 (string-join (list 1 2 3) "-")   ; => "1-2-3"
 (string-trim "  hi  ")           ; => "hi"
 (string-replace "a-b-c" "-" "+") ; => "a+b+c"
+(format "{} has {} items" "cart" 3) ; => "cart has 3 items"
 ```
+
+`format` has no escape for a literal `{}`: the template `"{{}}"` with one
+argument gives `"{1}"`, because the first `{}` starts at the second character.
+Build such text by concatenation instead.
 
 ## iter.lisp
 
@@ -148,6 +164,7 @@ separators produces a one-element list.
 | `(any? pred coll)` | True when at least one element satisfies `pred`. |
 | `(all? pred coll)` | True when every element satisfies `pred`. |
 | `(sort-by key coll)` | Returns a sorted copy of `coll`, ordered by `(key element)`; equal keys keep their relative order |
+| `(range start end [step])` | List of numbers from `start` up to but not including `end`; a step pointing away from `end` gives an empty list |
 
 `map` and `filter` return `nil` for an unknown collection type. `reduce`,
 `each`, `any?`, and `all?` support lists, arrays, and vectors.
@@ -158,6 +175,26 @@ separators produces a one-element list.
 (reduce + {1 2 3 4} 0)        ; => 10
 (any? even? [1 3 5 6])        ; => t
 (all? odd? [1 3 5])           ; => t
+```
+
+## hash.lisp
+
+| Signature | Description |
+| :--- | :--- |
+| `(hash-values map)` | List of the values, in no particular order |
+| `(hash-each f map)` | Calls `(f key value)` for every entry; returns `nil` |
+| `(hash->alist map)` | List of `(key . value)` pairs |
+| `(hash-merge &rest maps)` | New map with every entry; later maps win on a shared key |
+| `(hash-copy map)` | Shallow copy of `map` |
+
+Ordering is unspecified for all three, because a hash map has none. `hash->alist`
+is the way to sort entries: `(sort-by car (hash->alist map))`.
+
+```lisp
+(set m (hash))
+(hash-set m "b" 2)
+(hash-set m "a" 1)
+(sort-by car (hash->alist m))   ; => ((a . 1) (b . 2))
 ```
 
 ## types.lisp

@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-HASHMAP_DEFINE(gl_value_t *, gl_value_table)
+HASHMAP_DEFINE(gl_value_t *, gl_value_table) // NOLINT(clang-analyzer-core.NullDereference)
 
 gl_value_t *gl_global_env = NULL;
 

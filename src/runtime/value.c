@@ -9,8 +9,6 @@
 #include "env.h"
 #include "memory.h"
 
-#include <stdio.h>
-
 #ifdef _WIN32
 #include "utils/strdup.h"
 #endif
@@ -118,6 +116,44 @@ gl_value_t *gl_value_make_cons(gl_ast_cons_t cons) {
     return res;
 }
 
+// Converts one parsed literal into a value. Quoted arrays and vectors keep
+// their element values, which the cons constructor needs because they can
+// appear inside a quoted list.
+static gl_value_t *__gl_value_from_ast(gl_ast_node_t *node) {
+    switch (node->type) {
+    case GL_AST_INT:
+        return gl_value_make_int(node->value.integral);
+    case GL_AST_FLOAT:
+        return gl_value_make_float(node->value.floating);
+    case GL_AST_SYMBOL:
+        return gl_value_make_symbol(node->value.symbol);
+    case GL_AST_STRING:
+        return gl_value_make_string(node->value.string);
+    case GL_AST_CONS:
+        return gl_value_make_cons(node->value.cons);
+    case GL_AST_ARRAY: {
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, node->value.array.size, NULL);
+        for (size_t i = 0; i < node->value.array.size; ++i) {
+            arr->data[i] = __gl_value_from_ast(node->value.array.data[i]);
+        }
+        return gl_value_make_array_from(arr);
+    }
+    case GL_AST_VECTOR: {
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+        for (size_t i = 0; i < node->value.vector.size; ++i) {
+            gl_value_t *elem = __gl_value_from_ast(*gl_ast_vector_at(&node->value.vector, i));
+            gl_value_vector_push_back(vec, elem);
+        }
+        return gl_value_make_vector_from(vec);
+    }
+    case GL_AST_NIL:
+        break;
+    }
+    return gl_value_make_nil();
+}
+
 gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr) {
     gl_value_cons_t *cons = malloc(sizeof(gl_value_cons_t));
     cons->car = car;
@@ -196,7 +232,7 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
 ARRAY_DEFINE(gl_function_param_t *, gl_function_params);
 ARRAY_DEFINE(gl_value_t *, gl_value_array);
 VECTOR_DEFINE(gl_value_t *, gl_value_vector);
-HASHMAP_DEFINE(gl_value_t *, gl_value_hashmap)
+HASHMAP_DEFINE(gl_value_t *, gl_value_hashmap) // NOLINT(clang-analyzer-core.NullDereference)
 
 gl_function_param_t *gl_function_param_make(const char *name, gl_param_kind_t kind,
                                             gl_ast_node_t *default_val) {
@@ -595,7 +631,9 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
         return "hashmap";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
+        return "environment";
     }
+    return "unknown";
 }
 
 // Textual representation used by print/write. Strings and symbols are emitted

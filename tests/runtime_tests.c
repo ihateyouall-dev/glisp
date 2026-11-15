@@ -134,6 +134,9 @@ void test_derived_envs(void) {
 void test_array_and_vector_eval(void) {
     gl_value_t *arr = eval_str("[1 (+ 2 3) 6]");
     TEST(arr != NULL, "Eval array not null");
+    if (arr == NULL) {
+        return;
+    }
     TEST(arr->type == GL_VAL_ARRAY, "Eval array type");
     gl_value_array_t *a = gl_value_get_array(arr);
     TEST(a->size == 3, "Array size");
@@ -143,6 +146,9 @@ void test_array_and_vector_eval(void) {
 
     gl_value_t *vec = eval_str("{10 (* 2 3) 30}");
     TEST(vec != NULL, "Eval vector not null");
+    if (vec == NULL) {
+        return;
+    }
     TEST(vec->type == GL_VAL_VECTOR, "Eval vector type");
     gl_value_vector_t *v = gl_value_get_vector(vec);
     TEST(v->size == 3, "Vector size");
@@ -428,13 +434,89 @@ void test_std_strings(void) {
 
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim \"  hi  \")")), "hi") == 0,
          "string-trim removes both ends");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \" \")")) == 1,
+         "string-whitespace? space");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\t\")")) == 1,
+         "string-whitespace? tab");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\n\")")) == 1,
+         "string-whitespace? newline");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\\r\")")) == 1,
+         "string-whitespace? carriage return");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"x\")")) == 0,
+         "string-whitespace? letter");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"  \")")) == 0,
+         "string-whitespace? rejects two characters");
+    TEST(gl_value_get_bool(eval_str("(string-whitespace? \"\")")) == 0,
+         "string-whitespace? rejects the empty string");
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim-left \"  hi  \")")), "hi  ") == 0,
          "string-trim-left");
     TEST(strcmp(gl_value_get_string(eval_str("(string-trim-right \"  hi  \")")), "  hi") == 0,
          "string-trim-right");
     TEST(gl_value_get_int(eval_str("(len (string-trim \"   \"))")) == 0, "string-trim blank");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"{} has {}\" \"cart\" 3)")), "cart has 3") ==
+             0,
+         "format substitutes placeholders");
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"plain\")")), "plain") == 0,
+         "format without placeholders");
+    TEST(strcmp(gl_value_get_string(eval_str("(format \"{}{}\" 1 2)")), "12") == 0,
+         "format adjacent placeholders");
+    TEST(eval_expr("(format \"{}\")") == NULL, "format with too few arguments");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-left \"7\" 3)")), "  7") == 0,
+         "string-pad-left");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-right \"7\" 3)")), "7  ") == 0,
+         "string-pad-right");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-pad-left \"abcd\" 2)")), "abcd") == 0,
+         "string-pad-left keeps longer strings");
+
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\nb\\nc\"))")) == 3,
+         "string-lines count");
+    TEST(strcmp(gl_value_get_string(eval_str("(car (string-lines \"a\\nb\"))")), "a") == 0,
+         "string-lines first line");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\nb\\n\"))")) == 3 - 1,
+         "string-lines drops one trailing empty line");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\r\\nb\\r\\n\"))")) == 2,
+         "string-lines accepts carriage returns");
+    TEST(eval_str("(string-lines \"\")")->type == GL_VAL_NIL, "string-lines of an empty string");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"single\"))")) == 1,
+         "string-lines of one line");
 }
 
+void test_range(void) {
+    TEST(gl_value_get_int(eval_str("(len (range 0 5))")) == 5, "range length");
+    TEST(gl_value_get_int(eval_str("(car (range 0 5))")) == 0, "range starts at the first bound");
+    TEST(gl_value_get_int(eval_str("(car (range 1 4))")) == 1, "range with a non-zero start");
+    TEST(gl_value_get_int(eval_str("(len (range 0 10 3))")) == 4, "range with a step");
+    TEST(gl_value_get_int(eval_str("(car (range 0 10 3))")) == 0, "range step starts correctly");
+    TEST(gl_value_get_bool(eval_str("(= (range 5 0 -2) (list 5 3 1))")) == 1, "range counts down");
+    TEST(eval_str("(range 0 0)")->type == GL_VAL_NIL, "empty range");
+    TEST(eval_expr("(range 0 5 0)") == NULL, "range rejects a zero step");
+    TEST(gl_value_get_int(eval_str("(len (map 1+ (range 0 100)))")) == 100, "range feeds map");
+}
+
+void test_list_helpers(void) {
+    TEST(gl_value_get_int(eval_str("(len (take (list 1 2 3 4) 2))")) == 2, "take length");
+    TEST(gl_value_get_int(eval_str("(car (take (list 1 2 3) 5))")) == 1, "take clamps to length");
+    TEST(eval_str("(take (list 1 2) 0)")->type == GL_VAL_NIL, "take of zero");
+    TEST(eval_str("(take nil 3)")->type == GL_VAL_NIL, "take of nil");
+
+    TEST(gl_value_get_int(eval_str("(car (drop (list 1 2 3 4) 2))")) == 3, "drop first element");
+    TEST(gl_value_get_int(eval_str("(len (drop (list 1 2 3 4) 2))")) == 2, "drop length");
+    TEST(eval_str("(drop (list 1 2) 5)")->type == GL_VAL_NIL, "drop past the end");
+
+    TEST(gl_value_get_int(eval_str("(len (zip (list 1 2 3) (list \"a\" \"b\")))")) == 2,
+         "zip stops at the shorter list");
+    TEST(gl_value_get_int(eval_str("(car (car (zip (list 1 2) (list 3 4))))")) == 1,
+         "zip first of the first pair");
+    TEST(gl_value_get_int(eval_str("(car (cdr (car (zip (list 1 2) (list 3 4)))))")) == 3,
+         "zip second of the first pair");
+
+    TEST(gl_value_get_int(eval_str("(len (flatten (list 1 (list 2 (list 3 4)) 5)))")) == 5,
+         "flatten nested lists");
+    TEST(gl_value_get_int(eval_str("(car (flatten (list (list 1 2) 3)))")) == 1,
+         "flatten keeps order");
+}
 // The list is longer than the evaluator's recursion limit, so these helpers have
 // to use loops: a recursive map or filter would stop with a depth error.
 void test_long_lists(void) {
@@ -452,6 +534,75 @@ void test_long_lists(void) {
          "member of a long list");
     TEST(gl_value_get_bool(eval_str("(all? (lambda (x) t) big-list)")) == 1,
          "all? over a long list");
+}
+
+void test_alist(void) {
+    eval_str("(set sample-alist (list (cons \"a\" 1) (cons \"b\" 2)))");
+
+    TEST(gl_value_get_int(eval_str("(cdr (assoc \"a\" sample-alist))")) == 1, "assoc finds a key");
+    TEST(eval_str("(assoc \"z\" sample-alist)")->type == GL_VAL_NIL, "assoc miss is nil");
+    TEST(gl_value_get_int(eval_str("(alist-get \"b\" sample-alist)")) == 2, "alist-get value");
+    TEST(gl_value_get_int(eval_str("(alist-get \"z\" sample-alist 99)")) == 99,
+         "alist-get default");
+    TEST(eval_str("(alist-get \"z\" sample-alist)")->type == GL_VAL_NIL,
+         "alist-get without default");
+    TEST(gl_value_get_int(eval_str("(len (alist-delete \"a\" sample-alist))")) == 1,
+         "alist-delete removes the pair");
+    TEST(strcmp(gl_value_get_string(eval_str("(car (car (alist-delete \"a\" sample-alist)))")),
+                "b") == 0,
+         "alist-delete keeps the rest");
+    TEST(strcmp(gl_value_get_string(
+                    eval_str("(car (cdr (assoc 2 (list (list 1 \"one\") (list 2 \"two\")))))")),
+                "two") == 0,
+         "assoc compares with the language equality");
+}
+
+void test_hash_helpers(void) {
+    eval_str("(set helper-map (hash))");
+    eval_str("(hash-set helper-map \"a\" 1)");
+    eval_str("(hash-set helper-map \"b\" 2)");
+
+    TEST(gl_value_get_bool(eval_str("(hash? helper-map)")) == 1, "hash? on a map");
+    TEST(gl_value_get_bool(eval_str("(hash? (list 1))")) == 0, "hash? on a list");
+
+    TEST(gl_value_get_int(eval_str("(len (hash-values helper-map))")) == 2, "hash-values length");
+    TEST(gl_value_get_int(eval_str("(len (hash->alist helper-map))")) == 2, "hash->alist length");
+    TEST(gl_value_get_int(eval_str("(cdr (car (hash->alist helper-map)))")) >= 1,
+         "hash->alist pairs hold values");
+
+    eval_str("(set helper-sum 0)");
+    eval_str("(hash-each (lambda (k v) (set helper-sum (+ helper-sum v))) helper-map)");
+    TEST(gl_value_get_int(eval_str("helper-sum")) == 3, "hash-each visits every value");
+    TEST(eval_str("(hash-each (lambda (k v) v) helper-map)")->type == GL_VAL_NIL,
+         "hash-each returns nil");
+
+    TEST(gl_value_get_int(eval_str("(len (sort-by car (hash->alist helper-map)))")) == 2,
+         "hash entries can be sorted");
+
+    eval_str("(set merge-left (hash))");
+    eval_str("(hash-set merge-left \"x\" 1)");
+    eval_str("(hash-set merge-left \"y\" 2)");
+    eval_str("(set merge-right (hash))");
+    eval_str("(hash-set merge-right \"y\" 20)");
+    eval_str("(hash-set merge-right \"z\" 3)");
+    eval_str("(set merged (hash-merge merge-left merge-right))");
+
+    TEST(gl_value_get_int(eval_str("(len merged)")) == 3, "hash-merge entry count");
+    TEST(gl_value_get_int(eval_str("(alist-get \"y\" (hash->alist merged))")) == 20,
+         "hash-merge prefers the later map");
+    TEST(gl_value_get_int(eval_str("(alist-get \"x\" (hash->alist merged))")) == 1,
+         "hash-merge keeps earlier keys");
+    TEST(gl_value_get_int(eval_str("(len merge-left)")) == 2, "hash-merge leaves its inputs alone");
+    TEST(gl_value_get_int(eval_str("(len (hash-merge))")) == 0, "hash-merge of nothing");
+
+    eval_str("(set copy-source (hash))");
+    eval_str("(hash-set copy-source \"k\" 1)");
+    eval_str("(set copy-target (hash-copy copy-source))");
+    eval_str("(hash-set copy-target \"extra\" 2)");
+    TEST(gl_value_get_int(eval_str("(len copy-source)")) == 1,
+         "hash-copy does not alias the source");
+    TEST(gl_value_get_int(eval_str("(len copy-target)")) == 2,
+         "hash-copy is independently mutable");
 }
 
 void test_sort(void) {
@@ -519,11 +670,10 @@ void test_let_star(void) {
 
 void test_cons(void) {
     gl_value_t *c1 = eval_str("(cons 1 2)");
-    TEST(c1->type == GL_VAL_CONS, "cons creates cons cell");
+    TEST(c1 != NULL && c1->type == GL_VAL_CONS, "cons creates cons cell");
     TEST(gl_value_get_int(eval_str("(car (cons 1 2))")) == 1, "car of cons");
     TEST(gl_value_get_int(eval_str("(cdr (cons 1 2))")) == 2, "cdr of cons");
 
-    gl_value_t *c2 = eval_str("(cons 42 nil)");
     TEST(gl_value_get_int(eval_str("(car (cons 42 nil))")) == 42, "car of cons with nil");
     TEST(eval_str("(cdr (cons 42 nil))")->type == GL_VAL_NIL, "cdr of cons with nil is nil");
 }
@@ -1205,7 +1355,11 @@ int main(void) {
     test_typeid();
     test_strings();
     test_std_strings();
+    test_range();
+    test_list_helpers();
     test_long_lists();
+    test_alist();
+    test_hash_helpers();
     test_sort();
     test_let();
     test_let_star();
