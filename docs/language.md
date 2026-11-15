@@ -159,7 +159,9 @@ protected. Attempts to modify a constant with `set`, `set-global`,
   required arguments; others require an argument count within
   `[min, max]`.
 - Parameters are bound to deep copies of the argument values.
-- Recursion is supported, but calls are not tail-call optimized.
+- Recursion is supported. A call in tail position, meaning the last form of a
+  body or of an `if`, `cond`, `when`, `unless` or `progn` branch, reuses the
+  caller's frame, so a loop written that way runs in constant stack.
 
 A function body is a sequence of expressions; the value of the last one is
 returned. `defun` returns the newly created function, `lambda` returns an
@@ -312,7 +314,10 @@ error API is not implemented yet.
 - No `\uXXXX` escape, and a literal `"` cannot be written. Escapes produce
   single bytes, not code points.
 - No macros or quasiquote.
-- No tail-call optimization; deep recursion consumes the C stack.
+- Tail calls are eliminated only where the call is the last form of a function
+  body or of an `if`, `cond`, `when`, `unless` or `progn` branch. A call inside
+  `let`, `let*`, `and`, `or`, `while` or `for` still consumes the C stack, and a
+  self-recursive call there reaches the depth limit instead of looping forever.
 - No module system; `load` evaluates into the global environment.
 - No exception handling.
 - Function namespace takes precedence over variables in call position.

@@ -64,10 +64,18 @@ void gl_call_stack_print_stacktrace() {
 
     // Runaway recursion would otherwise print thousands of identical frames.
     const size_t limit = 20;
-    size_t total = gl_call_stack.size;
+    size_t total = 0;
     size_t printed = 0;
 
-    for (size_t i = total; i > 0; --i) {
+    // Frames without a call site (load, for, let) carry no printable position,
+    // so they are excluded from the count as well as from the output.
+    for (size_t i = 0; i < gl_call_stack.size; ++i) {
+        if (__gl_call_stack_at(&gl_call_stack, i)->call_node != NULL) {
+            ++total;
+        }
+    }
+
+    for (size_t i = gl_call_stack.size; i > 0; --i) {
         gl_call_frame_t frame = __gl_call_stack_pop_back(&gl_call_stack);
         if (frame.call_node == NULL) {
             continue;
