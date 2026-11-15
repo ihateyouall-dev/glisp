@@ -1,4 +1,5 @@
 #include "builtins.h"
+#include "callstack.h"
 #include "env.h"
 #include "memory.h"
 #include "parser.h"
@@ -70,7 +71,7 @@ int test_status = 0;
 
 static gl_value_t *eval_str(const char *src) {
     gl_parser_t parser = gl_make_parser(src, "");
-    gl_value_t *res = gl_parse_and_eval(&parser, 0);
+    gl_value_t *res = gl_parse_and_eval(&parser);
     gl_parser_destroy(&parser);
     return res;
 }
@@ -247,6 +248,51 @@ void test_array_vector_gc(void) {
     TEST(gl_value_get_array(a)->size == 3, "Array size after GC");
 }
 
+void test_hashmap(void) {
+    gl_value_t *empty = eval_str("(hash)");
+    TEST(empty->type == GL_VAL_HASHMAP, "hash creates a hashmap");
+    TEST(gl_value_get_hashmap(empty)->size == 0, "New hashmap is empty");
+    TEST(gl_value_get_int(eval_str("(len (hash))")) == 0, "Empty hashmap len");
+
+    eval_str("(set hm (hash))");
+    eval_str("(hash-set hm \"name\" \"glisp\")");
+    TEST(strcmp(gl_value_get_string(eval_str("(hash-get hm \"name\")")), "glisp") == 0,
+         "get returns stored value");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 1, "len after set");
+
+    TEST(eval_str("(hash-get hm \"missing\")")->type == GL_VAL_NIL, "get missing key is nil");
+    TEST(gl_value_get_int(eval_str("(hash-get hm \"missing\" 7)")) == 7, "get default value");
+
+    TEST(gl_value_get_bool(eval_str("(hash-has? hm \"name\")")) == 1, "has? on present key");
+    TEST(gl_value_get_bool(eval_str("(hash-has? hm \"missing\")")) == 0, "has? on missing key");
+
+    eval_str("(hash-set hm \"name\" \"other\")");
+    TEST(strcmp(gl_value_get_string(eval_str("(hash-get hm \"name\")")), "other") == 0,
+         "set replaces existing key");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 1, "len after replacement");
+
+    TEST(gl_value_get_bool(eval_str("(hash-delete hm \"name\")")) == 1, "delete returns t");
+    TEST(gl_value_get_bool(eval_str("(hash-delete hm \"name\")")) == 0, "delete of missing key");
+    TEST(gl_value_get_int(eval_str("(len hm)")) == 0, "len after delete");
+
+    TEST(gl_value_get_int(eval_str("(let ((m (hash))) (hash-set m \"a\" 1) (hash-set m \"b\" 2) "
+                                   "(len (hash-keys m)))")) == 2,
+         "keys length");
+
+    TEST(gl_value_get_int(eval_str("(let ((m (hash))) (hash-set m \"a\" 1) "
+                                   "(hash-get m \"a\"))")) == 1,
+         "hashmap in let binding");
+
+    eval_str("(set gc-hm (hash))");
+    eval_str("(hash-set gc-hm \"k\" (list 1 2 3))");
+    eval_str("(pragma gc-collect)");
+    gl_value_t *gc_hm = eval_str("gc-hm");
+    TEST(gc_hm->type == GL_VAL_HASHMAP, "Hashmap survives GC");
+    TEST(gl_value_get_int(eval_str("(len gc-hm)")) == 1, "Hashmap len after GC");
+    TEST(gl_value_get_int(eval_str("(car (hash-get gc-hm \"k\"))")) == 1,
+         "Hashmap contents after GC");
+}
+
 void test_typeid(void) {
     TEST(gl_value_get_bool(eval_str("(= (typeof 42) int-t)")) == 1, "typeof int");
     TEST(gl_value_get_bool(eval_str("(= (typeof 3.14) float-t)")) == 1, "typeof float");
@@ -292,11 +338,138 @@ void test_strings(void) {
          "string-upcase");
     TEST(strcmp(gl_value_get_string(eval_str("(string-downcase \"aBc1\")")), "abc1") == 0,
          "string-downcase");
+
+    TEST(gl_value_get_int(eval_str("(string->number \"42\")")) == 42, "string->number int");
+    TEST(gl_value_get_int(eval_str("(string->number \"-7\")")) == -7, "string->number negative");
+    TEST(gl_value_get_bool(eval_str("(= (typeof (string->number \"2.5\")) float-t)")) == 1,
+         "string->number float type");
+    TEST(gl_value_get_bool(eval_str("(approx= (string->number \"2.5\") 2.5)")) == 1,
+         "string->number float value");
+    TEST(eval_str("(string->number \"\")")->type == GL_VAL_NIL, "string->number empty");
+    TEST(eval_str("(string->number \"abc\")")->type == GL_VAL_NIL, "string->number text");
+    TEST(eval_str("(string->number \"12abc\")")->type == GL_VAL_NIL,
+         "string->number trailing text");
+    TEST(eval_str("(string->number \"1e9\")")->type == GL_VAL_NIL, "string->number exponent");
+    TEST(eval_str("(string->number \"1.\")")->type == GL_VAL_NIL, "string->number bare dot");
+    TEST(eval_str("(string->number \"99999999999999999999999\")")->type == GL_VAL_NIL,
+         "string->number overflow");
+}
+
+void test_std_strings(void) {
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"ll\")")) == 2, "string-index match");
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"h\")")) == 0,
+         "string-index at start");
+    TEST(gl_value_get_int(eval_str("(string-index \"hello\" \"\")")) == 0,
+         "string-index empty needle");
+    TEST(eval_str("(string-index \"hello\" \"z\")")->type == GL_VAL_NIL,
+         "string-index absent needle");
+    TEST(eval_str("(string-index \"he\" \"hello\")")->type == GL_VAL_NIL,
+         "string-index needle longer than haystack");
+
+    TEST(gl_value_get_bool(eval_str("(string-contains? \"hello\" \"ell\")")) == 1,
+         "string-contains? match");
+    TEST(gl_value_get_bool(eval_str("(string-contains? \"hello\" \"z\")")) == 0,
+         "string-contains? absent needle");
+
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a,b,c\" \",\") "
+                                    "(list \"a\" \"b\" \"c\"))")) == 1,
+         "string-split single character separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a::b::c\" \"::\") "
+                                    "(list \"a\" \"b\" \"c\"))")) == 1,
+         "string-split multi-character separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"a,\" \",\") (list \"a\" \"\"))")) == 1,
+         "string-split trailing separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"abc\" \",\") (list \"abc\"))")) == 1,
+         "string-split without separator");
+    TEST(gl_value_get_bool(eval_str("(= (string-split \"\" \",\") (list \"\"))")) == 1,
+         "string-split empty string");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\" \"b\") \"-\")")), "a-b") ==
+             0,
+         "string-join with separator");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list 1 2 3) \"-\")")), "1-2-3") == 0,
+         "string-join converts with to-string");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join (list \"a\") \"-\")")), "a") == 0,
+         "string-join single element");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-join nil \"-\")")), "") == 0,
+         "string-join empty list");
+    TEST(strcmp(
+             gl_value_get_string(eval_str("(string-join (string-split \"a::b::c\" \"::\") \"-\")")),
+             "a-b-c") == 0,
+         "string-join of string-split result");
+
+    TEST(eval_str("(string-split \"a,b\" \"\")") == NULL, "string-split empty separator");
+
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"hello\" \"he\")")) == 1,
+         "string-starts-with? match");
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"hello\" \"lo\")")) == 0,
+         "string-starts-with? mismatch");
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"he\" \"hello\")")) == 0,
+         "string-starts-with? longer prefix");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"lo\")")) == 1,
+         "string-ends-with? match");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"\")")) == 1,
+         "string-ends-with? empty suffix");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"he\")")) == 0,
+         "string-ends-with? mismatch");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-repeat \"ab\" 3)")), "ababab") == 0,
+         "string-repeat");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-repeat \"ab\" 0)")), "") == 0,
+         "string-repeat zero");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"a-b-c\" \"-\" \"+\")")), "a+b+c") ==
+             0,
+         "string-replace every occurrence");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"aaa\" \"aa\" \"b\")")), "ba") == 0,
+         "string-replace left to right");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"abc\" \"z\" \"y\")")), "abc") == 0,
+         "string-replace without a match");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim \"  hi  \")")), "hi") == 0,
+         "string-trim removes both ends");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim-left \"  hi  \")")), "hi  ") == 0,
+         "string-trim-left");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim-right \"  hi  \")")), "  hi") == 0,
+         "string-trim-right");
+    TEST(gl_value_get_int(eval_str("(len (string-trim \"   \"))")) == 0, "string-trim blank");
+}
+
+// The list is longer than the evaluator's recursion limit, so these helpers have
+// to use loops: a recursive map or filter would stop with a depth error.
+void test_long_lists(void) {
+    eval_str("(defun build-list (n acc) (if (= n 0) acc (build-list (- n 1) (cons n acc))))");
+    eval_str("(set big-list (build-list 1200 nil))");
+
+    TEST(gl_value_get_int(eval_str("(len big-list)")) == 1200, "long list length");
+    TEST(gl_value_get_int(eval_str("(len (map 1+ big-list))")) == 1200, "map over a long list");
+    TEST(gl_value_get_int(eval_str("(car (map 1+ big-list))")) == 2, "map keeps the order");
+    TEST(gl_value_get_int(eval_str("(len (filter even? big-list))")) == 600,
+         "filter over a long list");
+    TEST(gl_value_get_int(eval_str("(len (append big-list (list 1 2)))")) == 1202,
+         "append a long list");
+    TEST(gl_value_get_int(eval_str("(car (member 1100 big-list))")) == 1100,
+         "member of a long list");
+    TEST(gl_value_get_bool(eval_str("(all? (lambda (x) t) big-list)")) == 1,
+         "all? over a long list");
 }
 
 void test_sort(void) {
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 0)")) == 1, "sort array");
     TEST(gl_value_get_int(eval_str("(get (sort [3 1 2]) 2)")) == 3, "sort array last element");
+
+    TEST(strcmp(gl_value_get_string(
+                    eval_str("(car (sort-by (lambda (s) (len s)) (list \"ccc\" \"a\" \"bb\")))")),
+                "a") == 0,
+         "sort-by orders by the key");
+    TEST(gl_value_get_int(
+             eval_str("(car (car (sort-by car (list (list 2 \"b\") (list 1 \"a\")))))")) == 1,
+         "sort-by with a builtin key");
+    TEST(gl_value_get_bool(eval_str("(= (sort-by (lambda (x) 0) (list 3 1 2)) (list 3 1 2))")) == 1,
+         "sort-by keeps equal keys in order");
+    TEST(gl_value_get_int(eval_str("(get (sort-by (lambda (x) (- 0 x)) [3 1 2]) 0)")) == 3,
+         "sort-by preserves the array type");
+    TEST(eval_str("(sort-by identity nil)")->type == GL_VAL_NIL, "sort-by of nil");
     TEST(gl_value_get_int(eval_str("(car (sort '(3 1 2)))")) == 1, "sort list");
     TEST(gl_value_get_int(eval_str("(get (sort {5 4 6}) 1)")) == 5, "sort vector");
     TEST(strcmp(gl_value_get_string(eval_str("(get (sort (list \"b\" \"a\" \"c\")) 0)")), "a") == 0,
@@ -368,6 +541,43 @@ void test_apply(void) {
          "apply user function on list");
 }
 
+void test_read_eval(void) {
+    TEST(gl_value_get_int(eval_str("(eval '(+ 1 2))")) == 3, "Eval of quoted form");
+
+    TEST(gl_value_get_int(eval_str("(eval (read \"(+ 1 2)\"))")) == 3, "Eval of read form");
+
+    char *printed = gl_value_to_string(eval_str("(read \"'(1 2)\")"));
+    TEST(strcmp(printed, "(quote (1 2))") == 0, "Read keeps quote as data");
+    free(printed);
+
+    printed = gl_value_to_string(eval_str("(read \"#'f\")"));
+    TEST(strcmp(printed, "(function f)") == 0, "Read keeps function sugar as data");
+    free(printed);
+
+    gl_value_t *arr = eval_str("(read \"[1 2]\")");
+    TEST(arr->type == GL_VAL_ARRAY, "Read array type");
+    TEST(gl_value_get_array(arr)->size == 2, "Read array size");
+    TEST(gl_value_get_int(gl_value_get_array(arr)->data[1]) == 2, "Read array element");
+
+    TEST(eval_str("(read \"{1 2}\")")->type == GL_VAL_VECTOR, "Read vector type");
+
+    TEST(eval_str("(eval (read \"(defun sq (x) (* x x))\"))") != NULL, "Eval defines a function");
+    TEST(gl_value_get_int(eval_str("(eval (read \"(sq 5)\"))")) == 25,
+         "Eval calls a defined function");
+
+    TEST(gl_value_get_int(eval_str("(let ((x 4)) (eval (read \"(* x x)\")))")) == 16,
+         "Eval sees let binding");
+
+    TEST(gl_value_get_bool(eval_str("(eq (eval \"a\\\\b\") \"a\\\\b\")")) == 1,
+         "Eval preserves string contents");
+
+    TEST(eval_str("(read \"\")")->type == GL_VAL_NIL, "Empty input reads as nil");
+    TEST(gl_value_get_int(eval_str("(read \"1 2\")")) == 1, "Trailing text is ignored");
+
+    TEST(eval_expr("(read \"(1 2\")") == NULL, "Read reports a syntax error");
+    TEST(eval_expr("(eval sq)") == NULL, "Eval rejects a function");
+}
+
 void test_load_relative(void) {
     gl_value_t *r1 = eval_str("(load \"tests/load_test/top.lisp\")");
     TEST(r1 != NULL, "load top.lisp succeeds");
@@ -378,6 +588,41 @@ void test_load_relative(void) {
     TEST(r2 != NULL, "load relative_up.lisp succeeds");
     TEST(gl_value_get_int(eval_str("(sibling-marker)")) == 999,
          "relative_up.lisp successfully loaded ../sibling.lisp relatively");
+}
+
+void test_load_failure(void) {
+    char path[512];
+    int created = gl_test_make_temp(path, sizeof(path));
+    TEST(created == 0, "create temporary load file");
+    if (created != 0) {
+        return;
+    }
+
+    FILE *file = fopen(path, "w");
+    TEST(file != NULL, "write temporary load file");
+    if (!file) {
+        remove(path);
+        return;
+    }
+    fputs("(undefined-function 1)", file);
+    fclose(file);
+
+    char src[512];
+    snprintf(src, sizeof(src), "(load \"%s\")", path);
+    TEST(eval_str(src) == NULL, "failed load returns NULL");
+    TEST(!gl_call_stack_initialized || gl_call_stack.size == 0, "failed load leaves no call frame");
+    TEST(gl_value_get_int(eval_str("(+ 1 2)")) == 3, "evaluation after failed load");
+
+    file = fopen(path, "w");
+    TEST(file != NULL, "rewrite temporary load file");
+    if (file) {
+        fputs("(set after-load 7)", file);
+        fclose(file);
+    }
+    TEST(eval_str(src) != NULL, "load after failed load");
+    TEST(gl_value_get_int(eval_str("after-load")) == 7, "later load evaluated");
+
+    remove(path);
 }
 
 void test_stdlib(void) {
@@ -608,6 +853,62 @@ void test_for(void) {
     eval_str("(set i 999)");
     eval_str("(for (i [1 2 3]) nil)");
     TEST(gl_value_get_int(eval_str("i")) == 999, "for variable does not leak");
+}
+
+void test_control_forms(void) {
+    TEST(eval_expr("(let ((i 0)) (while (< i 3) (len 5)))") == NULL,
+         "While stops when the body fails");
+    TEST(eval_expr("(while (len 5) 0)") == NULL, "While stops when the condition fails");
+    TEST(gl_value_get_int(eval_str("(let ((i 0)) (while (< i 3) (set i (+ i 1))) i)")) == 3,
+         "While still runs normally");
+    TEST(gl_value_get_int(eval_str("(when t 1 2 3)")) == 3, "When returns last body value");
+    gl_value_t *when_nil = eval_str("(when nil 1)");
+    TEST(when_nil != NULL && when_nil->type == GL_VAL_NIL, "When false returns nil");
+
+    eval_str("(set when_ran 0)");
+    eval_str("(when nil (set when_ran 1))");
+    TEST(gl_value_get_int(eval_str("when_ran")) == 0, "When false skips body");
+
+    TEST(gl_value_get_int(eval_str("(unless nil 1 2 3)")) == 3, "Unless returns last body value");
+    gl_value_t *unless_nil = eval_str("(unless t 1)");
+    TEST(unless_nil != NULL && unless_nil->type == GL_VAL_NIL, "Unless true returns nil");
+
+    eval_str("(set unless_ran 0)");
+    eval_str("(unless t (set unless_ran 1))");
+    TEST(gl_value_get_int(eval_str("unless_ran")) == 0, "Unless true skips body");
+
+    TEST(gl_value_get_int(eval_str("(case 2 (1 10) (2 20) (3 30))")) == 20, "Case matching key");
+    TEST(gl_value_get_int(eval_str("(case 9 (1 10) (else 99))")) == 99, "Case else clause");
+    gl_value_t *case_nil = eval_str("(case 9 (1 10) (2 20))");
+    TEST(case_nil != NULL && case_nil->type == GL_VAL_NIL, "Case no match returns nil");
+    TEST(gl_value_get_int(eval_str("(case 1 (1 10) (1 20))")) == 10, "Case first match wins");
+    TEST(gl_value_get_int(eval_str("(case 2 ((+ 1 1) 20) (else 99))")) == 20, "Case evaluated key");
+
+    eval_str("(set case_ran 0)");
+    eval_str("(case 1 (1 (set case_ran 1)) (2 (set case_ran 2)))");
+    TEST(gl_value_get_int(eval_str("case_ran")) == 1, "Case skips other bodies");
+
+    eval_str("(set dot_seq nil)");
+    eval_str("(dotimes (i 3) (set dot_seq (cons i dot_seq)))");
+    TEST(gl_value_get_bool(eval_str("(= dot_seq (list 2 1 0))")) == 1, "Dotimes counter values");
+    TEST(gl_value_get_int(eval_str("(dotimes (i 4 i))")) == 3, "Dotimes result sees final binding");
+
+    eval_str("(set dot_ran 0)");
+    gl_value_t *dot_nil = eval_str("(dotimes (i 0) (set dot_ran 1))");
+    TEST(gl_value_get_int(eval_str("dot_ran")) == 0, "Dotimes zero count skips body");
+    TEST(dot_nil != NULL && dot_nil->type == GL_VAL_NIL, "Dotimes zero count returns nil");
+    TEST(gl_value_get_int(eval_str("(dotimes (i 0 i))")) == 0,
+         "Dotimes zero count result sees binding");
+
+    TEST(eval_str("(dotimes (i 1.5) nil)") == NULL, "Dotimes non-integer count fails");
+    TEST(eval_str("(dotimes (i -1) nil)") == NULL, "Dotimes negative count fails");
+    TEST(eval_str("(dotimes (t 1) nil)") == NULL, "Dotimes does not shadow constants");
+
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (when t n))")) == 10, "When sees let binding");
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (dotimes (i 1 n)))")) == 10,
+         "Dotimes sees let binding");
+    TEST(gl_value_get_int(eval_str("(let ((n 10)) (dotimes (i 1) (set n (+ n 1))) n)")) == 11,
+         "Dotimes body sees let binding");
 }
 
 void test_add_to_list(void) {
@@ -868,7 +1169,7 @@ void test_list_hofs_large(void) {
 }
 
 void test_recursion(void) {
-    eval_str("(defun endless (n) (endless (+ n 1)))");
+    eval_str("(defun endless (n) (+ 1 (endless (+ n 1))))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
 
     eval_str("(defun countdown (n) (if (= n 0) 0 (countdown (- n 1))))");
@@ -876,6 +1177,12 @@ void test_recursion(void) {
     TEST(eval_str("(countdown 1000000)") == NULL, "deep recursion reports an error");
 
     TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");
+
+    eval_str("(defun count-down (n) (if (= n 0) 0 (count-down (- n 1))))");
+    TEST(gl_value_get_int(eval_str("(count-down 5000)")) == 0,
+         "tail recursion runs in constant stack");
+    TEST(gl_value_get_int(eval_str("(let ((i 0)) (dotimes (k 5000) (set i k)) i)")) == 4999,
+         "deep loop with set");
 }
 
 int main(void) {
@@ -894,20 +1201,26 @@ int main(void) {
     test_array_vector_operations();
     test_array_vector_comparison();
     test_array_vector_gc();
+    test_hashmap();
     test_typeid();
     test_strings();
+    test_std_strings();
+    test_long_lists();
     test_sort();
     test_let();
     test_let_star();
     test_cons();
     test_apply();
+    test_read_eval();
     test_load_relative();
+    test_load_failure();
     test_stdlib();
     test_autoload_stdlib();
     test_pragma();
     test_cond();
     test_optional_and_rest();
     test_for();
+    test_control_forms();
     test_add_to_list();
     test_defconst();
     test_io();

@@ -47,7 +47,7 @@ the standard library, then either evaluate a file or run the REPL.
 | `array.h` | `ARRAY_DECLARE(T, Name)` / `ARRAY_DEFINE(T, Name)`: fixed-size typed array. |
 | `vector.h` | `VECTOR_DECLARE(T, Name)` / `VECTOR_DEFINE(T, Name)`: growable typed vector. |
 | `hashmap.h` | `HASHMAP_DECLARE(T, Name)` / `HASHMAP_DEFINE(T, Name)`: chained hash map keyed by C strings. |
-| `ansi.h` | ANSI SGR sequences and `gl_process_ansi_str`, which decodes string-literal escapes for `gl_ast_make_string`. |
+| `ansi.h` | ANSI SGR sequences and `gl_process_ansi_str`, which decodes string-literal escapes for `gl_ast_make_string`. Diagnostics disable color when `stderr` is not a terminal or `NO_COLOR` is set. |
 | `strdup.h` | `strdup` shim for MSVC. |
 | `rl_wrapper.h` | Convenience include for GNU Readline. |
 
@@ -166,9 +166,10 @@ environment and producing stack traces.
 ### `eval.h`
 
 - `gl_eval(node)` evaluates one AST node. It is the only safe point at which the
-  collector may run automatically. It also enforces the recursion limit by
-  watching the remaining C stack.
-- `gl_parse_and_eval(parser, abort_on_error)` loops over top-level forms.
+  collector may run automatically.
+- `gl_parse_and_eval(parser)` loops over top-level forms and returns the last
+  value, or `NULL` when the unit is empty or a form fails.
+>>>>>>> main
 - `gl_eval_args(args)` evaluates a list of argument AST nodes into a
   `gl_function_args_t`. It pushes each evaluated value as a temporary GC root.
 - `gl_call_function(loc, callable, argv)` invokes a callable with an existing

@@ -88,14 +88,25 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("vector-push", vector_push);
     DEFINE_BUILTIN("pop", vector_pop);
     DEFINE_BUILTIN("vector-pop", vector_pop);
+    DEFINE_BUILTIN("sort", sort);
+
+    DEFINE_BUILTIN("hash", hash);
+    DEFINE_BUILTIN("hash-set", hash_set);
+    DEFINE_BUILTIN("hash-get", hash_get);
+    DEFINE_BUILTIN("hash-has?", hash_has_p);
+    DEFINE_BUILTIN("hash-delete", hash_delete);
+    DEFINE_BUILTIN("hash-keys", hash_keys);
 
     DEFINE_BUILTIN("string-append", string_append);
     DEFINE_BUILTIN("substring", substring);
     DEFINE_BUILTIN("string-upcase", string_upcase);
     DEFINE_BUILTIN("string-downcase", string_downcase);
+    DEFINE_BUILTIN("string->number", string_to_number);
 
     DEFINE_BUILTIN("apply", apply);
     DEFINE_BUILTIN("load", load);
+    DEFINE_BUILTIN("read", read);
+    DEFINE_BUILTIN("eval", eval);
 
     DEFINE_BUILTIN("assert", assert);
 
@@ -132,6 +143,8 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("if", if);
+    DEFINE_SPECFORM("when", when);
+    DEFINE_SPECFORM("unless", unless);
     DEFINE_SPECFORM("defun", defun);
     DEFINE_SPECFORM("lambda", lambda);
     DEFINE_SPECFORM("set", set);
@@ -144,7 +157,9 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("let*", let_star);
     DEFINE_SPECFORM("pragma", pragma);
     DEFINE_SPECFORM("cond", cond);
+    DEFINE_SPECFORM("case", case);
     DEFINE_SPECFORM("for", for);
+    DEFINE_SPECFORM("dotimes", dotimes);
     DEFINE_SPECFORM("and", and);
     DEFINE_SPECFORM("or", or);
     DEFINE_SPECFORM("add-to-list", add_to_list);
@@ -171,6 +186,7 @@ gl_env_t *gl_make_global_env(void) {
     DEFINE_TYPEID("list-t", GL_VAL_CONS);
     DEFINE_TYPEID("array-t", GL_VAL_ARRAY);
     DEFINE_TYPEID("vector-t", GL_VAL_VECTOR);
+    DEFINE_TYPEID("hashmap-t", GL_VAL_HASHMAP);
     DEFINE_TYPEID("file-t", GL_VAL_FILE);
     DEFINE_TYPEID("typeid-t", GL_VAL_TYPEID);
 

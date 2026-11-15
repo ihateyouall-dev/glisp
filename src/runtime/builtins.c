@@ -127,6 +127,14 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
         }                                                                                          \
     } while (0)
 
+#define EXPECT_HASHMAP(val)                                                                        \
+    do {                                                                                           \
+        if (val->type != GL_VAL_HASHMAP) {                                                         \
+            __emit_type_error(called_at, "hashmap", __gl_value_get_type_name(val));                \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
 #define EXPECT_CALLABLE(val)                                                                       \
     do {                                                                                           \
         if (val->type != GL_VAL_FUNCTION && val->type != GL_VAL_BUILTIN) {                         \
@@ -212,9 +220,20 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
         return "vector";
     case GL_VAL_FILE:
         return "file";
+    case GL_VAL_HASHMAP:
+        return "hashmap";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
+}
+
+// Keys are strings or symbols; both payloads are NUL-terminated buffers.
+static const char *__gl_hashmap_key(gl_location_t location, gl_value_t *val) {
+    if (val->type != GL_VAL_SYMBOL && val->type != GL_VAL_STRING) {
+        __emit_type_error(location, "string or symbol", __gl_value_get_type_name(val));
+        return NULL;
+    }
+    return (char *)val->val;
 }
 
 GL_BUILTIN(exit) {
@@ -592,6 +611,9 @@ GL_BUILTIN(len) {
     } else if (val->type == GL_VAL_VECTOR) {
         gl_value_vector_t *vec = val->val;
         return gl_value_make_int((int64_t)vec->size);
+    } else if (val->type == GL_VAL_HASHMAP) {
+        gl_value_hashmap_t *map = val->val;
+        return gl_value_make_int((int64_t)map->size);
     } else if (val->type == GL_VAL_STRING) {
         return gl_value_make_int((int64_t)strlen((char *)val->val));
     } else if (val->type == GL_VAL_CONS) {
@@ -741,6 +763,207 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
+// Stable merge sort over a temporary array; gl_value_compare orders values the
+// same way the language does.
+static void __gl_sort_merge(gl_value_t **data, gl_value_t **tmp, size_t left, size_t mid,
+                            size_t right) {
+    size_t i = left;
+    size_t j = mid;
+    size_t k = left;
+
+    while (i < mid && j < right) {
+        // The right half wins only when strictly smaller, which keeps equal
+        // elements in their original order.
+        if (gl_value_compare(data[j], data[i]) < 0) {
+            tmp[k++] = data[j++];
+        } else {
+            tmp[k++] = data[i++];
+        }
+    }
+    while (i < mid) {
+        tmp[k++] = data[i++];
+    }
+    while (j < right) {
+        tmp[k++] = data[j++];
+    }
+    for (size_t n = left; n < right; ++n) {
+        data[n] = tmp[n];
+    }
+}
+
+static void __gl_sort_range(gl_value_t **data, gl_value_t **tmp, size_t left, size_t right) {
+    if (right - left < 2) {
+        return;
+    }
+
+    size_t mid = left + (right - left) / 2;
+    __gl_sort_range(data, tmp, left, mid);
+    __gl_sort_range(data, tmp, mid, right);
+    __gl_sort_merge(data, tmp, left, mid, right);
+}
+
+// Sorting in C rather than in Lisp: the interpreter deep-copies every argument
+// on a call, so a Lisp sort spends most of its time duplicating sublists.
+GL_BUILTIN(sort) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *coll = NTH_VAL(0);
+    if (coll->type == GL_VAL_NIL) {
+        return gl_value_make_nil();
+    }
+
+    size_t size = 0;
+    if (coll->type == GL_VAL_CONS) {
+        gl_value_t *cur = coll;
+        while (cur->type == GL_VAL_CONS) {
+            ++size;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    } else if (coll->type == GL_VAL_ARRAY) {
+        size = gl_value_get_array(coll)->size;
+    } else if (coll->type == GL_VAL_VECTOR) {
+        size = gl_value_get_vector(coll)->size;
+    } else {
+        __emit_type_error(NTH_LOC(0), "list, array, or vector", __gl_value_get_type_name(coll));
+        return NULL;
+    }
+
+    gl_value_t **data = size > 0 ? malloc(sizeof(gl_value_t *) * size) : NULL;
+    gl_value_t **tmp = size > 0 ? malloc(sizeof(gl_value_t *) * size) : NULL;
+
+    if (coll->type == GL_VAL_CONS) {
+        gl_value_t *cur = coll;
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = gl_value_get_cons(cur)->car;
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+    } else if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = gl_value_get_array(coll);
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = arr->data[i];
+        }
+    } else {
+        gl_value_vector_t *vec = gl_value_get_vector(coll);
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = *gl_value_vector_at(vec, i);
+        }
+    }
+
+    __gl_sort_range(data, tmp, 0, size);
+    free(tmp);
+
+    gl_value_t *res = NULL;
+    if (coll->type == GL_VAL_CONS) {
+        size_t root_mark = gl_gc_root_mark();
+        res = gl_value_make_nil();
+        for (size_t i = size; i > 0; --i) {
+            res = gl_value_make_cons_raw(data[i - 1], res);
+            gl_gc_push_root(res);
+        }
+        gl_gc_roots_release(root_mark);
+    } else if (coll->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, size, NULL);
+        for (size_t i = 0; i < size; ++i) {
+            arr->data[i] = data[i];
+        }
+        res = gl_value_make_array_from(arr);
+    } else {
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+        for (size_t i = 0; i < size; ++i) {
+            gl_value_vector_push_back(vec, data[i]);
+        }
+        res = gl_value_make_vector_from(vec);
+    }
+
+    free(data);
+    return res;
+}
+
+GL_BUILTIN(hash) {
+    EXPECT_ARGS(0);
+
+    return gl_value_make_hashmap();
+}
+
+GL_BUILTIN(hash_set) {
+    EXPECT_ARGS(3);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    gl_value_hashmap_insert(map_val->val, key, NTH_VAL(2));
+    return map_val;
+}
+
+// The optional third argument is returned when the key is missing.
+GL_BUILTIN(hash_get) {
+    EXPECT_RVARGS(2, 3);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    gl_value_t **entry = gl_value_hashmap_get(map_val->val, key);
+    if (entry != NULL) {
+        return *entry;
+    }
+    return ARGC == 3 ? NTH_VAL(2) : gl_value_make_nil();
+}
+
+GL_BUILTIN(hash_has_p) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    return gl_value_make_bool(gl_value_hashmap_get(map_val->val, key) != NULL);
+}
+
+GL_BUILTIN(hash_delete) {
+    EXPECT_ARGS(2);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    const char *key = __gl_hashmap_key(NTH_LOC(1), NTH_VAL(1));
+    if (key == NULL) {
+        return NULL;
+    }
+
+    return gl_value_make_bool(gl_value_hashmap_remove(map_val->val, key));
+}
+
+// Keys come out in bucket order, so the order is not the insertion order.
+GL_BUILTIN(hash_keys) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *map_val = NTH_VAL(0);
+    EXPECT_HASHMAP(map_val);
+    gl_value_hashmap_t *map = map_val->val;
+
+    gl_value_t *res = gl_value_make_nil();
+    for (size_t i = 0; i < map->buckets_count; ++i) {
+        gl_value_hashmapBucket_t *bucket = &map->buckets[i];
+        for (size_t j = 0; j < bucket->size; ++j) {
+            gl_value_hashmapEntry_t *entry = gl_value_hashmapBucket_at(bucket, j);
+            res = gl_value_make_cons_raw(gl_value_make_string(entry->key), res);
+        }
+    }
+    return res;
+}
+
 // Concatenates every argument into a new string.
 GL_BUILTIN(string_append) {
     EXPECT_VARGS(0);
@@ -830,6 +1053,52 @@ GL_BUILTIN(string_downcase) {
     gl_value_t *res = gl_value_make_string(buf);
     free(buf);
     return res;
+}
+
+// Follows the reader's number syntax: an optional '-', digits, and an optional
+// fractional part. Anything else, including a value out of range, reads as nil.
+GL_BUILTIN(string_to_number) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *val = NTH_VAL(0);
+    EXPECT_STRING(val);
+
+    const char *str = gl_value_get_string(val);
+    const char *cur = str;
+
+    if (*cur == '-') {
+        ++cur;
+    }
+    if (!isdigit((unsigned char)*cur)) {
+        return gl_value_make_nil();
+    }
+    while (isdigit((unsigned char)*cur)) {
+        ++cur;
+    }
+
+    int is_float = 0;
+    if (*cur == '.') {
+        is_float = 1;
+        ++cur;
+        if (!isdigit((unsigned char)*cur)) {
+            return gl_value_make_nil();
+        }
+        while (isdigit((unsigned char)*cur)) {
+            ++cur;
+        }
+    }
+    if (*cur != '\0') {
+        return gl_value_make_nil();
+    }
+
+    errno = 0;
+    if (is_float) {
+        long double num = strtold(str, NULL);
+        return errno == ERANGE ? gl_value_make_nil() : gl_value_make_float(num);
+    }
+
+    long long num = strtoll(str, NULL, 10);
+    return errno == ERANGE ? gl_value_make_nil() : gl_value_make_int((int64_t)num);
 }
 
 // The final argument is a collection whose elements are appended to the call.
@@ -1004,11 +1273,13 @@ gl_value_t *gl_load_file(const char *filepath, const char *caller_unit) {
 
     gl_call_stack_push_env(gl_global_env, NULL, "load");
     gl_parser_t parser = gl_make_parser(buf, target_path);
-    gl_value_t *res = gl_parse_and_eval(&parser, 1);
+    int empty = gl_lex_token_vector_at(&parser.tokens, 0)->type == GL_LEX_EOF;
+    gl_value_t *res = gl_parse_and_eval(&parser);
     gl_parser_destroy(&parser);
     gl_call_stack_pop_env();
 
-    if (!res) {
+    // Empty files have no last value; they still load as t.
+    if (!res && empty) {
         res = gl_value_make_bool(1);
     }
     return res;
@@ -1029,6 +1300,193 @@ GL_BUILTIN(load) {
         gl_diagnostic_report_error(err);
         return NULL;
     }
+    return res;
+}
+
+// Converts parsed syntax into runtime data for read.
+static gl_value_t *__gl_ast_to_value(gl_ast_node_t *node) {
+    switch (node->type) {
+    case GL_AST_INT:
+        return gl_value_make_int(node->value.integral);
+    case GL_AST_FLOAT:
+        return gl_value_make_float(node->value.floating);
+    case GL_AST_SYMBOL:
+        return gl_value_make_symbol(node->value.symbol);
+    case GL_AST_STRING:
+        return gl_value_make_string(node->value.string);
+    case GL_AST_NIL:
+        return gl_value_make_nil();
+    case GL_AST_CONS:
+        return gl_value_make_cons_raw(__gl_ast_to_value(node->value.cons.car),
+                                      __gl_ast_to_value(node->value.cons.cdr));
+    case GL_AST_ARRAY: {
+        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+        gl_value_array_init(arr, node->value.array.size, NULL);
+
+        for (size_t i = 0; i < node->value.array.size; ++i) {
+            arr->data[i] = __gl_ast_to_value(node->value.array.data[i]);
+        }
+        return gl_value_make_array_from(arr);
+    }
+    case GL_AST_VECTOR: {
+        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+        gl_value_vector_init(vec, NULL);
+
+        for (size_t i = 0; i < node->value.vector.size; ++i) {
+            gl_value_t *elem = __gl_ast_to_value(*gl_ast_vector_at(&node->value.vector, i));
+            gl_value_vector_push_back(vec, elem);
+        }
+        return gl_value_make_vector_from(vec);
+    }
+    }
+    return NULL;
+}
+
+// Only the first expression is parsed; trailing text is ignored.
+// Empty or whitespace-only input has no expression and reads as nil.
+GL_BUILTIN(read) {
+    EXPECT_ARGS(1);
+
+    gl_value_t *str = NTH_VAL(0);
+    EXPECT_STRING(str);
+
+    gl_parser_t parser = gl_make_parser(gl_value_get_string(str), "<read>");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    gl_value_t *res = NULL;
+
+    if (node) {
+        res = __gl_ast_to_value(node);
+        gl_ast_destroy(node);
+    } else if (gl_lex_token_vector_at(&parser.tokens, 0)->type == GL_LEX_EOF) {
+        res = gl_value_make_nil();
+    }
+
+    gl_parser_destroy(&parser);
+    return res;
+}
+
+static void __emit_eval_error(gl_location_t location, const char *type) {
+    char buf[256] = "";
+    snprintf(buf, sizeof(buf), "Cannot evaluate %s", type);
+    gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, location, buf));
+}
+
+// gl_ast_make_string decodes escapes, so backslashes in a value are doubled first.
+static char *__gl_escape_backslashes(const char *str) {
+    size_t len = strlen(str);
+    char *res = malloc(len * 2 + 1);
+    char *dst = res;
+
+    for (const char *src = str; *src != '\0'; ++src) {
+        if (*src == '\\') {
+            *dst++ = '\\';
+        }
+        *dst++ = *src;
+    }
+    *dst = '\0';
+    return res;
+}
+
+static gl_ast_node_t *__gl_value_to_ast(gl_value_t *val, gl_location_t location);
+
+// A dotted tail cannot be code: only proper lists convert to an AST list.
+static gl_ast_node_t *__gl_value_to_ast_list(gl_value_t *val, gl_location_t location) {
+    if (val->type == GL_VAL_NIL) {
+        return gl_ast_make_nil(location);
+    }
+
+    if (val->type != GL_VAL_CONS) {
+        __emit_eval_error(location, "improper list");
+        return NULL;
+    }
+
+    gl_value_cons_t *cons = gl_value_get_cons(val);
+    gl_ast_node_t *car = __gl_value_to_ast(cons->car, location);
+    if (!car) {
+        return NULL;
+    }
+
+    gl_ast_node_t *cdr = __gl_value_to_ast_list(cons->cdr, location);
+    if (!cdr) {
+        gl_ast_destroy(car);
+        return NULL;
+    }
+
+    return gl_ast_make_cons(car, cdr, location);
+}
+
+// Converts runtime data into syntax for eval.
+static gl_ast_node_t *__gl_value_to_ast(gl_value_t *val, gl_location_t location) {
+    switch (val->type) {
+    case GL_VAL_NIL:
+        return gl_ast_make_nil(location);
+    case GL_VAL_INT:
+        return gl_ast_make_int(gl_value_get_int(val), location);
+    case GL_VAL_FLOAT:
+        return gl_ast_make_float(gl_value_get_float(val), location);
+    case GL_VAL_SYMBOL:
+        return gl_ast_make_symbol(gl_value_get_symbol(val), location);
+    case GL_VAL_STRING: {
+        char *str = __gl_escape_backslashes(gl_value_get_string(val));
+        gl_ast_node_t *res = gl_ast_make_string(str, location);
+        free(str);
+        return res;
+    }
+    case GL_VAL_CONS:
+        return __gl_value_to_ast_list(val, location);
+    case GL_VAL_ARRAY: {
+        gl_value_array_t *arr = gl_value_get_array(val);
+        gl_ast_vector_t temp;
+        gl_ast_vector_init(&temp, gl_ast_node_destroy_helper);
+
+        for (size_t i = 0; i < arr->size; ++i) {
+            gl_ast_node_t *elem = __gl_value_to_ast(arr->data[i], location);
+            if (!elem) {
+                gl_ast_vector_destroy(&temp);
+                return NULL;
+            }
+            gl_ast_vector_push_back(&temp, elem);
+        }
+        gl_ast_array_t res;
+        gl_ast_array_init(&res, temp.size, gl_ast_node_destroy_helper);
+        for (size_t i = 0; i < temp.size; ++i) {
+            res.data[i] = temp.data[i];
+        }
+        free(temp.data);
+        return gl_ast_make_array(res, location);
+    }
+    case GL_VAL_VECTOR: {
+        gl_value_vector_t *vec = gl_value_get_vector(val);
+        gl_ast_vector_t res;
+        gl_ast_vector_init(&res, gl_ast_node_destroy_helper);
+
+        for (size_t i = 0; i < vec->size; ++i) {
+            gl_ast_node_t *elem = __gl_value_to_ast(*gl_value_vector_at(vec, i), location);
+            if (!elem) {
+                gl_ast_vector_destroy(&res);
+                return NULL;
+            }
+            gl_ast_vector_push_back(&res, elem);
+        }
+        return gl_ast_make_vector(res, location);
+    }
+    default:
+        __emit_eval_error(location,
+                          val->type == GL_VAL_ENV ? "environment" : __gl_value_get_type_name(val));
+        return NULL;
+    }
+}
+
+GL_BUILTIN(eval) {
+    EXPECT_ARGS(1);
+
+    gl_ast_node_t *node = __gl_value_to_ast(NTH_VAL(0), called_at);
+    if (!node) {
+        return NULL;
+    }
+
+    gl_value_t *res = gl_eval(node);
+    gl_ast_destroy(node);
     return res;
 }
 

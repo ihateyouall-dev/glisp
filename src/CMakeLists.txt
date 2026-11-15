@@ -28,9 +28,3 @@ endif()
 
 target_compile_definitions(runtime
                            PRIVATE GLISP_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-
-# Math functions are in a separate libm on Linux, but ship with the C library
-# on MinGW and macOS.
-if(NOT WIN32)
-  target_link_libraries(runtime PUBLIC m)
-endif()
