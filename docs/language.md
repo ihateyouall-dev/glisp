@@ -67,6 +67,7 @@ reader macro that composes with other forms.
 | list | `list-t` | `'(1 2 3)` | cons cells; may be improper |
 | array | `array-t` | `[1 2 3]` | fixed size, O(1) index |
 | vector | `vector-t` | `{1 2 3}` | growable, amortized O(1) push |
+| hashmap | `hashmap-t` | `(hash)` | string keys, values of any type; identity equality |
 | function | `function-t` | `(lambda (x) x)` | closure |
 | builtin | — | `+`, `car` | implemented in C |
 | special form | — | `if`, `let` | implemented in C |
@@ -157,7 +158,9 @@ protected. Attempts to modify a constant with `set`, `set-global`,
   required arguments; others require an argument count within
   `[min, max]`.
 - Parameters are bound to deep copies of the argument values.
-- Recursion is supported, but calls are not tail-call optimized.
+- Recursion is supported. A call in tail position, meaning the last form of a
+  body or of an `if`, `cond`, `when`, `unless` or `progn` branch, reuses the
+  caller's frame, so a loop written that way runs in constant stack.
 
 A function body is a sequence of expressions; the value of the last one is
 returned. `defun` returns the newly created function, `lambda` returns an
@@ -311,9 +314,10 @@ error API is not implemented yet.
   ends a string at the first raw `"`. Escapes produce single bytes, not code
   points.
 - No macros or quasiquote.
-- No tail-call optimization. Recursion is limited by the available C stack;
-  exceeding the limit reports a recursion error. The exact depth is
-  platform-dependent.
+- Tail calls are eliminated only where the call is the last form of a function
+  body or of an `if`, `cond`, `when`, `unless` or `progn` branch. A call inside
+  `let`, `let*`, `and`, `or`, `while` or `for` still consumes the C stack, and a
+  self-recursive call there reaches the depth limit instead of looping forever.
 - No module system; `load` evaluates into the global environment.
 - No exception handling.
 - `len` and `get` are linear for lists.

@@ -212,10 +212,18 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
     }
 }
 
+static gl_value_t *__gl_eval_tail(gl_ast_node_t *node);
+
+// Evaluates the body forms in order; the last one runs in tail position, so a
+// recursive call at the end of the body does not grow the C stack.
 static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *env) {
     gl_ast_node_t *current = func_tree;
     gl_value_t *res = gl_value_make_nil();
+
     while (current->type != GL_AST_NIL) {
+        if (current->value.cons.cdr->type == GL_AST_NIL) {
+            return __gl_eval_tail(current->value.cons.car);
+        }
         res = gl_eval(current->value.cons.car);
         if (!res) {
             return NULL;
@@ -225,6 +233,209 @@ static gl_value_t *__gl_eval_function_tree(gl_ast_node_t *func_tree, gl_env_t *e
     return res;
 }
 
+// Reports the arity mismatch of a user function call in the same way the
+// normal call path does.
+static void __gl_report_arity(const gl_function_t *function, gl_ast_node_t *func_node,
+                              const gl_function_args_t *argv) {
+    if (function->has_rest) {
+        gl_diagnostic_report_variadic_arity_error(func_node->location, function->min_args,
+                                                  argv->size);
+    } else if (function->min_args == function->max_args) {
+        gl_diagnostic_report_arity_error(func_node->location, function->min_args, argv->size);
+    } else {
+        gl_diagnostic_report_range_arity_error(func_node->location, function->min_args,
+                                               function->max_args, argv->size);
+    }
+}
+
+static int __gl_arity_ok(const gl_function_t *function, const gl_function_args_t *argv) {
+    return argv->size >= function->min_args &&
+           (function->has_rest || argv->size <= function->max_args);
+}
+
+// Evaluates every form except the last one; the last form is returned so the
+// caller can evaluate it in tail position.
+static gl_value_t *__gl_eval_leading_forms(gl_ast_node_t *body, gl_ast_node_t **last) {
+    gl_value_t *res = gl_value_make_nil();
+
+    while (body != NULL && body->type == GL_AST_CONS) {
+        if (body->value.cons.cdr->type == GL_AST_NIL) {
+            *last = body->value.cons.car;
+            return res;
+        }
+        res = gl_eval(body->value.cons.car);
+        if (!res) {
+            return NULL;
+        }
+        body = body->value.cons.cdr;
+    }
+    *last = NULL;
+    return res;
+}
+
+// Evaluates NODE in tail position. A call to a user function replaces the
+// current call frame instead of stacking a new one, and the forms that only
+// select one of their sub-expressions are looked through, so a recursion that
+// ends in if/cond/when/unless/progn runs in constant C stack.
+static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
+    while (node != NULL) {
+        if (node->type != GL_AST_CONS) {
+            return gl_eval(node);
+        }
+
+        gl_ast_node_t *head = node->value.cons.car;
+        gl_ast_node_t *body = node->value.cons.cdr;
+
+        if (head->type == GL_AST_SYMBOL) {
+            const char *name = head->value.symbol;
+
+            if (strcmp(name, "if") == 0) {
+                gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
+                if (test == NULL) {
+                    return NULL;
+                }
+
+                gl_ast_node_t *consequent = gl_ast_cons_nth_car(body, 1);
+                gl_ast_node_t *alternates = gl_ast_cons_nth_cdr(body, 1);
+
+                if (gl_value_get_bool(test)) {
+                    node = consequent;
+                    continue;
+                }
+                if (alternates == NULL || alternates->type == GL_AST_NIL) {
+                    return gl_value_make_nil();
+                }
+
+                gl_ast_node_t *last = NULL;
+                gl_value_t *res = __gl_eval_leading_forms(alternates, &last);
+                if (res == NULL) {
+                    return NULL;
+                }
+                node = last;
+                continue;
+            }
+
+            if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
+                strcmp(name, "unless") == 0) {
+                gl_ast_node_t *forms = body;
+
+                if (strcmp(name, "progn") != 0) {
+                    gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
+                    if (test == NULL) {
+                        return NULL;
+                    }
+
+                    int taken = gl_value_get_bool(test);
+                    if (strcmp(name, "unless") == 0) {
+                        taken = !taken;
+                    }
+                    if (!taken) {
+                        return gl_value_make_nil();
+                    }
+                    forms = gl_ast_cons_nth_cdr(body, 1);
+                }
+                if (forms == NULL || forms->type == GL_AST_NIL) {
+                    return gl_value_make_nil();
+                }
+
+                gl_ast_node_t *last = NULL;
+                gl_value_t *res = __gl_eval_leading_forms(forms, &last);
+                if (res == NULL) {
+                    return NULL;
+                }
+                node = last;
+                continue;
+            }
+
+            if (strcmp(name, "cond") == 0) {
+                gl_ast_node_t *clause = body;
+                gl_value_t *matched = NULL;
+
+                while (clause != NULL && clause->type == GL_AST_CONS) {
+                    gl_ast_node_t *entry = clause->value.cons.car;
+                    gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
+                    if (test == NULL) {
+                        return NULL;
+                    }
+                    if (gl_value_get_bool(test)) {
+                        matched = test;
+                        break;
+                    }
+                    clause = clause->value.cons.cdr;
+                }
+
+                if (matched == NULL) {
+                    return gl_value_make_nil();
+                }
+
+                gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
+                if (clause_body->type == GL_AST_NIL) {
+                    return matched;
+                }
+
+                gl_ast_node_t *last = NULL;
+                gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
+                if (res == NULL) {
+                    return NULL;
+                }
+                node = last;
+                continue;
+            }
+        }
+
+        // Everything else is a call or not a call at all. A call to a user
+        // function is the only case that can run in constant stack.
+        if (head->type != GL_AST_SYMBOL) {
+            return gl_eval(node);
+        }
+
+        gl_value_t *env = gl_current_env();
+        gl_value_t *func_val = gl_env_get_fun((gl_env_t *)env->val, head->value.symbol);
+        if (func_val == NULL) {
+            func_val = gl_env_get_var((gl_env_t *)env->val, head->value.symbol);
+        }
+        if (func_val == NULL || func_val->type != GL_VAL_FUNCTION) {
+            return gl_eval(node);
+        }
+
+        gl_function_t *function = func_val->val;
+        size_t root_mark = gl_gc_root_mark();
+
+        // Arguments are evaluated in the frame that is about to be replaced.
+        gl_function_args_t *argv = gl_eval_args(body);
+        if (argv == NULL) {
+            gl_gc_roots_release(root_mark);
+            return NULL;
+        }
+        if (!__gl_arity_ok(function, argv)) {
+            __gl_report_arity(function, head, argv);
+            gl_function_args_destroy(argv);
+            free(argv);
+            gl_gc_roots_release(root_mark);
+            return NULL;
+        }
+
+        gl_call_stack_pop_call();
+        gl_call_stack_push_call(function, head);
+        __gl_define_function_args(function, argv, (gl_env_t *)gl_current_env()->val);
+
+        gl_function_args_destroy(argv);
+        free(argv);
+        gl_gc_roots_release(root_mark);
+
+        gl_ast_node_t *last = NULL;
+        gl_value_t *res = __gl_eval_leading_forms(function->tree, &last);
+        if (res == NULL) {
+            return NULL;
+        }
+        if (last == NULL) {
+            return gl_value_make_nil();
+        }
+        node = last;
+    }
+
+    return gl_value_make_nil();
+}
 // Binds parameters in the call frame environment, then evaluates the body.
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
     gl_value_t *env = gl_current_env();
@@ -421,7 +632,7 @@ gl_value_t *gl_eval(gl_ast_node_t *node) {
         return NULL;
     }
 
-    if (__gl_stack_exhausted() || gl_eval_depth >= GL_MAX_EVAL_DEPTH) {
+    if (gl_eval_depth == GL_MAX_EVAL_DEPTH) {
         gl_diagnostic_report_error(gl_make_error(GL_RECURSION_ERROR, GL_ERROR, node->location,
                                                  "Maximum recursion depth exceeded"));
         return NULL;
@@ -471,29 +682,29 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
     }
 }
 
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error) {
-    // Start each independent top-level unit from the current stack position, so
-    // the recursion budget is measured from the caller, not from the first
-    // nested evaluation (for example, while loading the standard library).
-    if (gl_eval_depth == 0) {
-        volatile unsigned char probe = 0;
-        gl_stack_base = (uintptr_t)&probe;
-    }
-
-    gl_ast_node_t *current = gl_parser_parse(parser);
-
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser) {
     gl_value_t *res = NULL;
+    int failed = 0;
 
-    while (current) {
-        res = gl_eval(current);
-        // Aborting if got error during parsing
-        if (!res && abort_on_error) {
-            exit(-1);
+    while (1) {
+        size_t start = parser->pos;
+        gl_ast_node_t *current = gl_parser_parse(parser);
+
+        if (!current) {
+            // Reaching EOF here is the normal end of the unit; a NULL tree before
+            // that means the parser reported a syntax error.
+            if (gl_lex_token_vector_at(&parser->tokens, start)->type != GL_LEX_EOF) {
+                failed = 1;
+            }
+            break;
         }
-        gl_ast_node_t *next = gl_parser_parse(parser);
+
+        res = gl_eval(current);
+        if (!res) {
+            failed = 1;
+        }
         gl_ast_destroy(current);
-        current = next;
     }
 
-    return res;
+    return failed ? NULL : res;
 }

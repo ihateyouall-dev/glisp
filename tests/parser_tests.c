@@ -23,8 +23,7 @@ void test_parse_float(void) {
     TEST(node->type == GL_AST_FLOAT, "Parse FLOAT");
     // strtold rounds to long double, while the literal is a double, so the
     // two values are never bit-identical.
-    TEST(node->value.floating > 45.66L && node->value.floating < 45.68L,
-         "Parse FLOAT value");
+    TEST(node->value.floating > 45.66L && node->value.floating < 45.68L, "Parse FLOAT value");
     TEST(node->value.floating > 45.66 && node->value.floating < 45.68, "Parse FLOAT value");
     gl_ast_destroy(node);
     gl_parser_destroy(&parser);
@@ -238,6 +237,18 @@ void test_parse_nested_array_vector(void) {
     gl_parser_destroy(&parser);
 }
 
+void test_parse_dangling_quote(void) {
+    gl_parser_t parser = gl_make_parser("'", "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Dangling quote is rejected");
+    gl_parser_destroy(&parser);
+
+    parser = gl_make_parser("#'", "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Dangling funquote is rejected");
+    gl_parser_destroy(&parser);
+}
+
 void parser_test(void) {
     test_parse_int();
     test_parse_float();
@@ -253,6 +264,7 @@ void parser_test(void) {
     test_parse_vector();
     test_parse_empty_vector();
     test_parse_nested_array_vector();
+    test_parse_dangling_quote();
 }
 
 int main(void) {

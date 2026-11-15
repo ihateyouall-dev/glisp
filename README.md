@@ -15,6 +15,10 @@ frozen.
   defaults, and variadic `&rest`.
 - **Native collections.** Cons lists, fixed-size arrays (`[...]`), and growable
   vectors (`{...}`).
+- **String operations.** Concatenation, slicing, case folding, searching,
+  splitting, joining, and conversion back to numbers.
+- **Hash maps.** String-keyed maps created with `(hash)`, with lookup,
+  insertion, deletion, and key listing.
 - **Mutable bindings and constants.** `set`, `set-global`, and immutable
   `defconst` values, including protected built-ins.
 - **Control flow.** `if`, `cond`, short-circuiting `and`/`or`, `while`, and
@@ -25,8 +29,10 @@ frozen.
   file-mode bitmasks.
 - **Diagnostics.** Colored source snippets with line/column carets and call
   stack traces.
-- **Readline REPL.** Interactive development with line editing and in-session
-  history.
+- **Code as data.** `read` turns text into data; `eval` runs data in the
+  current environment.
+- **Readline REPL.** Interactive development with line editing, in-session
+  history, and multi-line input.
 - **Autoloaded standard library.** Math, list utilities, higher-order
   functions, type predicates, and I/O helpers.
 
@@ -105,12 +111,16 @@ cmake --build build
 Usage: glisp [options] [file]
 
 Options:
-  --no-stdlib    Do not autoload the standard library
-  -h, --help     Show help
+  --no-stdlib      Do not autoload the standard library
+  -e, --eval EXPR  Evaluate an expression and exit; may be repeated
+  -h, --help       Show help
+  -v, --version    Show the version and exit
 ```
 
 - With a `file`, GLisp evaluates it and exits.
-- Without a file, GLisp starts the interactive REPL.
+- With `-e`/`--eval`, GLisp evaluates each `EXPR` in order and exits. A non-nil
+  result is printed. `-e` cannot be combined with a file.
+- Without a file or an expression, GLisp starts the interactive REPL.
 - Scripts may start with a shebang:
 
 ```lisp

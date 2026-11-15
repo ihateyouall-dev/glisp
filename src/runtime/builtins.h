@@ -92,6 +92,22 @@ GL_BUILTIN(vector_push);
 
 GL_BUILTIN(vector_pop);
 
+GL_BUILTIN(sort);
+
+// Hashmaps
+
+GL_BUILTIN(hash);
+
+GL_BUILTIN(hash_set);
+
+GL_BUILTIN(hash_get);
+
+GL_BUILTIN(hash_has_p);
+
+GL_BUILTIN(hash_delete);
+
+GL_BUILTIN(hash_keys);
+
 // String operations
 
 GL_BUILTIN(string_append);
@@ -102,11 +118,17 @@ GL_BUILTIN(string_upcase);
 
 GL_BUILTIN(string_downcase);
 
+GL_BUILTIN(string_to_number);
+
 // Function application and source loading
 
 GL_BUILTIN(apply);
 
 GL_BUILTIN(load);
+
+GL_BUILTIN(read);
+
+GL_BUILTIN(eval);
 
 // Loads and executes a Lisp file.
 // If caller_unit is provided, relative paths resolve relative to caller_unit's directory.

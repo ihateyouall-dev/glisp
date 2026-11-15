@@ -20,10 +20,12 @@ gl_value_t *gl_eval(gl_ast_node_t *node);
 /**
  * Parses and evaluates every top-level form produced by @p parser.
  *
- * @param abort_on_error when non-zero, exits the process on the first error.
- * @return the value of the last form, or NULL if the unit was empty/failed.
+ * A failing form is reported and evaluation continues, but the unit as a whole
+ * then returns NULL.
+ *
+ * @return the value of the last form, or NULL if the unit was empty or failed.
  */
-gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser, int abort_on_error);
+gl_value_t *gl_parse_and_eval(gl_parser_t *restrict parser);
 
 /**
  * Evaluates the argument AST list into a newly allocated argument array.

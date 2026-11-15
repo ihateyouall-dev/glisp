@@ -196,6 +196,7 @@ gl_value_t *gl_value_make_builtin(gl_builtin_t builtin) {
 ARRAY_DEFINE(gl_function_param_t *, gl_function_params);
 ARRAY_DEFINE(gl_value_t *, gl_value_array);
 VECTOR_DEFINE(gl_value_t *, gl_value_vector);
+HASHMAP_DEFINE(gl_value_t *, gl_value_hashmap)
 
 gl_function_param_t *gl_function_param_make(const char *name, gl_param_kind_t kind,
                                             gl_ast_node_t *default_val) {
@@ -381,6 +382,20 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = file;
         break;
     }
+    case GL_VAL_HASHMAP: {
+        gl_value_hashmap_t *orig = val->val;
+        gl_value_hashmap_t *map = malloc(sizeof(gl_value_hashmap_t));
+        gl_value_hashmap_init(map, NULL, gl_value_copy);
+        for (size_t i = 0; i < orig->buckets_count; ++i) {
+            gl_value_hashmapBucket_t *bucket = &orig->buckets[i];
+            for (size_t j = 0; j < bucket->size; ++j) {
+                gl_value_hashmapEntry_t *entry = gl_value_hashmapBucket_at(bucket, j);
+                gl_value_hashmap_insert(map, entry->key, gl_value_copy(entry->value));
+            }
+        }
+        res->val = map;
+        break;
+    }
     }
     gl_register_value(res);
     return res;
@@ -444,6 +459,14 @@ void gl_value_destroy(gl_value_t **val) {
             gl_value_vector_t *vec = (*val)->val;
             free(vec->data);
             free(vec);
+            (*val)->val = NULL;
+        }
+        break;
+    case GL_VAL_HASHMAP:
+        if ((*val)->val != NULL) {
+            gl_value_hashmap_t *map = (*val)->val;
+            gl_value_hashmap_destroy(map);
+            free(map);
             (*val)->val = NULL;
         }
         break;
@@ -532,6 +555,16 @@ gl_value_t *gl_value_make_vector_from(gl_value_vector_t *vec) {
     return res;
 }
 
+gl_value_t *gl_value_make_hashmap(void) {
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_HASHMAP;
+    gl_value_hashmap_t *map = malloc(sizeof(gl_value_hashmap_t));
+    gl_value_hashmap_init(map, NULL, gl_value_copy);
+    res->val = map;
+    gl_register_value(res);
+    return res;
+}
+
 static const char *__gl_typeid_str(gl_value_type_t type) {
     switch (type) {
     case GL_VAL_INT:
@@ -558,6 +591,8 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
         return "vector";
     case GL_VAL_FILE:
         return "file";
+    case GL_VAL_HASHMAP:
+        return "hashmap";
     case GL_VAL_ENV:
         assert(0 && "UNREACHABLE");
     }
@@ -640,6 +675,11 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
         fprintf(file, "}");
         break;
     }
+    case GL_VAL_HASHMAP: {
+        gl_value_hashmap_t *map = val->val;
+        fprintf(file, "#hashmap(%zu)", map ? map->size : 0);
+        break;
+    }
     case GL_VAL_FILE: {
         gl_file_t *f = gl_value_get_file(val);
         fprintf(file, "#<file %s %s>", f->name ? f->name : "unnamed",
@@ -720,6 +760,10 @@ gl_value_array_t *gl_value_get_array(gl_value_t *val) {
 }
 gl_value_vector_t *gl_value_get_vector(gl_value_t *val) {
     assert(val->type == GL_VAL_VECTOR);
+    return val->val;
+}
+gl_value_hashmap_t *gl_value_get_hashmap(gl_value_t *val) {
+    assert(val->type == GL_VAL_HASHMAP);
     return val->val;
 }
 gl_value_type_t gl_value_get_typeid(gl_value_t *val) {
@@ -842,7 +886,7 @@ static int __gl_value_compare_numbers(gl_value_t *lhs, gl_value_t *rhs) {
 }
 
 // Structural equality: numbers by value (mixed int/float allowed), symbols and
-// strings by content, collections element-wise.
+// strings by content, collections element-wise; hash maps only by identity.
 int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
     if (__gl_value_is_number(lhs)) {
         if (__gl_value_is_number(rhs)) {
@@ -922,6 +966,10 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
         } else {
             return -1;
         }
+    }
+
+    if (lhs->type == GL_VAL_HASHMAP) {
+        return lhs == rhs ? 0 : -1;
     }
 
     if (lhs->type == GL_VAL_CONS) {

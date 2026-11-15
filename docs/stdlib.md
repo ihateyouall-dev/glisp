@@ -5,7 +5,7 @@ automatically at startup unless `--no-stdlib` is given. `std/std.lisp` loads the
 modules in this order:
 
 ```
-core.lisp -> math.lisp -> list.lisp -> iter.lisp -> types.lisp -> io.lisp
+core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> io.lisp
 ```
 
 All definitions are installed in the global environment. Because `types.lisp`
@@ -105,6 +105,35 @@ Domain errors are reported with `assert` and abort the current form.
 | `(append a b)` | Concatenates two lists (recursive) |
 | `(member item lst)` | Returns the sublist starting at `item`, or `nil`; compares with `=` |
 
+## strings.lisp
+
+| Signature | Description |
+| :--- | :--- |
+| `(string-index haystack needle)` | First index of `needle`, or `nil`; empty `needle` gives `0` |
+| `(string-contains? haystack needle)` | `t` when `needle` occurs in `haystack`, otherwise `nil` |
+| `(string-split string separator)` | Pieces between separators; an empty `separator` raises an error |
+| `(string-join list separator)` | Elements converted with `to-string`, joined with `separator` |
+| `(string-starts-with? string prefix)` | `t` when `string` begins with `prefix` |
+| `(string-ends-with? string suffix)` | `t` when `string` ends with `suffix` |
+| `(string-repeat string count)` | `string` repeated `count` times; zero or less gives `""` |
+| `(string-replace string from to)` | Replaces every occurrence of `from`, left to right and without overlap |
+| `(string-whitespace? string)` | `t` for a single space, tab, newline or carriage return |
+| `(string-trim-left string)` | `string` without leading whitespace |
+| `(string-trim-right string)` | `string` without trailing whitespace |
+| `(string-trim string)` | `string` without leading or trailing whitespace |
+
+A trailing separator produces a trailing empty string, and a string without
+separators produces a one-element list.
+
+```lisp
+(string-index "hello" "ll")      ; => 2
+(string-contains? "hello" "z")   ; => nil
+(string-split "a::b::c" "::")    ; => ("a" "b" "c")
+(string-join (list 1 2 3) "-")   ; => "1-2-3"
+(string-trim "  hi  ")           ; => "hi"
+(string-replace "a-b-c" "-" "+") ; => "a+b+c"
+```
+
 ## iter.lisp
 
 | Signature | Description |
@@ -118,7 +147,7 @@ Domain errors are reported with `assert` and abort the current form.
 | `(each f coll)` | Calls `f` for each element; returns `nil`. |
 | `(any? pred coll)` | True when at least one element satisfies `pred`. |
 | `(all? pred coll)` | True when every element satisfies `pred`. |
-| `(sort coll)` | Returns a sorted copy of a list, array or vector, in ascending order. |
+| `(sort-by key coll)` | Returns a sorted copy of `coll`, ordered by `(key element)`; equal keys keep their relative order |
 
 `map` and `filter` return `nil` for an unknown collection type. `reduce`,
 `each`, `any?`, and `all?` support lists, arrays, and vectors.
