@@ -82,7 +82,7 @@
   (if (or (list? coll) (nil? coll))
       (let ((acc init)
             (cur coll))
-        (while (not (nil? cur))
+        (while cur
           (set acc (f acc (car cur)))
           (set cur (cdr cur)))
         acc)
@@ -98,7 +98,7 @@
   "Calls F for every element of COLL and returns nil."
   (if (or (list? coll) (nil? coll))
       (let ((cur coll))
-        (while (not (nil? cur))
+        (while cur
           (f (car cur))
           (set cur (cdr cur))))
       (let ((i 0)

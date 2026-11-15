@@ -12,6 +12,8 @@ option(GLISP_ENABLE_TESTING "Build tests" OFF)
 # get, which would make the depth guard in eval.c fire much later than intended.
 if(MINGW)
   add_link_options(-Wl,--stack,8388608)
+elseif(MSVC)
+  add_link_options(/STACK:8388608)
 endif()
 
 find_package(readline CONFIG QUIET)

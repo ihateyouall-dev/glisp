@@ -145,6 +145,7 @@ optional, and rest parameters.
   in `gl_global_env`.
 - `gl_env_set_var` / `gl_env_set_fun` / `gl_env_set_const` insert bindings.
 - `gl_env_get_var` / `gl_env_get_fun` search the frame chain.
+- `gl_env_get_callable` resolves a callable using the nearest lexical binding.
 - `gl_env_is_const` reports whether a name is protected.
 
 ### `callstack.h`

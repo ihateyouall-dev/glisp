@@ -14,15 +14,51 @@
 #include "runtime/env.h"
 #include "value.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 // Deeper nesting than this is reported as an error: the C stack is finite, so
 // a runaway Lisp call has to end with a diagnostic instead of a crash.
-const size_t GL_MAX_EVAL_DEPTH = 2000;
+const size_t GL_MAX_EVAL_DEPTH = 1000;
 
 static size_t gl_eval_depth = 0;
+static uintptr_t gl_stack_base = 0;
+static size_t gl_stack_budget = 0;
+
+static size_t __gl_stack_budget(void) {
+    if (gl_stack_budget != 0) {
+        return gl_stack_budget;
+    }
+
+    size_t budget = (size_t)6 * 1024 * 1024;
+#ifndef _WIN32
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY) {
+        size_t stack = (size_t)limit.rlim_cur;
+        size_t margin = (size_t)1024 * 1024;
+        budget = stack > margin ? stack - margin : stack / 2;
+    }
+#endif
+
+    gl_stack_budget = budget;
+    return budget;
+}
+
+static int __gl_stack_exhausted(void) {
+    volatile unsigned char probe = 0;
+    uintptr_t current = (uintptr_t)&probe;
+
+    if (gl_stack_base == 0) {
+        gl_stack_base = current;
+        return 0;
+    }
+
+    size_t used = current > gl_stack_base ? (size_t)(current - gl_stack_base)
+                                          : (size_t)(gl_stack_base - current);
+    return used > __gl_stack_budget();
+}
 
 static gl_value_t *__gl_eval_int(gl_ast_node_t *node) {
     return gl_value_make_int(node->value.integral);
@@ -245,100 +281,106 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
         gl_ast_node_t *head = node->value.cons.car;
         gl_ast_node_t *body = node->value.cons.cdr;
 
+        gl_value_t *env = gl_current_env();
+        gl_value_t *callee = NULL;
+
         if (head->type == GL_AST_SYMBOL) {
             const char *name = head->value.symbol;
+            callee = gl_env_get_callable((gl_env_t *)env->val, name);
 
-            if (strcmp(name, "if") == 0) {
-                gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
-                if (test == NULL) {
-                    return NULL;
-                }
-
-                gl_ast_node_t *consequent = gl_ast_cons_nth_car(body, 1);
-                gl_ast_node_t *alternates = gl_ast_cons_nth_cdr(body, 1);
-
-                if (gl_value_get_bool(test)) {
-                    node = consequent;
-                    continue;
-                }
-                if (alternates == NULL || alternates->type == GL_AST_NIL) {
-                    return gl_value_make_nil();
-                }
-
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(alternates, &last);
-                if (res == NULL) {
-                    return NULL;
-                }
-                node = last;
-                continue;
-            }
-
-            if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
-                strcmp(name, "unless") == 0) {
-                gl_ast_node_t *forms = body;
-
-                if (strcmp(name, "progn") != 0) {
+            if (callee != NULL && callee->type == GL_VAL_SPFORM) {
+                if (strcmp(name, "if") == 0) {
                     gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
                     if (test == NULL) {
                         return NULL;
                     }
 
-                    int taken = gl_value_get_bool(test);
-                    if (strcmp(name, "unless") == 0) {
-                        taken = !taken;
+                    gl_ast_node_t *consequent = gl_ast_cons_nth_car(body, 1);
+                    gl_ast_node_t *alternates = gl_ast_cons_nth_cdr(body, 1);
+
+                    if (gl_value_get_bool(test)) {
+                        node = consequent;
+                        continue;
                     }
-                    if (!taken) {
+                    if (alternates == NULL || alternates->type == GL_AST_NIL) {
                         return gl_value_make_nil();
                     }
-                    forms = gl_ast_cons_nth_cdr(body, 1);
-                }
-                if (forms == NULL || forms->type == GL_AST_NIL) {
-                    return gl_value_make_nil();
-                }
 
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(forms, &last);
-                if (res == NULL) {
-                    return NULL;
-                }
-                node = last;
-                continue;
-            }
-
-            if (strcmp(name, "cond") == 0) {
-                gl_ast_node_t *clause = body;
-                gl_value_t *matched = NULL;
-
-                while (clause != NULL && clause->type == GL_AST_CONS) {
-                    gl_ast_node_t *entry = clause->value.cons.car;
-                    gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
-                    if (test == NULL) {
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(alternates, &last);
+                    if (res == NULL) {
                         return NULL;
                     }
-                    if (gl_value_get_bool(test)) {
-                        matched = test;
-                        break;
+                    node = last;
+                    continue;
+                }
+
+                if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
+                    strcmp(name, "unless") == 0) {
+                    gl_ast_node_t *forms = body;
+
+                    if (strcmp(name, "progn") != 0) {
+                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
+                        if (test == NULL) {
+                            return NULL;
+                        }
+
+                        int taken = gl_value_get_bool(test);
+                        if (strcmp(name, "unless") == 0) {
+                            taken = !taken;
+                        }
+                        if (!taken) {
+                            return gl_value_make_nil();
+                        }
+                        forms = gl_ast_cons_nth_cdr(body, 1);
                     }
-                    clause = clause->value.cons.cdr;
+                    if (forms == NULL || forms->type == GL_AST_NIL) {
+                        return gl_value_make_nil();
+                    }
+
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(forms, &last);
+                    if (res == NULL) {
+                        return NULL;
+                    }
+                    node = last;
+                    continue;
                 }
 
-                if (matched == NULL) {
-                    return gl_value_make_nil();
-                }
+                if (strcmp(name, "cond") == 0) {
+                    gl_ast_node_t *clause = body;
+                    gl_value_t *matched = NULL;
 
-                gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
-                if (clause_body->type == GL_AST_NIL) {
-                    return matched;
-                }
+                    while (clause != NULL && clause->type == GL_AST_CONS) {
+                        gl_ast_node_t *entry = clause->value.cons.car;
+                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
+                        if (test == NULL) {
+                            return NULL;
+                        }
+                        if (gl_value_get_bool(test)) {
+                            matched = test;
+                            break;
+                        }
+                        clause = clause->value.cons.cdr;
+                    }
 
-                gl_ast_node_t *last = NULL;
-                gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
-                if (res == NULL) {
-                    return NULL;
+                    if (matched == NULL) {
+                        return gl_value_make_nil();
+                    }
+
+                    gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
+                    if (clause_body->type == GL_AST_NIL) {
+                        return matched;
+                    }
+
+                    gl_ast_node_t *last = NULL;
+                    gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
+                    if (res == NULL) {
+                        return NULL;
+                    }
+                    node = last;
+                    continue;
                 }
-                node = last;
-                continue;
             }
         }
 
@@ -348,15 +390,11 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
             return gl_eval(node);
         }
 
-        gl_value_t *env = gl_current_env();
-        gl_value_t *func_val = gl_env_get_fun((gl_env_t *)env->val, head->value.symbol);
-        if (func_val == NULL) {
-            func_val = gl_env_get_var((gl_env_t *)env->val, head->value.symbol);
-        }
-        if (func_val == NULL || func_val->type != GL_VAL_FUNCTION) {
+        if (callee == NULL || callee->type != GL_VAL_FUNCTION) {
             return gl_eval(node);
         }
 
+        gl_value_t *func_val = callee;
         gl_function_t *function = func_val->val;
         size_t root_mark = gl_gc_root_mark();
 
@@ -434,19 +472,19 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         }
     } else {
         const char *func_name = func_node->value.symbol;
-        func_val = gl_env_get_fun((gl_env_t *)env->val, func_name);
-        // Evaluating variable value if function is undefined. We trying it because variables can
-        // also store functions
-        if (func_val == NULL) {
-            func_val = gl_env_get_var((gl_env_t *)env->val, func_name);
-        }
-        // Emmiting error if function still not found
-        if (!func_val || !func_val->val) {
+        func_val = gl_env_get_callable((gl_env_t *)env->val, func_name);
+        if (!func_val) {
             const char *fmt = "undefined function '%s'";
             char buf[1024];
             snprintf(buf, sizeof(buf), fmt, func_name);
             gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func_node->location, buf);
             gl_diagnostic_report_error(err);
+            return NULL;
+        }
+        if (func_val->type != GL_VAL_FUNCTION && func_val->type != GL_VAL_BUILTIN &&
+            func_val->type != GL_VAL_SPFORM) {
+            gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, func_node->location,
+                                                     "Expression result cannot be called"));
             return NULL;
         }
         gl_gc_push_root(func_val);

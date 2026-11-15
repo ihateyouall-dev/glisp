@@ -30,7 +30,7 @@
 (defun reverse (lst)
   "Returns a new list with the elements of LST in reverse order."
   (let ((acc nil))
-    (while (not (nil? lst))
+    (while lst
       (set acc (cons (car lst) acc))
       (set lst (cdr lst)))
     acc))

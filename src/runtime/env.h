@@ -56,3 +56,12 @@ gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym);
 
 /** Looks up a function, walking parent frames; returns NULL when unbound. */
 gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym);
+
+/**
+ * Resolves a callable name using the nearest lexical binding.
+ *
+ * Frames are searched from innermost to outermost. Within one frame a function
+ * binding wins over a variable binding, but an inner variable shadows an outer
+ * function of the same name.
+ */
+gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym);
