@@ -399,6 +399,40 @@ void test_std_strings(void) {
          "string-join of string-split result");
 
     TEST(eval_str("(string-split \"a,b\" \"\")") == NULL, "string-split empty separator");
+
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"hello\" \"he\")")) == 1,
+         "string-starts-with? match");
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"hello\" \"lo\")")) == 0,
+         "string-starts-with? mismatch");
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? \"he\" \"hello\")")) == 0,
+         "string-starts-with? longer prefix");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"lo\")")) == 1,
+         "string-ends-with? match");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"\")")) == 1,
+         "string-ends-with? empty suffix");
+    TEST(gl_value_get_bool(eval_str("(string-ends-with? \"hello\" \"he\")")) == 0,
+         "string-ends-with? mismatch");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-repeat \"ab\" 3)")), "ababab") == 0,
+         "string-repeat");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-repeat \"ab\" 0)")), "") == 0,
+         "string-repeat zero");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"a-b-c\" \"-\" \"+\")")), "a+b+c") ==
+             0,
+         "string-replace every occurrence");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"aaa\" \"aa\" \"b\")")), "ba") == 0,
+         "string-replace left to right");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-replace \"abc\" \"z\" \"y\")")), "abc") == 0,
+         "string-replace without a match");
+
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim \"  hi  \")")), "hi") == 0,
+         "string-trim removes both ends");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim-left \"  hi  \")")), "hi  ") == 0,
+         "string-trim-left");
+    TEST(strcmp(gl_value_get_string(eval_str("(string-trim-right \"  hi  \")")), "  hi") == 0,
+         "string-trim-right");
+    TEST(gl_value_get_int(eval_str("(len (string-trim \"   \"))")) == 0, "string-trim blank");
 }
 
 // The list is longer than the evaluator's recursion limit, so these helpers have
