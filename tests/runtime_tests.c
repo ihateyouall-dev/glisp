@@ -1068,9 +1068,15 @@ void test_gc_stress(void) {
 }
 
 void test_recursion(void) {
-    eval_str("(defun endless (n) (endless (+ n 1)))");
+    eval_str("(defun endless (n) (+ 1 (endless (+ n 1))))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
     TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");
+
+    eval_str("(defun count-down (n) (if (= n 0) 0 (count-down (- n 1))))");
+    TEST(gl_value_get_int(eval_str("(count-down 20000)")) == 0,
+         "tail recursion runs in constant stack");
+    TEST(gl_value_get_int(eval_str("(let ((i 0)) (dotimes (k 20000) (set i k)) i)")) == 19999,
+         "deep loop with set");
 }
 
 int main(void) {
