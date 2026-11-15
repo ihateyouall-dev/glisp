@@ -6,4 +6,5 @@
 (load "strings.lisp")
 (load "iter.lisp")
 (load "types.lisp")
+(load "hash.lisp")
 (load "io.lisp")

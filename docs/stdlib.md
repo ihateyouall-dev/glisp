@@ -5,7 +5,7 @@ automatically at startup unless `--no-stdlib` is given. `std/std.lisp` loads the
 modules in this order:
 
 ```
-core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> io.lisp
+core.lisp -> math.lisp -> list.lisp -> strings.lisp -> iter.lisp -> types.lisp -> hash.lisp -> io.lisp
 ```
 
 All definitions are installed in the global environment. Because `types.lisp`
@@ -162,6 +162,24 @@ separators produces a one-element list.
 (reduce + {1 2 3 4} 0)        ; => 10
 (any? even? [1 3 5 6])        ; => t
 (all? odd? [1 3 5])           ; => t
+```
+
+## hash.lisp
+
+| Signature | Description |
+| :--- | :--- |
+| `(hash-values map)` | List of the values, in no particular order |
+| `(hash-each f map)` | Calls `(f key value)` for every entry; returns `nil` |
+| `(hash->alist map)` | List of `(key . value)` pairs |
+
+Ordering is unspecified for all three, because a hash map has none. `hash->alist`
+is the way to sort entries: `(sort-by car (hash->alist map))`.
+
+```lisp
+(set m (hash))
+(hash-set m "b" 2)
+(hash-set m "a" 1)
+(sort-by car (hash->alist m))   ; => ((a . 1) (b . 2))
 ```
 
 ## types.lisp
