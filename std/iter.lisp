@@ -144,3 +144,15 @@
               (set failed t))
           (set i (+ i 1)))
         (not failed))))
+
+(defun sort-by (key coll)
+  "Returns a sorted copy of COLL, ordered by (KEY element) in ascending order."
+  (assert (function? key) "KEY must be function")
+  (let ((i 0))
+    (let ((decorated
+           (map (lambda (x)
+                  (let ((pos i))
+                    (set i (+ i 1))
+                    (cons (key x) (cons pos x))))
+                coll)))
+      (map (lambda (entry) (cdr (cdr entry))) (sort decorated)))))

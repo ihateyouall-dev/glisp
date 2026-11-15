@@ -147,6 +147,7 @@ separators produces a one-element list.
 | `(each f coll)` | Calls `f` for each element; returns `nil`. |
 | `(any? pred coll)` | True when at least one element satisfies `pred`. |
 | `(all? pred coll)` | True when every element satisfies `pred`. |
+| `(sort-by key coll)` | Returns a sorted copy of `coll`, ordered by `(key element)`; equal keys keep their relative order |
 
 `map` and `filter` return `nil` for an unknown collection type. `reduce`,
 `each`, `any?`, and `all?` support lists, arrays, and vectors.
