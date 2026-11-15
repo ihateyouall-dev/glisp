@@ -449,6 +449,18 @@ void test_std_strings(void) {
          "string-pad-right");
     TEST(strcmp(gl_value_get_string(eval_str("(string-pad-left \"abcd\" 2)")), "abcd") == 0,
          "string-pad-left keeps longer strings");
+
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\nb\\nc\"))")) == 3,
+         "string-lines count");
+    TEST(strcmp(gl_value_get_string(eval_str("(car (string-lines \"a\\nb\"))")), "a") == 0,
+         "string-lines first line");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\nb\\n\"))")) == 3 - 1,
+         "string-lines drops one trailing empty line");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"a\\r\\nb\\r\\n\"))")) == 2,
+         "string-lines accepts carriage returns");
+    TEST(eval_str("(string-lines \"\")")->type == GL_VAL_NIL, "string-lines of an empty string");
+    TEST(gl_value_get_int(eval_str("(len (string-lines \"single\"))")) == 1,
+         "string-lines of one line");
 }
 
 void test_range(void) {

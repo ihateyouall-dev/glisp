@@ -166,3 +166,17 @@
       (set acc (string-append acc " "))
       (set gap (- gap 1)))
     acc))
+
+(defun string-lines (text)
+  "Returns the lines of TEXT, splitting on newlines and dropping a trailing carriage return."
+  (assert (string? text) "TEXT must be string")
+  (if (= (len text) 0)
+      nil
+      (let ((parts (string-split (string-replace text "\r\n" "\n") "\n"))
+            (rev nil))
+        (while (not (nil? parts))
+          (set rev (cons (car parts) rev))
+          (set parts (cdr parts)))
+        (if (and (not (nil? (cdr rev))) (= (car rev) ""))
+            (reverse (cdr rev))
+            (reverse rev)))))
