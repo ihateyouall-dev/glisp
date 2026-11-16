@@ -638,6 +638,20 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
 
 // Textual representation used by print/write. Strings and symbols are emitted
 // verbatim; improper lists use dotted-pair notation.
+// Floats print with the shortest form that keeps 15 significant digits, so
+// 1.5 stays 1.5 instead of 1.500000, and an integral value keeps its type
+// visible as 1.0. Very large or small magnitudes still use exponent notation.
+static void __gl_fprint_float(FILE *file, long double num) {
+    char buf[64];
+
+    snprintf(buf, sizeof(buf), "%.15Lg", num);
+    if (strpbrk(buf, ".eE") == NULL) {
+        size_t len = strlen(buf);
+        snprintf(buf + len, sizeof(buf) - len, ".0");
+    }
+    fputs(buf, file);
+}
+
 void gl_value_fprint(FILE *file, gl_value_t *val) {
     if (!val) {
         return;
@@ -647,7 +661,7 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
         fprintf(file, "%lld", (*(int64_t *)val->val));
         break;
     case GL_VAL_FLOAT:
-        fprintf(file, "%Lf", (*(long double *)val->val));
+        __gl_fprint_float(file, *(long double *)val->val);
         break;
     case GL_VAL_TYPEID:
         fprintf(file, "%s", __gl_typeid_str(*(gl_value_type_t *)val->val));

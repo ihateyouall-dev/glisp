@@ -982,13 +982,17 @@ GL_SPECIAL_FORM(for) {
 }
 
 GL_SPECIAL_FORM(and) {
+    // With no operands the identity holds: nothing failed.
     if (!args || args->type == GL_AST_NIL) {
-        return gl_value_make_nil();
+        return gl_value_make_bool(1);
     }
 
     gl_ast_node_t *current = args;
     while (current->type != GL_AST_NIL) {
         gl_value_t *current_val = gl_eval(current->value.cons.car);
+        if (current_val == NULL) {
+            return NULL;
+        }
 
         if (!gl_value_get_bool(current_val)) {
             return gl_value_make_bool(0);
@@ -1006,6 +1010,9 @@ GL_SPECIAL_FORM(or) {
     gl_ast_node_t *current = args;
     while (current->type != GL_AST_NIL) {
         gl_value_t *current_val = gl_eval(current->value.cons.car);
+        if (current_val == NULL) {
+            return NULL;
+        }
 
         if (gl_value_get_bool(current_val)) {
             return gl_value_make_bool(1);

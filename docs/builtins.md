@@ -241,6 +241,7 @@ Dispatches a runtime directive.
 | :--- | :--- |
 | `(exit [code])` | Terminates the process with `code` (default `0`). |
 | `(typeof value)` | Returns the value's typeid. |
+| `(copy value)` | Returns a deep copy; collections inside it are duplicated, so mutating the copy leaves the original alone. A file copies the handle it shares. |
 | `(load path)` | Evaluates a source file relative to the current unit and returns its last value. |
 | `(assert condition [message])` | Returns `nil`; aborts the current form with a diagnostic if `condition` is nil. |
 

@@ -13,6 +13,7 @@
 #include "memory.h"
 #include "parser.h"
 #include "runtime/value.h"
+#include "syntax.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -537,6 +538,14 @@ GL_BUILTIN(typeof) {
     EXPECT_ARGS(1);
 
     return gl_value_make_typeid(NTH_VAL(0)->type);
+}
+
+// Collections are mutable by reference, so assigning one to another name makes
+// both names point at the same cells; a copy is the way to get an independent one.
+GL_BUILTIN(copy) {
+    EXPECT_ARGS(1);
+
+    return gl_value_copy(NTH_VAL(0));
 }
 
 GL_BUILTIN(int_con) {
@@ -1363,45 +1372,6 @@ GL_BUILTIN(load) {
     return res;
 }
 
-// Converts parsed syntax into runtime data for read.
-static gl_value_t *__gl_ast_to_value(gl_ast_node_t *node) {
-    switch (node->type) {
-    case GL_AST_INT:
-        return gl_value_make_int(node->value.integral);
-    case GL_AST_FLOAT:
-        return gl_value_make_float(node->value.floating);
-    case GL_AST_SYMBOL:
-        return gl_value_make_symbol(node->value.symbol);
-    case GL_AST_STRING:
-        return gl_value_make_string(node->value.string);
-    case GL_AST_NIL:
-        return gl_value_make_nil();
-    case GL_AST_CONS:
-        return gl_value_make_cons_raw(__gl_ast_to_value(node->value.cons.car),
-                                      __gl_ast_to_value(node->value.cons.cdr));
-    case GL_AST_ARRAY: {
-        gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
-        gl_value_array_init(arr, node->value.array.size, NULL);
-
-        for (size_t i = 0; i < node->value.array.size; ++i) {
-            arr->data[i] = __gl_ast_to_value(node->value.array.data[i]);
-        }
-        return gl_value_make_array_from(arr);
-    }
-    case GL_AST_VECTOR: {
-        gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
-        gl_value_vector_init(vec, NULL);
-
-        for (size_t i = 0; i < node->value.vector.size; ++i) {
-            gl_value_t *elem = __gl_ast_to_value(*gl_ast_vector_at(&node->value.vector, i));
-            gl_value_vector_push_back(vec, elem);
-        }
-        return gl_value_make_vector_from(vec);
-    }
-    }
-    return NULL;
-}
-
 // Only the first expression is parsed; trailing text is ignored.
 // Empty or whitespace-only input has no expression and reads as nil.
 GL_BUILTIN(read) {
@@ -1415,7 +1385,7 @@ GL_BUILTIN(read) {
     gl_value_t *res = NULL;
 
     if (node) {
-        res = __gl_ast_to_value(node);
+        res = gl_ast_to_value(node);
         gl_ast_destroy(node);
     } else if (gl_lex_token_vector_at(&parser.tokens, 0)->type == GL_LEX_EOF) {
         res = gl_value_make_nil();
@@ -1425,122 +1395,10 @@ GL_BUILTIN(read) {
     return res;
 }
 
-static void __emit_eval_error(gl_location_t location, const char *type) {
-    char buf[256] = "";
-    snprintf(buf, sizeof(buf), "Cannot evaluate %s", type);
-    gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, location, buf));
-}
-
-// gl_ast_make_string decodes escapes, so backslashes in a value are doubled first.
-static char *__gl_escape_backslashes(const char *str) {
-    size_t len = strlen(str);
-    char *res = malloc(len * 2 + 1);
-    char *dst = res;
-
-    for (const char *src = str; *src != '\0'; ++src) {
-        if (*src == '\\') {
-            *dst++ = '\\';
-        }
-        *dst++ = *src;
-    }
-    *dst = '\0';
-    return res;
-}
-
-static gl_ast_node_t *__gl_value_to_ast(gl_value_t *val, gl_location_t location);
-
-// A dotted tail cannot be code: only proper lists convert to an AST list.
-static gl_ast_node_t *__gl_value_to_ast_list(gl_value_t *val, gl_location_t location) {
-    if (val->type == GL_VAL_NIL) {
-        return gl_ast_make_nil(location);
-    }
-
-    if (val->type != GL_VAL_CONS) {
-        __emit_eval_error(location, "improper list");
-        return NULL;
-    }
-
-    gl_value_cons_t *cons = gl_value_get_cons(val);
-    gl_ast_node_t *car = __gl_value_to_ast(cons->car, location);
-    if (!car) {
-        return NULL;
-    }
-
-    gl_ast_node_t *cdr = __gl_value_to_ast_list(cons->cdr, location);
-    if (!cdr) {
-        gl_ast_destroy(car);
-        return NULL;
-    }
-
-    return gl_ast_make_cons(car, cdr, location);
-}
-
-// Converts runtime data into syntax for eval.
-static gl_ast_node_t *__gl_value_to_ast(gl_value_t *val, gl_location_t location) {
-    switch (val->type) {
-    case GL_VAL_NIL:
-        return gl_ast_make_nil(location);
-    case GL_VAL_INT:
-        return gl_ast_make_int(gl_value_get_int(val), location);
-    case GL_VAL_FLOAT:
-        return gl_ast_make_float(gl_value_get_float(val), location);
-    case GL_VAL_SYMBOL:
-        return gl_ast_make_symbol(gl_value_get_symbol(val), location);
-    case GL_VAL_STRING: {
-        char *str = __gl_escape_backslashes(gl_value_get_string(val));
-        gl_ast_node_t *res = gl_ast_make_string(str, location);
-        free(str);
-        return res;
-    }
-    case GL_VAL_CONS:
-        return __gl_value_to_ast_list(val, location);
-    case GL_VAL_ARRAY: {
-        gl_value_array_t *arr = gl_value_get_array(val);
-        gl_ast_vector_t temp;
-        gl_ast_vector_init(&temp, gl_ast_node_destroy_helper);
-
-        for (size_t i = 0; i < arr->size; ++i) {
-            gl_ast_node_t *elem = __gl_value_to_ast(arr->data[i], location);
-            if (!elem) {
-                gl_ast_vector_destroy(&temp);
-                return NULL;
-            }
-            gl_ast_vector_push_back(&temp, elem);
-        }
-        gl_ast_array_t res;
-        gl_ast_array_init(&res, temp.size, gl_ast_node_destroy_helper);
-        for (size_t i = 0; i < temp.size; ++i) {
-            res.data[i] = temp.data[i];
-        }
-        free(temp.data);
-        return gl_ast_make_array(res, location);
-    }
-    case GL_VAL_VECTOR: {
-        gl_value_vector_t *vec = gl_value_get_vector(val);
-        gl_ast_vector_t res;
-        gl_ast_vector_init(&res, gl_ast_node_destroy_helper);
-
-        for (size_t i = 0; i < vec->size; ++i) {
-            gl_ast_node_t *elem = __gl_value_to_ast(*gl_value_vector_at(vec, i), location);
-            if (!elem) {
-                gl_ast_vector_destroy(&res);
-                return NULL;
-            }
-            gl_ast_vector_push_back(&res, elem);
-        }
-        return gl_ast_make_vector(res, location);
-    }
-    default:
-        __emit_eval_error(location,
-                          val->type == GL_VAL_ENV ? "environment" : __gl_value_get_type_name(val));
-        return NULL;
-    }
-}
-
 GL_BUILTIN(eval) {
     EXPECT_ARGS(1);
 
-    gl_ast_node_t *node = __gl_value_to_ast(NTH_VAL(0), called_at);
+    gl_ast_node_t *node = gl_value_to_ast(NTH_VAL(0), called_at);
     if (!node) {
         return NULL;
     }

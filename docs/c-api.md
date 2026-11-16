@@ -133,6 +133,19 @@ typedef struct gl_value_t {
 closure, name, and arity bounds. `gl_function_param_t` models required,
 optional, and rest parameters.
 
+### `syntax.h`
+
+Conversions between parsed AST nodes and runtime data (the "code as data"
+boundary used by `read`, `eval`, and future macro expansion).
+
+- `gl_ast_to_value(node)` converts a parsed tree into runtime data (symbols,
+  lists, arrays, vectors). The result is GC-managed.
+- `gl_value_to_ast(value, location)` converts runtime data back into syntax.
+  It rejects improper lists and values that cannot be code (functions,
+  builtins, environments, files). The caller owns the returned AST and must
+  free it with `gl_ast_destroy`. All produced nodes receive `location`, so macro
+  expansion can point diagnostics at the macro call site.
+
 ### `env.h`
 
 `gl_env_t` is a lexical frame with three hash tables (`variables`, `functions`,

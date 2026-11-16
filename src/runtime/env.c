@@ -54,6 +54,7 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
 static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("exit", exit);
     DEFINE_BUILTIN("typeof", typeof);
+    DEFINE_BUILTIN("copy", copy);
 
     DEFINE_BUILTIN("+", add);
     DEFINE_BUILTIN("-", sub);
