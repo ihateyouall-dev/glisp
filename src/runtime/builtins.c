@@ -2166,3 +2166,24 @@ GL_BUILTIN(lognot) {
 
     return gl_value_make_int(~gl_value_get_int(val));
 }
+
+static unsigned long long __gl_gensym_counter = 0;
+
+GL_BUILTIN(gensym) {
+    EXPECT_RVARGS(0, 1);
+
+    const char *prefix = "g";
+    if (ARGC == 1) {
+        gl_value_t *arg = NTH_VAL(0);
+        EXPECT_STRING(arg);
+        prefix = gl_value_get_string(arg);
+    }
+
+    size_t len = strlen(prefix) + 32;
+    char *name = malloc(len);
+    snprintf(name, len, " #:%s%llu", prefix, ++__gl_gensym_counter);
+
+    gl_value_t *res = gl_value_make_symbol(name);
+    free(name);
+    return res;
+}

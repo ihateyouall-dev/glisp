@@ -383,3 +383,21 @@ unknown bits are rejected.
 | `(lognot a)` | Bitwise NOT |
 
 All bitwise builtins require int arguments.
+
+## Metaprogramming
+
+### `gensym`
+
+```
+(gensym [text])
+```
+
+```
+(gensym)
+; " #:g<counter>"
+(gensym "tmp")
+; " #:tmp<counter>"
+```
+
+Returns symbol with leading space at the beginning to avoid collisions in macros (WIP),
+pass TEXT to generate symbol like that. COUNTER increments on every call.

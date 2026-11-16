@@ -1332,6 +1332,24 @@ void test_list_hofs_large(void) {
     TEST(gl_value_get_int(eval_str("(len (member 0 hof-list))")) == 1, "member on 1000 elements");
 }
 
+void test_gensym(void) {
+    TEST(gl_value_get_bool(eval_str("(symbol? (gensym))")) == 1, "gensym returns a symbol");
+    TEST(gl_value_get_bool(eval_str("(= (gensym) (gensym))")) == 0, "gensym values are unique");
+    TEST(gl_value_get_bool(eval_str("(= (gensym \"x\") (gensym \"x\"))")) == 0,
+         "gensym uniqueness does not depend on the prefix");
+    TEST(gl_value_get_bool(eval_str("(string-contains? (to-string (gensym \"tmp\")) \"tmp\")")) ==
+             1,
+         "gensym keeps the requested prefix");
+    TEST(gl_value_get_bool(eval_str("(string-starts-with? (to-string (gensym)) \" \")")) == 1,
+         "gensym has a hidden leading marker");
+
+    TEST(eval_expr("(gensym 42)") == NULL, "gensym rejects a non-string prefix");
+
+    eval_str("(set gensym-value (gensym))");
+    TEST(gl_value_get_bool(eval_str("(= gensym-value (read (to-string gensym-value)))")) == 0,
+         "gensym is not readable back to the same symbol");
+}
+
 void test_recursion(void) {
     eval_str("(defun endless (n) (+ 1 (endless (+ n 1))))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
@@ -1396,6 +1414,7 @@ int main(void) {
     test_gc_stress();
     test_call_resolution();
     test_list_hofs_large();
+    test_gensym();
     test_recursion();
 
     gl_destroy_memory_heap();

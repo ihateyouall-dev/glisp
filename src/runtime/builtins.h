@@ -200,3 +200,5 @@ GL_BUILTIN(logior);
 GL_BUILTIN(logxor);
 
 GL_BUILTIN(lognot);
+
+GL_BUILTIN(gensym);
