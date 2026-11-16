@@ -85,12 +85,14 @@
 (defun rem (a b)
   "Returns the remainder of A divided by B, truncated toward zero."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
-  (- a (* b (trunc (/ a b)))))
+  (let ((r (- a (* b (trunc (/ (float a) (float b)))))))
+    (if (and (int? a) (int? b)) (int r) r)))
 
 (defun mod (a b)
   "Returns the floored modulo of A by B; the sign follows B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
-  (- a (* b (floor (/ a b)))))
+  (let ((r (- a (* b (floor (/ (float a) (float b)))))))
+    (if (and (int? a) (int? b)) (int r) r)))
 
 (defun approx= (a b &optional (rel-tol 0.0000001) (abs-tol 0.000000001))
   "Returns t if A is approximately equal to B."
