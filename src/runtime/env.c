@@ -167,6 +167,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("add-to-list", add_to_list);
     DEFINE_SPECFORM("defconst", defconst);
     DEFINE_SPECFORM("defconstant", defconst);
+    DEFINE_SPECFORM("defvar", defvar);
 }
 
 // The global frame starts with singleton constants, typeids, standard streams,

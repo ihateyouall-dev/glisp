@@ -1187,6 +1187,58 @@ void test_autoload_stdlib(void) {
     gl_test_unsetenv("GLISP_STD_PATH");
 }
 
+void test_defvar(void) {
+    TEST(gl_value_get_int(eval_str("(defvar dv-init 1) dv-init")) == 1,
+         "defvar initializes a value");
+    TEST(gl_value_get_int(eval_str("(defvar dv-init 2) dv-init")) == 1,
+         "defvar keeps an existing value");
+    TEST(gl_value_get_int(eval_str("(set dv-init 3) (defvar dv-init 4) dv-init")) == 3,
+         "defvar keeps a later set");
+
+    eval_str("(set dv-side 0)");
+    TEST(gl_value_get_int(eval_str("(defvar dv-bound 10)")) == 10, "defvar binds a new value");
+    TEST(gl_value_get_int(eval_str("(defvar dv-bound (set dv-side 1))")) == 10,
+         "defvar returns an existing value");
+    TEST(gl_value_get_int(eval_str("dv-side")) == 0,
+         "defvar does not evaluate init when the variable is bound");
+
+    gl_value_t *empty = eval_str("(defvar dv-empty)");
+    TEST(empty != NULL && empty->type == GL_VAL_NIL, "defvar without init binds nil");
+    TEST(gl_value_get_bool(eval_str("(nil? dv-empty)")) == 1, "uninitialized defvar is nil");
+
+    eval_str("(set dv-outer 5)");
+    TEST(gl_value_get_int(eval_str("(let ((dv-outer 7)) (defvar dv-from-local dv-outer))")) == 7,
+         "defvar evaluates init in the current environment");
+    TEST(gl_value_get_int(eval_str("dv-from-local")) == 7, "defvar from a local scope is global");
+
+    eval_str("(defun dv-in-function () (defvar dv-global 42))");
+    eval_str("(dv-in-function)");
+    TEST(gl_value_get_int(eval_str("dv-global")) == 42,
+         "defvar inside a function defines a global");
+
+    eval_str("(set dv-shadow \"global\")");
+    TEST(strcmp(gl_value_get_string(
+                    eval_str("(let ((dv-shadow \"local\")) (defvar dv-shadow \"new\") dv-shadow)")),
+                "local") == 0,
+         "defvar leaves a local binding untouched");
+    TEST(strcmp(gl_value_get_string(eval_str("dv-shadow")), "global") == 0,
+         "defvar leaves an existing global value");
+
+    eval_str("(defun dv-local-only () (let ((dv-only \"local\")) (defvar dv-only \"new\")))");
+    eval_str("(dv-local-only)");
+    TEST(strcmp(gl_value_get_string(eval_str("dv-only")), "new") == 0,
+         "defvar defines a global even when a local variable shadows it");
+
+    TEST(eval_expr("(defvar t 1)") == NULL, "defvar rejects constants");
+    TEST(eval_expr("(defvar PI 1)") == NULL, "defvar rejects stdlib constants");
+    TEST(eval_expr("(defvar 1 2)") == NULL, "defvar requires a symbol name");
+    TEST(eval_expr("(defvar)") == NULL, "defvar requires a name");
+    TEST(eval_expr("(defvar dv-bad 1 2)") == NULL, "defvar docstring must be a string");
+    TEST(eval_expr("(defvar dv-bad 1 \"doc\" 2)") == NULL, "defvar rejects extra arguments");
+    TEST(gl_value_get_int(eval_str("(defvar dv-doc 1 \"doc\")")) == 1,
+         "defvar accepts a docstring");
+}
+
 void test_io(void) {
     char path[512];
     int created = gl_test_make_temp(path, sizeof(path));
@@ -1409,6 +1461,7 @@ int main(void) {
     test_control_forms();
     test_add_to_list();
     test_defconst();
+    test_defvar();
     test_io();
     test_string_escapes();
     test_gc_stress();
