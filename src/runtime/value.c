@@ -297,6 +297,13 @@ gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
     return res;
 }
 
+gl_value_t *gl_value_make_macro(const char *name, gl_ast_node_t *tree, gl_function_params_t *params,
+                                gl_value_t *closure) {
+    gl_value_t *res = gl_value_make_function(name, tree, params, closure);
+    res->type = GL_VAL_MACRO;
+    return res;
+}
+
 void gl_function_arg_free(gl_function_arg_t **arg) {
     if (arg && *arg) {
         free(*arg);
@@ -362,6 +369,7 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = strdup((char *)val->val);
         break;
     case GL_VAL_FUNCTION:
+    case GL_VAL_MACRO:
         res->val = malloc(sizeof(gl_function_t));
         gl_function_t *func = res->val;
         gl_function_t *orig = val->val;
@@ -460,6 +468,7 @@ void gl_value_destroy(gl_value_t **val) {
         (*val)->val = NULL;
         break;
     case GL_VAL_FUNCTION:
+    case GL_VAL_MACRO:
         if ((*val)->val != NULL) {
             gl_function_t *func = (*val)->val;
             if (func->name) {
@@ -619,6 +628,8 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
     case GL_VAL_BUILTIN:
     case GL_VAL_SPFORM:
         return "function";
+    case GL_VAL_MACRO:
+        return "macro";
     case GL_VAL_NIL:
         return "nil";
     case GL_VAL_ARRAY:
@@ -679,6 +690,11 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
     case GL_VAL_ENV:
         // Nothing to print now
         break;
+    case GL_VAL_MACRO: {
+        gl_function_t *macro = val->val;
+        fprintf(file, "#<macro %s>", macro && macro->name ? macro->name : "anonymous");
+        break;
+    }
     case GL_VAL_CONS: {
         fprintf(file, "(");
         gl_value_t *cur = val;
@@ -833,6 +849,11 @@ gl_builtin_t gl_value_get_builtin(gl_value_t *val) {
 }
 gl_function_t *gl_value_get_function(gl_value_t *val) {
     assert(val->type == GL_VAL_FUNCTION);
+    return val->val;
+}
+
+gl_function_t *gl_value_get_macro(gl_value_t *val) {
+    assert(val->type == GL_VAL_MACRO);
     return val->val;
 }
 gl_special_form_t gl_value_get_specform(gl_value_t *val) {
@@ -1044,11 +1065,14 @@ int gl_value_compare(gl_value_t *lhs, gl_value_t *rhs) {
         }
     }
 
-    if (lhs->type == GL_VAL_BUILTIN || lhs->type == GL_VAL_SPFORM || lhs->type == GL_VAL_FUNCTION) {
+    if (lhs->type == GL_VAL_BUILTIN || lhs->type == GL_VAL_SPFORM || lhs->type == GL_VAL_FUNCTION ||
+        lhs->type == GL_VAL_MACRO) {
         if (lhs->type == rhs->type) {
-            if (lhs->type == GL_VAL_FUNCTION) {
-                gl_function_t *f1 = gl_value_get_function(lhs);
-                gl_function_t *f2 = gl_value_get_function(rhs);
+            if (lhs->type == GL_VAL_FUNCTION || lhs->type == GL_VAL_MACRO) {
+                gl_function_t *f1 = lhs->type == GL_VAL_MACRO ? gl_value_get_macro(lhs)
+                                                              : gl_value_get_function(lhs);
+                gl_function_t *f2 = rhs->type == GL_VAL_MACRO ? gl_value_get_macro(rhs)
+                                                              : gl_value_get_function(rhs);
                 if (f1 == f2) {
                     return 0;
                 }

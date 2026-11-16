@@ -218,6 +218,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
     case GL_VAL_BUILTIN:
     case GL_VAL_SPFORM:
         return "function";
+    case GL_VAL_MACRO:
+        return "macro";
     case GL_VAL_NIL:
         return "nil";
     case GL_VAL_ARRAY:
@@ -1171,6 +1173,46 @@ GL_BUILTIN(string_to_number) {
 }
 
 // The final argument is a collection whose elements are appended to the call.
+GL_BUILTIN(macroexpand_1) {
+    EXPECT_ARGS(1);
+
+    int did_expand = 0;
+    gl_value_t *res = gl_macro_expand_value(NTH_VAL(0), called_at, &did_expand);
+    if (res == NULL) {
+        return NULL;
+    }
+    return res;
+}
+
+GL_BUILTIN(macroexpand) {
+    EXPECT_ARGS(1);
+
+    size_t root_mark = gl_gc_root_mark();
+    gl_value_t *current = NTH_VAL(0);
+    gl_gc_push_root(current);
+
+    for (size_t i = 0; i < 1000; ++i) {
+        int did_expand = 0;
+        gl_value_t *next = gl_macro_expand_value(current, called_at, &did_expand);
+        if (next == NULL) {
+            gl_gc_roots_release(root_mark);
+            return NULL;
+        }
+        if (!did_expand) {
+            gl_gc_roots_release(root_mark);
+            return current;
+        }
+
+        gl_gc_push_root(next);
+        current = next;
+    }
+
+    gl_diagnostic_report_error(gl_make_error(GL_RECURSION_ERROR, GL_ERROR, called_at,
+                                             "Maximum macro expansion iterations exceeded"));
+    gl_gc_roots_release(root_mark);
+    return NULL;
+}
+
 GL_BUILTIN(apply) {
     EXPECT_VARGS(2);
     gl_value_t *fn = NTH_VAL(0);

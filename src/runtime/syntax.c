@@ -108,6 +108,8 @@ static const char *__gl_value_type_name(gl_value_t *val) {
         return "file";
     case GL_VAL_HASHMAP:
         return "hashmap";
+    case GL_VAL_MACRO:
+        return "macro";
     }
 
     return "value";

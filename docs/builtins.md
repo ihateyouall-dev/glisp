@@ -156,6 +156,19 @@ returns it; `lambda` returns an anonymous closure without binding it.
   (list greeting who extra))
 ```
 
+### `defmacro`
+
+```
+(defmacro name (parameters ...) body ...)
+```
+
+Defines a macro. Parameters use the same lambda list as `defun`; they are bound
+to the unevaluated argument forms converted to runtime data. The macro body must
+return a value representing code; it is converted to syntax and evaluated in the
+caller's environment. `defmacro` binds the macro in the current environment and
+returns it. Macros share the function namespace and are not callable through
+`apply`.
+
 ### `defvar`
 
 ```
@@ -428,6 +441,18 @@ All bitwise builtins require int arguments.
 
 ## Metaprogramming
 
+### `macroexpand-1` / `macroexpand`
+
+```
+(macroexpand-1 form)
+(macroexpand form)
+```
+
+`macroexpand-1` expands the outermost macro call in the runtime value `form`
+once and returns the expansion as data; if `form` is not a macro call, it is
+returned unchanged. `macroexpand` repeats this until the head is no longer a
+macro. Neither evaluates the expansion.
+
 ### `gensym`
 
 ```
@@ -441,5 +466,7 @@ All bitwise builtins require int arguments.
 ; " #:tmp<counter>"
 ```
 
-Returns symbol with leading space at the beginning to avoid collisions in macros (WIP),
-pass TEXT to generate symbol like that. COUNTER increments on every call.
+Returns a unique symbol whose name starts with a hidden leading space, so it
+cannot collide with symbols written in source. Pass TEXT to include a readable
+prefix. The counter increments on every call. Intended for macros that introduce
+bindings.

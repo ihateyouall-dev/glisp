@@ -207,6 +207,7 @@ is the way to sort entries: `(sort-by car (hash->alist map))`.
 | `(string? x)`, `(symbol? x)`, `(nil? x)` | Scalar predicates |
 | `(null? x)` | Alias for `nil?` |
 | `(function? x)` | True for functions, builtins, and special forms |
+| `(macro? x)` | True for macro values |
 | `(list? x)`, `(array? x)`, `(vector? x)` | Collection predicates |
 | `(collection? x)` | True for lists, arrays, and vectors |
 | `(file? x)` | True for file handles |

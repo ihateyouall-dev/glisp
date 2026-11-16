@@ -23,6 +23,8 @@ frozen.
   `defconst` values, including protected built-ins.
 - **Control flow.** `if`, `cond`, short-circuiting `and`/`or`, `while`, and
   `for` over lists, arrays, vectors, and strings.
+- **Macros and quasiquote.** `defmacro` with backquote/unquote/splicing,
+  `macroexpand`/`macroexpand-1`, and `gensym` for introduced bindings.
 - **Garbage collection.** Mark-and-sweep with runtime inspection through
   `pragma`.
 - **I/O.** Files, standard streams, line input, buffered output, and composable

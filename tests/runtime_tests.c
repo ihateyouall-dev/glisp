@@ -1081,6 +1081,59 @@ void test_quasiquote(void) {
     TEST(eval_expr("`(1 ,@(cons 1 2))") == NULL, "splicing an improper list fails");
 }
 
+void test_macros(void) {
+    TEST(eval_str("(defmacro my-unless (test &rest body) `(if ,test nil (progn ,@body)))") != NULL,
+         "defmacro defines a macro");
+    TEST(gl_value_get_int(eval_str("(my-unless nil 1 2)")) == 2, "macro expands and evaluates");
+    TEST(gl_value_get_int(eval_str("(let ((n 5)) (my-unless nil n))")) == 5,
+         "macro expansion sees the caller environment");
+
+    TEST(gl_value_get_bool(eval_str("(macro? my-unless)")) == 1, "macro? on a macro");
+    TEST(gl_value_get_bool(eval_str("(function? my-unless)")) == 0, "macro is not a function");
+    TEST(gl_value_get_bool(eval_str("(= (typeof my-unless) macro-t)")) == 1, "typeof macro");
+    TEST(gl_value_get_bool(eval_str("(= my-unless my-unless)")) == 1, "macro identity equality");
+    TEST(gl_value_get_bool(eval_str("(macro? (id my-unless))")) == 1,
+         "copying a macro preserves its type");
+
+    char *printed = gl_value_to_string(eval_str("(macroexpand-1 '(my-unless nil 1 2))"));
+    TEST(strcmp(printed, "(if nil nil (progn 1 2))") == 0, "macroexpand-1 expands one step");
+    free(printed);
+
+    printed = gl_value_to_string(eval_str("(macroexpand-1 '(1 2))"));
+    TEST(strcmp(printed, "(1 2)") == 0, "macroexpand-1 leaves non-macros alone");
+    free(printed);
+
+    eval_str("(defmacro m1 (x) `(m2 ,x))");
+    eval_str("(defmacro m2 (x) `(+ ,x 1))");
+    printed = gl_value_to_string(eval_str("(macroexpand '(m1 41))"));
+    TEST(strcmp(printed, "(+ 41 1)") == 0, "macroexpand expands repeatedly");
+    free(printed);
+    TEST(gl_value_get_int(eval_str("(m1 41)")) == 42, "nested macro evaluates");
+
+    eval_str("(defmacro with-temp (value &rest body) "
+             "  (let ((tmp (gensym \"tmp\"))) `(let ((,tmp ,value)) ,@body)))");
+    TEST(gl_value_get_int(eval_str("(let ((tmp 7)) (with-temp 1 tmp))")) == 7,
+         "gensym prevents macro capture");
+    TEST(gl_value_get_int(eval_str("(with-temp 5 (+ 1 2))")) == 3, "macro body forms");
+
+    TEST(gl_value_get_int(
+             eval_str("(let ((n 3)) (defmacro local-m (x) `(+ ,x 10)) (local-m n))")) == 13,
+         "local macro is callable in its scope");
+    TEST(eval_expr("(local-m 1)") == NULL, "local macro is not visible outside its scope");
+
+    TEST(eval_expr("(apply my-unless (list nil 1))") == NULL, "apply rejects a macro");
+
+    eval_str("(defmacro no-args () 1)");
+    TEST(eval_expr("(no-args 2)") == NULL, "macro arity is checked");
+
+    eval_str("(defmacro endless-macro () '(endless-macro))");
+    TEST(eval_expr("(endless-macro)") == NULL, "runaway macro expansion reports an error");
+
+    eval_str("(defmacro endless-tail () '(endless-tail))");
+    eval_str("(defun tail-macro-loop () (endless-tail))");
+    TEST(eval_expr("(tail-macro-loop)") == NULL, "runaway tail macro expansion reports an error");
+}
+
 void test_load_relative(void) {
     gl_value_t *r1 = eval_str("(load \"tests/load_test/top.lisp\")");
     TEST(r1 != NULL, "load top.lisp succeeds");
@@ -1804,6 +1857,7 @@ int main(void) {
     test_apply();
     test_read_eval();
     test_quasiquote();
+    test_macros();
     test_load_relative();
     test_load_failure();
     test_stdlib();

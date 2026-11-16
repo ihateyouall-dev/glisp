@@ -25,6 +25,8 @@ GL_SPECIAL_FORM(unless);
 
 GL_SPECIAL_FORM(defun);
 
+GL_SPECIAL_FORM(defmacro);
+
 // Same as defun, but does not define function in environment
 GL_SPECIAL_FORM(lambda);
 

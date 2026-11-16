@@ -234,6 +234,31 @@ GL_SPECIAL_FORM(defun) {
     return res;
 }
 
+GL_SPECIAL_FORM(defmacro) {
+    assert(args);
+    assert(args->type == GL_AST_CONS);
+
+    gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
+    if (!name_node || name_node->type != GL_AST_SYMBOL) {
+        __emit_syntax_error(name_node ? name_node->location : args->location,
+                            "Macro name must be a symbol");
+        return NULL;
+    }
+    const char *name = name_node->value.symbol;
+
+    gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
+    gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
+    if (params->type != GL_AST_NIL && !func_params) {
+        return NULL;
+    }
+
+    gl_ast_node_t *tree = gl_ast_cons_nth_cdr(args, 1);
+    gl_value_t *res = gl_value_make_macro(name, gl_ast_copy(tree), func_params, gl_current_env());
+    gl_env_set_fun(env, name, res);
+
+    return res;
+}
+
 GL_SPECIAL_FORM(lambda) {
     assert(args);
     assert(args->type == GL_AST_CONS);

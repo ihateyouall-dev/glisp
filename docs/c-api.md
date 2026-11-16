@@ -121,8 +121,11 @@ typedef struct gl_value_t {
 - `GL_VAL_*` enumerates all value types.
 - Constructors: `gl_value_make_int`, `_float`, `_symbol`, `_cons`,
   `_cons_raw`, `_string`, `_nil`, `_bool`, `_typeid`, `_file`, `_builtin`,
-  `_specform`, `_function`, `_env`, `_array`, `_array_from`, `_vector`,
-  `_vector_from`.
+  `_specform`, `_function`, `_macro`, `_env`, `_array`, `_array_from`,
+  `_vector`, `_vector_from`.
+- `GL_VAL_MACRO` shares the `gl_function_t` payload with `GL_VAL_FUNCTION`;
+  use `gl_value_get_macro` to access it. Macros are not callable through
+  `gl_call_function`/`apply`.
 - Accessors validate the type with `assert` and return the payload:
   `gl_value_get_*`.
 - `gl_value_copy(value)` deep-copies the value (lists are copied recursively).
@@ -188,7 +191,10 @@ environment and producing stack traces.
 - `gl_eval_args(args)` evaluates a list of argument AST nodes into a
   `gl_function_args_t`. It pushes each evaluated value as a temporary GC root.
 - `gl_call_function(loc, callable, argv)` invokes a callable with an existing
-  argument array.
+  argument array. It rejects macro values.
+- `gl_macro_expand_value(form, loc, did_expand)` expands one macro call in a
+  runtime form and returns the expansion value; non-macro forms are returned
+  unchanged with `did_expand` set to 0.
 
 ### `memory.h` (garbage collector)
 
