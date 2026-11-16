@@ -1322,8 +1322,8 @@ void test_recursion(void) {
     eval_str("(defun endless (n) (+ 1 (endless (+ n 1))))");
     TEST(eval_str("(endless 0)") == NULL, "runaway recursion reports an error");
 
-    eval_str("(defun countdown (n) (if (= n 0) 0 (countdown (- n 1))))");
-    TEST(gl_value_get_int(eval_str("(countdown 100)")) == 0, "bounded recursion works");
+    eval_str("(defun countdown (n) (if (= n 0) 0 (+ 1 (countdown (- n 1)))))");
+    TEST(gl_value_get_int(eval_str("(countdown 100)")) == 100, "bounded recursion works");
     TEST(eval_str("(countdown 1000000)") == NULL, "deep recursion reports an error");
 
     TEST(eval_str("(+ 1 (assert nil) 3)") == NULL, "argument after a failing one is cleaned up");

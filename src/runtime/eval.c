@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
+
 // Deeper nesting than this is reported as an error: the C stack is finite, so
 // a runaway Lisp call has to end with a diagnostic instead of a crash.
 const size_t GL_MAX_EVAL_DEPTH = 1000;
@@ -50,9 +54,11 @@ static int __gl_stack_exhausted(void) {
     volatile unsigned char probe = 0;
     uintptr_t current = (uintptr_t)&probe;
 
+    // Only the numeric position is kept, never a pointer that could be
+    // dereferenced, so nothing dangles once this frame returns.
     if (gl_stack_base == 0) {
-        gl_stack_base = current;
-        return 0;
+        gl_stack_base = current; // NOLINT(clang-analyzer-core.StackAddressEscape)
+        return 0;                // NOLINT(clang-analyzer-core.StackAddressEscape)
     }
 
     size_t used = current > gl_stack_base ? (size_t)(current - gl_stack_base)

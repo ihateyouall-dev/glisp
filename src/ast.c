@@ -221,7 +221,6 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
         break;
     }
     case GL_AST_NIL:
-        break;
     case GL_AST_CONS:
         break;
     }
