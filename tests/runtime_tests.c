@@ -299,6 +299,36 @@ void test_hashmap(void) {
          "Hashmap contents after GC");
 }
 
+void test_copy(void) {
+    eval_str("(set copy-source {1 2})");
+    eval_str("(set copy-alias copy-source)");
+    eval_str("(push copy-alias 3)");
+    TEST(gl_value_get_int(eval_str("(len copy-source)")) == 3, "assignment aliases a vector");
+
+    eval_str("(set copy-source {1 2})");
+    eval_str("(set copy-made (copy copy-source))");
+    eval_str("(push copy-made 3)");
+    TEST(gl_value_get_int(eval_str("(len copy-source)")) == 2, "copy keeps the source unchanged");
+    TEST(gl_value_get_int(eval_str("(len copy-made)")) == 3, "copy is independently mutable");
+
+    eval_str("(set copy-nested (list {1 2}))");
+    eval_str("(set copy-nested2 (copy copy-nested))");
+    eval_str("(push (car copy-nested2) 3)");
+    TEST(gl_value_get_int(eval_str("(len (car copy-nested))")) == 2, "copy is deep for lists");
+    TEST(gl_value_get_int(eval_str("(len (car copy-nested2))")) == 3, "nested copy is mutable");
+
+    eval_str("(set copy-map (hash))");
+    eval_str("(hash-set copy-map \"k\" {1})");
+    eval_str("(set copy-map2 (copy copy-map))");
+    eval_str("(push (hash-get copy-map2 \"k\") 2)");
+    TEST(gl_value_get_int(eval_str("(len (hash-get copy-map \"k\"))")) == 1,
+         "copy is deep for hash maps");
+
+    TEST(gl_value_get_int(eval_str("(copy 5)")) == 5, "copy of an int");
+    TEST(strcmp(gl_value_get_string(eval_str("(copy \"abc\")")), "abc") == 0, "copy of a string");
+    TEST(eval_str("(copy nil)")->type == GL_VAL_NIL, "copy of nil");
+}
+
 void test_float_printing(void) {
     TEST(strcmp(gl_value_get_string(eval_str("(to-string 1.5)")), "1.5") == 0,
          "float prints short");
@@ -1383,6 +1413,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_hashmap();
+    test_copy();
     test_float_printing();
     test_typeid();
     test_strings();
