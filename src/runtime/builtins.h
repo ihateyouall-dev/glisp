@@ -64,6 +64,9 @@ GL_BUILTIN(le);
 // Return symbol representing type of arg
 GL_BUILTIN(typeof);
 
+// Deep copy of any value
+GL_BUILTIN(copy);
+
 // Type constructors
 
 GL_BUILTIN(int_con);

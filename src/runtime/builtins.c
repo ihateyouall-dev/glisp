@@ -539,6 +539,14 @@ GL_BUILTIN(typeof) {
     return gl_value_make_typeid(NTH_VAL(0)->type);
 }
 
+// Collections are mutable by reference, so assigning one to another name makes
+// both names point at the same cells; a copy is the way to get an independent one.
+GL_BUILTIN(copy) {
+    EXPECT_ARGS(1);
+
+    return gl_value_copy(NTH_VAL(0));
+}
+
 GL_BUILTIN(int_con) {
     EXPECT_ARGS(1);
     gl_value_t *val = NTH_VAL(0);
