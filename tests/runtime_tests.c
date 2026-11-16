@@ -1052,6 +1052,35 @@ void test_read_eval(void) {
     TEST(eval_expr("(eval sq)") == NULL, "Eval rejects a function");
 }
 
+void test_quasiquote(void) {
+    TEST(gl_value_get_bool(eval_str("(= `(1 2 3) '(1 2 3))")) == 1, "quasiquote literal list");
+    TEST(eval_str("`()")->type == GL_VAL_NIL, "quasiquote empty list");
+
+    eval_str("(set qq-x 10)");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,qq-x 3) '(1 10 3))")) == 1, "unquote");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@(list 2 3) 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing a list");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@[2 3] 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing an array");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@{2 3} 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing a vector");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@nil 2) '(1 2))")) == 1, "unquote-splicing nil");
+
+    TEST(gl_value_get_bool(eval_str("(= `(a `(b ,qq-x)) '(a (quasiquote (b (unquote qq-x)))))")) ==
+             1,
+         "nested quasiquote keeps inner unquote as data");
+    TEST(gl_value_get_bool(eval_str("(= `[,qq-x 2] [10 2])")) == 1, "unquote in an array");
+    TEST(gl_value_get_bool(eval_str("(= `{,qq-x 2} {10 2})")) == 1, "unquote in a vector");
+    TEST(gl_value_get_bool(eval_str("(= `[,@(list 1 2) 3] [1 2 3])")) == 1,
+         "unquote-splicing in an array");
+
+    TEST(eval_expr("`,@(list 1 2)") == NULL, "splicing outside a sequence fails");
+    TEST(eval_expr(",qq-x") == NULL, "unquote outside quasiquote fails");
+    TEST(eval_expr(",@(list 1)") == NULL, "unquote-splicing outside quasiquote fails");
+    TEST(eval_expr("`(1 ,@42)") == NULL, "splicing a non-sequence fails");
+    TEST(eval_expr("`(1 ,@(cons 1 2))") == NULL, "splicing an improper list fails");
+}
+
 void test_load_relative(void) {
     gl_value_t *r1 = eval_str("(load \"tests/load_test/top.lisp\")");
     TEST(r1 != NULL, "load top.lisp succeeds");
@@ -1774,6 +1803,7 @@ int main(void) {
     test_cons();
     test_apply();
     test_read_eval();
+    test_quasiquote();
     test_load_relative();
     test_load_failure();
     test_stdlib();

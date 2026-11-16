@@ -38,6 +38,12 @@ GL_SPECIAL_FORM(while);
 
 GL_SPECIAL_FORM(quote);
 
+GL_SPECIAL_FORM(quasiquote);
+
+GL_SPECIAL_FORM(unquote);
+
+GL_SPECIAL_FORM(unquote_splicing);
+
 GL_SPECIAL_FORM(function);
 
 GL_SPECIAL_FORM(let);

@@ -198,6 +198,25 @@ protected.
 
 Returns `expr` as data. Symbols become symbol values; lists become lists.
 
+### `quasiquote` / `unquote` / `unquote-splicing`
+
+```
+(quasiquote expr)
+`expr
+(unquote expr)
+,expr
+(unquote-splicing expr)
+,@expr
+```
+
+Builds a runtime value from a template. Everything is treated as data except
+`(unquote ...)`, which evaluates its argument, and `(unquote-splicing ...)`,
+which evaluates its argument and splices the elements of a list, array, vector,
+or `nil` into the surrounding sequence. Nested quasiquotes raise the quoting
+depth; `unquote` and `unquote-splicing` at that depth remain data. Using
+`unquote` or `unquote-splicing` outside a quasiquote is an error, and so is
+splicing a non-sequence.
+
 ### `function`
 
 ```

@@ -30,6 +30,9 @@ evaluated in order; the value of a file is the value of its last expression.
 | `[a b c]` | fixed-size array literal |
 | `{a b c}` | dynamic vector literal |
 | `'expr` | quote: `(quote expr)` |
+| `` `expr `` | quasiquote: `(quasiquote expr)` |
+| `,expr` | unquote: `(unquote expr)` |
+| `,@expr` | unquote-splicing: `(unquote-splicing expr)` |
 | `#'name` | function quote: `(function name)` |
 | `nil` | the empty list and the only false value |
 
@@ -52,8 +55,12 @@ could read back.
 The reader does not recognize dotted-pair syntax (`(a . b)`); improper lists can
 only be built programmatically with `cons`.
 
-There is no quasiquote (`\``, `,`, `,@`). A quote is a single token, not a
-reader macro that composes with other forms.
+Quasiquote is a template form: outside an `unquote`, symbols and lists are
+taken as data; `,expr` evaluates `expr` and inserts the resulting value, while
+`,@expr` evaluates `expr` and splices the elements of a list, array, vector, or
+`nil`. Nested quasiquotes increase the quoting depth, so only unquotes at the
+matching depth are evaluated. Quasiquote produces runtime data, which makes it
+the natural tool for constructing code in macros.
 
 ## Values
 
@@ -323,7 +330,7 @@ error API is not implemented yet.
 - No `\uXXXX` escape; write a double quote as `\x22` because the tokenizer
   ends a string at the first raw `"`. Escapes produce single bytes, not code
   points.
-- No macros or quasiquote.
+- No macro system yet (quasiquote is available).
 - Tail calls are eliminated only where the call is the last form of a function
   body or of an `if`, `cond`, `when`, `unless` or `progn` branch. A call inside
   `let`, `let*`, `and`, `or`, `while` or `for` still consumes the C stack, and a

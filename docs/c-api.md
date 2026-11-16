@@ -89,6 +89,9 @@ and vector nodes. Every node stores a `gl_location_t`.
 - `gl_ast_cons_nth_car` / `gl_ast_cons_nth_cdr` index into a cons list.
 - `gl_ast_cons_length` counts list elements.
 - `gl_ast_make_quote` / `gl_ast_make_funquote` build quote nodes.
+- `gl_ast_make_quasiquote`, `gl_ast_make_unquote`, and
+  `gl_ast_make_unquote_splicing` desugar the corresponding reader tokens into
+  `(quasiquote ...)`, `(unquote ...)`, and `(unquote-splicing ...)` forms.
 
 ### `diagnostics.h`
 

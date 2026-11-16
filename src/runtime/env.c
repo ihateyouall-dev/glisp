@@ -155,6 +155,9 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("progn", progn);
     DEFINE_SPECFORM("while", while);
     DEFINE_SPECFORM("quote", quote);
+    DEFINE_SPECFORM("quasiquote", quasiquote);
+    DEFINE_SPECFORM("unquote", unquote);
+    DEFINE_SPECFORM("unquote-splicing", unquote_splicing);
     DEFINE_SPECFORM("function", function);
     DEFINE_SPECFORM("let", let);
     DEFINE_SPECFORM("let*", let_star);

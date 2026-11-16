@@ -13,6 +13,7 @@
 #include "pragma.h"
 #include "runtime/env.h"
 #include "runtime/value.h"
+#include "syntax.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -377,6 +378,343 @@ GL_SPECIAL_FORM(quote) {
     }
 
     return gl_eval(node);
+}
+
+// --- quasiquote -----------------------------------------------------------
+
+typedef struct {
+    gl_value_t **data;
+    size_t size;
+    size_t capacity;
+} gl_qq_items_t;
+
+static int __gl_qq_is_named(gl_ast_node_t *node, const char *name) {
+    return node != NULL && node->type == GL_AST_CONS && node->value.cons.car != NULL &&
+           node->value.cons.car->type == GL_AST_SYMBOL &&
+           strcmp(node->value.cons.car->value.symbol, name) == 0;
+}
+
+// Extracts the single argument of (unquote x), (unquote-splicing x), or
+// (quasiquote x). Returns 0 for a malformed form.
+static int __gl_qq_unary(gl_ast_node_t *node, gl_ast_node_t **out_arg) {
+    gl_ast_node_t *rest = node->value.cons.cdr;
+    if (rest == NULL || rest->type != GL_AST_CONS) {
+        return 0;
+    }
+    if (rest->value.cons.cdr != NULL && rest->value.cons.cdr->type != GL_AST_NIL) {
+        return 0;
+    }
+    *out_arg = rest->value.cons.car;
+    return 1;
+}
+
+static int __gl_qq_items_push(gl_qq_items_t *items, gl_value_t *value) {
+    if (items->size == items->capacity) {
+        size_t capacity = items->capacity == 0 ? 8 : items->capacity * 2;
+        gl_value_t **grown = realloc(items->data, capacity * sizeof(*grown));
+        if (grown == NULL) {
+            return 0;
+        }
+        items->data = grown;
+        items->capacity = capacity;
+    }
+
+    gl_gc_push_root(value);
+    items->data[items->size++] = value;
+    return 1;
+}
+
+static gl_value_t *__gl_qq_build_list(const gl_qq_items_t *items) {
+    gl_value_t *res = gl_value_make_nil();
+    for (size_t i = items->size; i > 0; --i) {
+        res = gl_value_make_cons_raw(items->data[i - 1], res);
+    }
+    return res;
+}
+
+static gl_value_t *__gl_qq_build_array(const gl_qq_items_t *items) {
+    gl_value_array_t *arr = malloc(sizeof(gl_value_array_t));
+    gl_value_array_init(arr, items->size, NULL);
+    for (size_t i = 0; i < items->size; ++i) {
+        arr->data[i] = items->data[i];
+    }
+    return gl_value_make_array_from(arr);
+}
+
+static gl_value_t *__gl_qq_build_vector(const gl_qq_items_t *items) {
+    gl_value_vector_t *vec = malloc(sizeof(gl_value_vector_t));
+    gl_value_vector_init(vec, NULL);
+    for (size_t i = 0; i < items->size; ++i) {
+        gl_value_vector_push_back(vec, items->data[i]);
+    }
+    return gl_value_make_vector_from(vec);
+}
+
+static int __gl_qq_splice(gl_qq_items_t *items, gl_value_t *seq, gl_location_t location) {
+    if (seq->type == GL_VAL_NIL) {
+        return 1;
+    }
+
+    if (seq->type == GL_VAL_CONS) {
+        gl_value_t *cur = seq;
+        while (cur != NULL && cur->type == GL_VAL_CONS) {
+            if (!__gl_qq_items_push(items, gl_value_get_cons(cur)->car)) {
+                return 0;
+            }
+            cur = gl_value_get_cons(cur)->cdr;
+        }
+        if (cur != NULL && cur->type != GL_VAL_NIL) {
+            __emit_syntax_error(location, "Cannot splice an improper list");
+            return 0;
+        }
+        return 1;
+    }
+
+    if (seq->type == GL_VAL_ARRAY) {
+        gl_value_array_t *arr = gl_value_get_array(seq);
+        for (size_t i = 0; i < arr->size; ++i) {
+            if (!__gl_qq_items_push(items, arr->data[i])) {
+                return 0;
+            }
+        }
+        return 1;
+    }
+
+    if (seq->type == GL_VAL_VECTOR) {
+        gl_value_vector_t *vec = gl_value_get_vector(seq);
+        for (size_t i = 0; i < vec->size; ++i) {
+            if (!__gl_qq_items_push(items, *gl_value_vector_at(vec, i))) {
+                return 0;
+            }
+        }
+        return 1;
+    }
+
+    __emit_syntax_error(location, "unquote-splicing expects a list, array, vector, or nil");
+    return 0;
+}
+
+static gl_value_t *__gl_qq_wrap(const char *name, gl_value_t *value) {
+    gl_value_t *sym = gl_value_make_symbol(name);
+    gl_value_t *tail = gl_value_make_cons_raw(value, gl_value_make_nil());
+    return gl_value_make_cons_raw(sym, tail);
+}
+
+static gl_value_t *__gl_qq(gl_ast_node_t *node, size_t depth);
+
+static gl_value_t *__gl_qq_list(gl_ast_node_t *node, size_t depth) {
+    size_t root_mark = gl_gc_root_mark();
+    gl_qq_items_t items = {0};
+    gl_ast_node_t *cur = node;
+
+    while (cur != NULL && cur->type == GL_AST_CONS) {
+        gl_ast_node_t *elem = cur->value.cons.car;
+
+        if (depth == 1 && __gl_qq_is_named(elem, "unquote-splicing")) {
+            gl_ast_node_t *arg = NULL;
+            if (!__gl_qq_unary(elem, &arg)) {
+                __emit_syntax_error(elem->location, "unquote-splicing requires one argument");
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+
+            gl_value_t *seq = gl_eval(arg);
+            if (seq == NULL || !__gl_qq_splice(&items, seq, elem->location)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        } else {
+            gl_value_t *value = __gl_qq(elem, depth);
+            if (value == NULL || !__gl_qq_items_push(&items, value)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        }
+
+        cur = cur->value.cons.cdr;
+    }
+
+    if (cur != NULL && cur->type != GL_AST_NIL) {
+        __emit_syntax_error(cur->location, "Cannot quasiquote an improper list");
+        gl_gc_roots_release(root_mark);
+        free(items.data);
+        return NULL;
+    }
+
+    gl_value_t *res = __gl_qq_build_list(&items);
+    gl_gc_roots_release(root_mark);
+    free(items.data);
+    return res;
+}
+
+static gl_value_t *__gl_qq_array(gl_ast_node_t *node, size_t depth) {
+    size_t root_mark = gl_gc_root_mark();
+    gl_qq_items_t items = {0};
+
+    for (size_t i = 0; i < node->value.array.size; ++i) {
+        gl_ast_node_t *elem = node->value.array.data[i];
+
+        if (depth == 1 && __gl_qq_is_named(elem, "unquote-splicing")) {
+            gl_ast_node_t *arg = NULL;
+            if (!__gl_qq_unary(elem, &arg)) {
+                __emit_syntax_error(elem->location, "unquote-splicing requires one argument");
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+
+            gl_value_t *seq = gl_eval(arg);
+            if (seq == NULL || !__gl_qq_splice(&items, seq, elem->location)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        } else {
+            gl_value_t *value = __gl_qq(elem, depth);
+            if (value == NULL || !__gl_qq_items_push(&items, value)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        }
+    }
+
+    gl_value_t *res = __gl_qq_build_array(&items);
+    gl_gc_roots_release(root_mark);
+    free(items.data);
+    return res;
+}
+
+static gl_value_t *__gl_qq_vector(gl_ast_node_t *node, size_t depth) {
+    size_t root_mark = gl_gc_root_mark();
+    gl_qq_items_t items = {0};
+
+    for (size_t i = 0; i < node->value.vector.size; ++i) {
+        gl_ast_node_t *elem = *gl_ast_vector_at(&node->value.vector, i);
+
+        if (depth == 1 && __gl_qq_is_named(elem, "unquote-splicing")) {
+            gl_ast_node_t *arg = NULL;
+            if (!__gl_qq_unary(elem, &arg)) {
+                __emit_syntax_error(elem->location, "unquote-splicing requires one argument");
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+
+            gl_value_t *seq = gl_eval(arg);
+            if (seq == NULL || !__gl_qq_splice(&items, seq, elem->location)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        } else {
+            gl_value_t *value = __gl_qq(elem, depth);
+            if (value == NULL || !__gl_qq_items_push(&items, value)) {
+                gl_gc_roots_release(root_mark);
+                free(items.data);
+                return NULL;
+            }
+        }
+    }
+
+    gl_value_t *res = __gl_qq_build_vector(&items);
+    gl_gc_roots_release(root_mark);
+    free(items.data);
+    return res;
+}
+
+static gl_value_t *__gl_qq(gl_ast_node_t *node, size_t depth) {
+    if (node == NULL) {
+        return NULL;
+    }
+
+    if (node->type == GL_AST_CONS) {
+        gl_ast_node_t *car = node->value.cons.car;
+        if (car != NULL && car->type == GL_AST_SYMBOL) {
+            const char *name = car->value.symbol;
+
+            if (strcmp(name, "unquote") == 0) {
+                gl_ast_node_t *arg = NULL;
+                if (!__gl_qq_unary(node, &arg)) {
+                    __emit_syntax_error(node->location, "unquote requires one argument");
+                    return NULL;
+                }
+                if (depth == 1) {
+                    return gl_eval(arg);
+                }
+
+                gl_value_t *inner = __gl_qq(arg, depth - 1);
+                return inner ? __gl_qq_wrap("unquote", inner) : NULL;
+            }
+
+            if (strcmp(name, "unquote-splicing") == 0) {
+                gl_ast_node_t *arg = NULL;
+                if (!__gl_qq_unary(node, &arg)) {
+                    __emit_syntax_error(node->location, "unquote-splicing requires one argument");
+                    return NULL;
+                }
+                if (depth == 1) {
+                    __emit_syntax_error(node->location,
+                                        "unquote-splicing is only valid inside a sequence");
+                    return NULL;
+                }
+
+                gl_value_t *inner = __gl_qq(arg, depth - 1);
+                return inner ? __gl_qq_wrap("unquote-splicing", inner) : NULL;
+            }
+
+            if (strcmp(name, "quasiquote") == 0) {
+                gl_ast_node_t *arg = NULL;
+                if (!__gl_qq_unary(node, &arg)) {
+                    __emit_syntax_error(node->location, "quasiquote requires one argument");
+                    return NULL;
+                }
+
+                gl_value_t *inner = __gl_qq(arg, depth + 1);
+                return inner ? __gl_qq_wrap("quasiquote", inner) : NULL;
+            }
+        }
+
+        return __gl_qq_list(node, depth);
+    }
+
+    if (node->type == GL_AST_ARRAY) {
+        return __gl_qq_array(node, depth);
+    }
+
+    if (node->type == GL_AST_VECTOR) {
+        return __gl_qq_vector(node, depth);
+    }
+
+    return gl_ast_to_value(node);
+}
+
+GL_SPECIAL_FORM(quasiquote) {
+    gl_ast_node_t *arg = gl_ast_cons_nth_car(args, 0);
+    gl_ast_node_t *rest = gl_ast_cons_nth_cdr(args, 0);
+
+    if (arg == NULL || rest == NULL || rest->type != GL_AST_NIL) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "quasiquote requires exactly one argument");
+        return NULL;
+    }
+
+    return __gl_qq(arg, 1);
+}
+
+GL_SPECIAL_FORM(unquote) {
+    __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                        "unquote is only valid inside quasiquote");
+    return NULL;
+}
+
+GL_SPECIAL_FORM(unquote_splicing) {
+    __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                        "unquote-splicing is only valid inside quasiquote");
+    return NULL;
 }
 
 GL_SPECIAL_FORM(function) {
