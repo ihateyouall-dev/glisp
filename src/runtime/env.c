@@ -140,6 +140,8 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("logior", logior);
     DEFINE_BUILTIN("logxor", logxor);
     DEFINE_BUILTIN("lognot", lognot);
+
+    DEFINE_BUILTIN("gensym", gensym);
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
