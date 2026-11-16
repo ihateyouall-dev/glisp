@@ -315,6 +315,226 @@ void test_std_integer_math(void) {
     TEST(gl_value_get_bool(eval_str("(approx= (rem -5.5 2) -1.5)")) == 1, "rem of floats");
 }
 
+void test_arithmetic_builtins(void) {
+    TEST(gl_value_get_int(eval_str("(% 10 3)")) == 1, "modulo of positive numbers");
+    TEST(gl_value_get_int(eval_str("(% -10 3)")) == -1, "modulo keeps the dividend sign");
+    TEST(gl_value_get_int(eval_str("(int 2.9)")) == 2, "int truncates toward zero");
+    TEST(gl_value_get_int(eval_str("(int -2.9)")) == -2, "int truncates negatives toward zero");
+    TEST(gl_value_get_int(eval_str("(int 7)")) == 7, "int of an int is unchanged");
+    TEST(gl_value_get_bool(eval_str("(approx= (float 2) 2.0)")) == 1, "float widens an int");
+    TEST(gl_value_get_int(eval_str("(+ 1 2 3 4)")) == 10, "addition of several arguments");
+    TEST(gl_value_get_int(eval_str("(- 10 3 2)")) == 5, "left associative subtraction");
+    TEST(gl_value_get_int(eval_str("(/ 7 2)")) == 3, "integer division truncates");
+    TEST(eval_expr("(/ 1 0)") == NULL, "division by integer zero is an error");
+    TEST(eval_expr("(% 1 0)") == NULL, "modulo by zero is an error");
+}
+
+void test_comparison_builtins(void) {
+    TEST(gl_value_get_bool(eval_str("(> 3 2)")) == 1, "greater than");
+    TEST(gl_value_get_bool(eval_str("(> 2 3)")) == 0, "greater than is false");
+    TEST(gl_value_get_bool(eval_str("(>= 3 3)")) == 1, "greater or equal");
+    TEST(gl_value_get_bool(eval_str("(<= 2 3)")) == 1, "less or equal");
+    TEST(gl_value_get_bool(eval_str("(<= 3 2)")) == 0, "less or equal is false");
+    TEST(gl_value_get_bool(eval_str("(< 1 1.5)")) == 1, "mixed int and float compare");
+    TEST(gl_value_get_bool(eval_str("(< \"abc\" \"abd\")")) == 1, "strings compare by content");
+    TEST(gl_value_get_bool(eval_str("(= 'a 'a)")) == 1, "symbols compare by name");
+    TEST(gl_value_get_bool(eval_str("(= 1 1.0)")) == 1, "int and float compare numerically");
+}
+
+void test_sequence_aliases(void) {
+    TEST(gl_value_get_int(eval_str("(length (list 1 2 3))")) == 3, "length alias");
+    TEST(gl_value_get_int(eval_str("(nth (list 10 20) 1)")) == 20, "nth alias");
+    TEST(gl_value_get_int(eval_str("(aref [10 20] 1)")) == 20, "aref alias");
+    TEST(gl_value_get_int(eval_str("(aset [1 2] 0 9)")) == 9, "aset returns the new value");
+    TEST(gl_value_get_int(eval_str("(let ((v [1 2])) (aset v 0 9) (get v 0))")) == 9,
+         "aset mutates in place");
+    TEST(gl_value_get_int(eval_str("(len (vector-push {1} 2 3))")) == 3, "vector-push alias");
+    TEST(gl_value_get_int(eval_str("(vector-pop {1 2})")) == 2, "vector-pop alias");
+}
+
+void test_math_builtins(void) {
+    TEST(gl_value_get_bool(eval_str("(approx= (sqrt 9) 3.0)")) == 1, "sqrt");
+    TEST(gl_value_get_bool(eval_str("(approx= (pow 2 10) 1024.0)")) == 1, "pow");
+    TEST(gl_value_get_bool(eval_str("(approx= (exp 0) 1.0)")) == 1, "exp of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (exp2 10) 1024.0)")) == 1, "exp2");
+    TEST(gl_value_get_bool(eval_str("(approx= (log 1) 0.0)")) == 1, "log of one");
+    TEST(gl_value_get_bool(eval_str("(approx= (log2 8) 3.0)")) == 1, "log2");
+    TEST(gl_value_get_bool(eval_str("(approx= (floor 2.7) 2.0)")) == 1, "floor");
+    TEST(gl_value_get_bool(eval_str("(approx= (floor -2.5) -3.0)")) == 1, "floor of a negative");
+    TEST(gl_value_get_bool(eval_str("(approx= (ceil 2.1) 3.0)")) == 1, "ceil");
+    TEST(gl_value_get_bool(eval_str("(approx= (ceil -2.5) -2.0)")) == 1, "ceil of a negative");
+    TEST(gl_value_get_bool(eval_str("(approx= (round 2.5) 3.0)")) == 1,
+         "round half away from zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (round -2.5) -3.0)")) == 1, "round a negative half");
+    TEST(gl_value_get_bool(eval_str("(approx= (sin 0) 0.0)")) == 1, "sin of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (cos 0) 1.0)")) == 1, "cos of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (atan2 1 1) (/ PI 4))")) == 1, "atan2");
+    TEST(gl_value_get_bool(eval_str("(approx= (fma 2 3 4) 10.0)")) == 1, "fma");
+    TEST(gl_value_get_bool(eval_str("(approx= (copysign 3 -1) -3.0)")) == 1, "copysign");
+    TEST(gl_value_get_bool(eval_str("(approx= (copysign -3 1) 3.0)")) == 1,
+         "copysign of a negative");
+}
+
+void test_bitwise_builtins(void) {
+    TEST(gl_value_get_int(eval_str("(logand 12 10)")) == 8, "logand");
+    TEST(gl_value_get_int(eval_str("(logior 12 10)")) == 14, "logior");
+    TEST(gl_value_get_int(eval_str("(logxor 12 10)")) == 6, "logxor");
+    TEST(gl_value_get_int(eval_str("(lognot 0)")) == -1, "lognot of zero");
+    TEST(gl_value_get_bool(eval_str("(= (lognot (lognot 5)) 5)")) == 1, "double lognot");
+}
+
+void test_std_iteration(void) {
+    eval_str("(set each-sum 0)");
+    eval_str("(each (lambda (x) (set each-sum (+ each-sum x))) (list 1 2 3 4))");
+    TEST(gl_value_get_int(eval_str("each-sum")) == 10, "each visits every element");
+    TEST(eval_str("(each (lambda (x) x) (list 1))")->type == GL_VAL_NIL, "each returns nil");
+
+    eval_str("(set each-vec 0)");
+    eval_str("(each (lambda (x) (set each-vec (+ each-vec x))) {1 2 3})");
+    TEST(gl_value_get_int(eval_str("each-vec")) == 6, "each over a vector");
+
+    eval_str("(set each-str 0)");
+    eval_str("(each (lambda (c) (set each-str (+ each-str 1))) \"abc\")");
+    TEST(gl_value_get_int(eval_str("each-str")) == 3, "each over a string");
+
+    TEST(gl_value_get_int(eval_str("(reduce (lambda (a b) (+ a b)) [1 2 3] 10)")) == 16,
+         "reduce over an array with an initial value");
+    TEST(gl_value_get_int(eval_str("(len (map 1+ (range 0 4)))")) == 4,
+         "map over a generated list");
+}
+
+void test_std_math_functions(void) {
+    TEST(gl_value_get_int(eval_str("(factorial 5)")) == 120, "factorial");
+    TEST(gl_value_get_int(eval_str("(factorial 0)")) == 1, "factorial of zero");
+    TEST(gl_value_get_int(eval_str("(gcd 12 18)")) == 6, "gcd");
+    TEST(gl_value_get_int(eval_str("(lcm 4 6)")) == 12, "lcm");
+    TEST(gl_value_get_int(eval_str("(lcm 0 5)")) == 0, "lcm with zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (hypot 3 4) 5.0)")) == 1, "hypot");
+    TEST(gl_value_get_bool(eval_str("(approx= (lerp 0 10 0.5) 5.0)")) == 1, "lerp");
+    TEST(gl_value_get_bool(eval_str("(approx= (trunc 2.9) 2.0)")) == 1, "trunc");
+    TEST(gl_value_get_bool(eval_str("(approx= (trunc -2.9) -2.0)")) == 1, "trunc of a negative");
+    TEST(gl_value_get_int(eval_str("(signum -5)")) == -1, "signum of a negative");
+    TEST(gl_value_get_int(eval_str("(signum 0)")) == 0, "signum of zero");
+    TEST(gl_value_get_int(eval_str("(signum 5)")) == 1, "signum of a positive");
+    TEST(gl_value_get_bool(eval_str("(approx= (deg->rad 180) PI)")) == 1, "degrees to radians");
+    TEST(gl_value_get_bool(eval_str("(approx= (rad->deg PI) 180.0)")) == 1, "radians to degrees");
+    TEST(gl_value_get_bool(eval_str("(approx= (cbrt 27) 3.0)")) == 1, "cube root");
+    TEST(gl_value_get_bool(eval_str("(approx= (cbrt -8) -2.0)")) == 1, "cube root of a negative");
+
+    TEST(gl_value_get_bool(eval_str("(approx= (tan 0) 0.0)")) == 1, "tan");
+    TEST(gl_value_get_bool(eval_str("(approx= (cot (/ PI 4)) 1.0)")) == 1, "cot");
+    TEST(gl_value_get_bool(eval_str("(approx= (sec 0) 1.0)")) == 1, "sec");
+    TEST(gl_value_get_bool(eval_str("(approx= (csc (/ PI 2)) 1.0)")) == 1, "csc");
+    TEST(gl_value_get_bool(eval_str("(approx= (asin 1) (/ PI 2))")) == 1, "asin");
+    TEST(gl_value_get_bool(eval_str("(approx= (acos 1) 0.0)")) == 1, "acos of one");
+    TEST(gl_value_get_bool(eval_str("(approx= (atan 1) (/ PI 4))")) == 1, "atan");
+    TEST(gl_value_get_bool(eval_str("(approx= (acot 1) (/ PI 4))")) == 1, "acot");
+    TEST(gl_value_get_bool(eval_str("(approx= (asec 1) 0.0)")) == 1, "asec of one");
+    TEST(gl_value_get_bool(eval_str("(approx= (acsc 1) (/ PI 2))")) == 1, "acsc of one");
+
+    TEST(gl_value_get_bool(eval_str("(approx= (sinh 0) 0.0)")) == 1, "sinh of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (cosh 0) 1.0)")) == 1, "cosh of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (tanh 0) 0.0)")) == 1, "tanh of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (coth 1) (/ 1.0 (tanh 1)))")) == 1, "coth");
+    TEST(gl_value_get_bool(eval_str("(approx= (sech 0) 1.0)")) == 1, "sech of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (csch 1) (/ 1.0 (sinh 1)))")) == 1, "csch");
+    TEST(gl_value_get_bool(eval_str("(approx= (asinh 0) 0.0)")) == 1, "asinh of zero");
+    TEST(gl_value_get_bool(eval_str("(approx= (acosh 1) 0.0)")) == 1, "acosh of one");
+    TEST(gl_value_get_bool(eval_str("(approx= (atanh 0.5) (* 0.5 (log 3)))")) == 1, "atanh");
+    TEST(gl_value_get_bool(eval_str("(approx= (acoth 2) (atanh (/ 1.0 2)))")) == 1, "acoth");
+    TEST(gl_value_get_bool(eval_str("(approx= (asech 1) 0.0)")) == 1, "asech of one");
+    TEST(gl_value_get_bool(eval_str("(approx= (acsch 1) (asinh 1))")) == 1, "acsch");
+
+    TEST(gl_value_get_bool(eval_str("(frac? 2.5)")) == 1, "frac? of a fractional value");
+    TEST(gl_value_get_bool(eval_str("(frac? 2.0)")) == 0, "frac? of a whole float");
+    TEST(gl_value_get_bool(eval_str("(frac? 2)")) == 0, "frac? of an int");
+    TEST(gl_value_get_bool(eval_str("(natural? 0)")) == 1, "natural? of zero");
+    TEST(gl_value_get_bool(eval_str("(natural? -1)")) == 0, "natural? of a negative");
+    TEST(gl_value_get_bool(eval_str("(natural? 2.5)")) == 0, "natural? of a fraction");
+
+    TEST(gl_value_get_int(eval_str("(min 3 5)")) == 3, "min");
+    TEST(gl_value_get_int(eval_str("(max 3 5)")) == 5, "max");
+    TEST(gl_value_get_int(eval_str("(clamp 10 0 5)")) == 5, "clamp above the range");
+    TEST(gl_value_get_int(eval_str("(clamp -1 0 5)")) == 0, "clamp below the range");
+    TEST(gl_value_get_int(eval_str("(clamp 3 0 5)")) == 3, "clamp inside the range");
+    TEST(gl_value_get_int(eval_str("(1+ 41)")) == 42, "1+");
+    TEST(gl_value_get_int(eval_str("(1- 43)")) == 42, "1-");
+    TEST(gl_value_get_bool(eval_str("(even? 4)")) == 1, "even?");
+    TEST(gl_value_get_bool(eval_str("(odd? 4)")) == 0, "odd? of an even number");
+    TEST(gl_value_get_bool(eval_str("(approx= (abs -7) 7)")) == 1, "abs of a negative");
+}
+
+void test_std_predicates(void) {
+    TEST(gl_value_get_bool(eval_str("(instanceof? int-t 5)")) == 1, "instanceof? match");
+    TEST(gl_value_get_bool(eval_str("(instanceof? string-t 5)")) == 0, "instanceof? mismatch");
+    TEST(gl_value_get_bool(eval_str("(int? 5)")) == 1, "int?");
+    TEST(gl_value_get_bool(eval_str("(int? 5.0)")) == 0, "int? of a float");
+    TEST(gl_value_get_bool(eval_str("(float? 5.0)")) == 1, "float?");
+    TEST(gl_value_get_bool(eval_str("(number? 5.0)")) == 1, "number? of a float");
+    TEST(gl_value_get_bool(eval_str("(string? \"x\")")) == 1, "string?");
+    TEST(gl_value_get_bool(eval_str("(symbol? 'x)")) == 1, "symbol?");
+    TEST(gl_value_get_bool(eval_str("(nil? nil)")) == 1, "nil?");
+    TEST(gl_value_get_bool(eval_str("(function? car)")) == 1, "function? of a builtin");
+    TEST(gl_value_get_bool(eval_str("(function? (lambda (x) x))")) == 1, "function? of a lambda");
+    TEST(gl_value_get_bool(eval_str("(list? (list 1))")) == 1, "list?");
+    TEST(gl_value_get_bool(eval_str("(array? [1])")) == 1, "array?");
+    TEST(gl_value_get_bool(eval_str("(vector? {1})")) == 1, "vector?");
+    TEST(gl_value_get_bool(eval_str("(hash? (hash))")) == 1, "hash?");
+    TEST(gl_value_get_bool(eval_str("(collection? {1})")) == 1, "collection?");
+    TEST(gl_value_get_bool(eval_str("(collection? 1)")) == 0, "collection? of an int");
+    TEST(gl_value_get_bool(eval_str("(file? *stdout*)")) == 1, "file?");
+    TEST(gl_value_get_bool(eval_str("(type= 1 2)")) == 1, "type= of same-typed values");
+    TEST(gl_value_get_bool(eval_str("(type= 1 \"a\")")) == 0, "type= of different types");
+    TEST(gl_value_get_bool(eval_str("(type= int-t float-t)")) == 1,
+         "type= compares the type of its arguments, so two typeids match");
+    TEST(gl_value_get_bool(eval_str("(null? nil)")) == 1, "null? alias");
+}
+
+void test_std_list_accessors(void) {
+    TEST(gl_value_get_int(eval_str("(last (list 1 2 3))")) == 3, "last");
+    TEST(gl_value_get_int(eval_str("(caar (list (list 1 2) 3))")) == 1, "caar");
+    TEST(gl_value_get_int(eval_str("(cadr (list 1 2 3))")) == 2, "cadr");
+    TEST(gl_value_get_int(eval_str("(car (cdar (list (list 1 2))))")) == 2, "cdar");
+    TEST(gl_value_get_int(eval_str("(car (cddr (list 1 2 3)))")) == 3, "cddr");
+    TEST(gl_value_get_int(eval_str("(caddr (list 1 2 3))")) == 3, "caddr");
+    TEST(gl_value_get_int(eval_str("(identity 42)")) == 42, "identity");
+    TEST(gl_value_get_int(eval_str("(id 42)")) == 42, "id alias");
+}
+
+void test_std_io_helpers(void) {
+    char path[512];
+    if (gl_test_make_temp(path, sizeof(path)) != 0) {
+        TEST(0, "create temporary io file");
+        return;
+    }
+
+    char src[1024];
+    snprintf(src, sizeof(src), "(set io-helper (open \"%s\" \"w\"))", path);
+    TEST(eval_str(src) != NULL, "open a file for the io helpers");
+
+    TEST(gl_value_get_int(eval_str("(write 7 io-helper)")) == 1, "write returns the byte count");
+    TEST(eval_str("(write-each (list 8 9) io-helper)")->type == GL_VAL_NIL,
+         "write-each returns nil");
+    TEST(eval_str("(fprint io-helper \"x\")") != NULL, "fprint writes");
+    TEST(eval_str("(fprintln io-helper \"y\")") != NULL, "fprintln writes a line");
+    TEST(eval_str("(feprintln io-helper \"z\")")->type == GL_VAL_NIL, "feprintln writes a line");
+    TEST(gl_value_get_bool(eval_str("(closed? io-helper)")) == 0, "closed? on an open file");
+    eval_str("(close io-helper)");
+    TEST(gl_value_get_bool(eval_str("(closed? io-helper)")) == 1, "closed? on a closed file");
+
+    snprintf(src, sizeof(src), "(set io-helper (open \"%s\" \"r\"))", path);
+    eval_str(src);
+    gl_value_t *line = eval_str("(read-line io-helper)");
+    TEST(line != NULL && line->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(line), "789xy") == 0,
+         "the io helpers wrote the expected first line");
+    line = eval_str("(read-line io-helper)");
+    TEST(line != NULL && line->type == GL_VAL_STRING && strcmp(gl_value_get_string(line), "z") == 0,
+         "feprintln starts a new line");
+    eval_str("(close io-helper)");
+    remove(path);
+}
+
 void test_logic_forms(void) {
     TEST(gl_value_get_bool(eval_str("(and)")) == 1, "and without operands is true");
     TEST(eval_str("(or)")->type == GL_VAL_NIL, "or without operands is nil");
@@ -1447,6 +1667,16 @@ int main(void) {
     test_array_vector_gc();
     test_hashmap();
     test_std_integer_math();
+    test_arithmetic_builtins();
+    test_comparison_builtins();
+    test_sequence_aliases();
+    test_math_builtins();
+    test_bitwise_builtins();
+    test_std_iteration();
+    test_std_math_functions();
+    test_std_predicates();
+    test_std_list_accessors();
+    test_std_io_helpers();
     test_logic_forms();
     test_copy();
     test_float_printing();
