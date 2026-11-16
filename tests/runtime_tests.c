@@ -299,6 +299,22 @@ void test_hashmap(void) {
          "Hashmap contents after GC");
 }
 
+void test_std_integer_math(void) {
+    TEST(gl_value_get_int(eval_str("(mod 10 3)")) == 1, "mod of positive numbers");
+    TEST(gl_value_get_int(eval_str("(mod -10 3)")) == 2, "mod follows the divisor sign");
+    TEST(gl_value_get_int(eval_str("(mod 10 -3)")) == -2, "mod with a negative divisor");
+    TEST(gl_value_get_int(eval_str("(mod -10 -3)")) == -1, "mod of two negatives");
+    TEST(gl_value_get_bool(eval_str("(int? (mod 10 3))")) == 1, "mod of ints stays an int");
+
+    TEST(gl_value_get_int(eval_str("(rem 10 3)")) == 1, "rem of positive numbers");
+    TEST(gl_value_get_int(eval_str("(rem -10 3)")) == -1, "rem follows the dividend sign");
+    TEST(gl_value_get_int(eval_str("(rem 10 -3)")) == 1, "rem with a negative divisor");
+    TEST(gl_value_get_bool(eval_str("(int? (rem 10 3))")) == 1, "rem of ints stays an int");
+
+    TEST(gl_value_get_bool(eval_str("(approx= (mod 5.5 2) 1.5)")) == 1, "mod of floats");
+    TEST(gl_value_get_bool(eval_str("(approx= (rem -5.5 2) -1.5)")) == 1, "rem of floats");
+}
+
 void test_logic_forms(void) {
     TEST(gl_value_get_bool(eval_str("(and)")) == 1, "and without operands is true");
     TEST(eval_str("(or)")->type == GL_VAL_NIL, "or without operands is nil");
@@ -1430,6 +1446,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_hashmap();
+    test_std_integer_math();
     test_logic_forms();
     test_copy();
     test_float_printing();
