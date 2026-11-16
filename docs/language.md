@@ -77,6 +77,11 @@ reader macro that composes with other forms.
 `typeof` returns a typeid, which can be compared with `=` or tested with the
 predicates from `std/types.lisp` (`int?`, `string?`, `list?`, ...).
 
+Floats print in their shortest form with fifteen significant digits: `1.5`,
+`3.14`, `0.3`. An integral float keeps its type visible as `1.0`, and a value
+large enough for exponent notation prints as `1e+17`, which the reader cannot
+lex back.
+
 ## Truthiness
 
 Only `nil` is false. `t` and `else` are constants bound to true. Every other
