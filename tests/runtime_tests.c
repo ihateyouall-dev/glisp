@@ -1035,6 +1035,16 @@ void test_read_eval(void) {
     TEST(gl_value_get_bool(eval_str("(eq (eval \"a\\\\b\") \"a\\\\b\")")) == 1,
          "Eval preserves string contents");
 
+    printed = gl_value_to_string(eval_str("(read \"(1 (2 3) [4 5] {6})\")"));
+    TEST(strcmp(printed, "(1 (2 3) [4 5] {6})") == 0, "Read preserves nested syntax");
+    free(printed);
+
+    TEST(gl_value_get_int(eval_str("(get (eval (read \"[1 (+ 1 2)]\")) 1)")) == 3,
+         "Eval of a read array");
+    TEST(gl_value_get_bool(eval_str("(= (eval (read \"{1 2}\")) {1 2})")) == 1,
+         "Eval of a read vector");
+    TEST(eval_expr("(eval car)") == NULL, "Eval rejects a builtin");
+
     TEST(eval_str("(read \"\")")->type == GL_VAL_NIL, "Empty input reads as nil");
     TEST(gl_value_get_int(eval_str("(read \"1 2\")")) == 1, "Trailing text is ignored");
 

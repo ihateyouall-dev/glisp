@@ -5,7 +5,7 @@ add_library(ast ast.c)
 add_library(parser parser.c)
 add_library(diagnostics diagnostics.c)
 
-file(GLOB runtime_src "runtime/*.c")
+file(GLOB runtime_src CONFIGURE_DEPENDS "runtime/*.c")
 
 add_library(runtime ${runtime_src})
 
