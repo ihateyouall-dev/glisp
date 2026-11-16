@@ -299,6 +299,23 @@ void test_hashmap(void) {
          "Hashmap contents after GC");
 }
 
+void test_float_printing(void) {
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string 1.5)")), "1.5") == 0,
+         "float prints short");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string 3.14)")), "3.14") == 0,
+         "float keeps its digits");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string 1.0)")), "1.0") == 0,
+         "integral float keeps the point");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string -0.5)")), "-0.5") == 0,
+         "negative float prints with its sign");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string (+ 0.1 0.2))")), "0.3") == 0,
+         "float does not show binary noise");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string 1000000.0)")), "1000000.0") == 0,
+         "large integral float stays in fixed form");
+    TEST(strcmp(gl_value_get_string(eval_str("(to-string (/ 1.0 3.0))")), "0.333333333333333") == 0,
+         "float keeps fifteen significant digits");
+}
+
 void test_typeid(void) {
     TEST(gl_value_get_bool(eval_str("(= (typeof 42) int-t)")) == 1, "typeof int");
     TEST(gl_value_get_bool(eval_str("(= (typeof 3.14) float-t)")) == 1, "typeof float");
@@ -1366,6 +1383,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_hashmap();
+    test_float_printing();
     test_typeid();
     test_strings();
     test_std_strings();
