@@ -770,10 +770,44 @@ GL_BUILTIN(vector_pop) {
     return gl_value_vector_pop_back(vec);
 }
 
-// Stable merge sort over a temporary array; gl_value_compare orders values the
-// same way the language does.
-static void __gl_sort_merge(gl_value_t **data, gl_value_t **tmp, size_t left, size_t mid,
-                            size_t right) {
+// Stable merge sort over a temporary array. Elements are ordered by the
+// optional predicate when one is given, otherwise by gl_value_compare, which is
+// the same order the language's = and < use.
+typedef struct {
+    gl_value_t *predicate; /* NULL for the default order */
+    gl_location_t location;
+    int failed; /* set when the predicate reported an error */
+} gl_sort_ctx_t;
+
+static int __gl_sort_less(gl_sort_ctx_t *ctx, gl_value_t *a, gl_value_t *b) {
+    if (ctx->failed) {
+        return 0;
+    }
+    if (ctx->predicate == NULL) {
+        return gl_value_compare(a, b) < 0;
+    }
+
+    gl_function_args_t args;
+    gl_function_args_init(&args, 2, gl_function_arg_free);
+    args.data[0] = malloc(sizeof(gl_function_arg_t));
+    args.data[0]->val = a;
+    args.data[0]->location = ctx->location;
+    args.data[1] = malloc(sizeof(gl_function_arg_t));
+    args.data[1]->val = b;
+    args.data[1]->location = ctx->location;
+
+    gl_value_t *res = gl_call_function(ctx->location, ctx->predicate, &args);
+    gl_function_args_destroy(&args);
+
+    if (res == NULL) {
+        ctx->failed = 1;
+        return 0;
+    }
+    return gl_value_get_bool(res);
+}
+
+static void __gl_sort_merge(gl_sort_ctx_t *ctx, gl_value_t **data, gl_value_t **tmp, size_t left,
+                            size_t mid, size_t right) {
     size_t i = left;
     size_t j = mid;
     size_t k = left;
@@ -781,10 +815,13 @@ static void __gl_sort_merge(gl_value_t **data, gl_value_t **tmp, size_t left, si
     while (i < mid && j < right) {
         // The right half wins only when strictly smaller, which keeps equal
         // elements in their original order.
-        if (gl_value_compare(data[j], data[i]) < 0) {
+        if (__gl_sort_less(ctx, data[j], data[i])) {
             tmp[k++] = data[j++];
         } else {
             tmp[k++] = data[i++];
+        }
+        if (ctx->failed) {
+            return;
         }
     }
     while (i < mid) {
@@ -798,23 +835,29 @@ static void __gl_sort_merge(gl_value_t **data, gl_value_t **tmp, size_t left, si
     }
 }
 
-static void __gl_sort_range(gl_value_t **data, gl_value_t **tmp, size_t left, size_t right) {
+static void __gl_sort_range(gl_sort_ctx_t *ctx, gl_value_t **data, gl_value_t **tmp, size_t left,
+                            size_t right) {
     if (right - left < 2) {
         return;
     }
 
     size_t mid = left + (right - left) / 2;
-    __gl_sort_range(data, tmp, left, mid);
-    __gl_sort_range(data, tmp, mid, right);
-    __gl_sort_merge(data, tmp, left, mid, right);
+    __gl_sort_range(ctx, data, tmp, left, mid);
+    __gl_sort_range(ctx, data, tmp, mid, right);
+    __gl_sort_merge(ctx, data, tmp, left, mid, right);
 }
 
 // Sorting in C rather than in Lisp: the interpreter deep-copies every argument
 // on a call, so a Lisp sort spends most of its time duplicating sublists.
 GL_BUILTIN(sort) {
-    EXPECT_ARGS(1);
+    EXPECT_RVARGS(1, 2);
 
     gl_value_t *coll = NTH_VAL(0);
+    gl_value_t *predicate = NULL;
+    if (ARGC == 2) {
+        predicate = NTH_VAL(1);
+        EXPECT_CALLABLE(predicate);
+    }
     if (coll->type == GL_VAL_NIL) {
         return gl_value_make_nil();
     }
@@ -856,8 +899,18 @@ GL_BUILTIN(sort) {
         }
     }
 
-    __gl_sort_range(data, tmp, 0, size);
+    gl_sort_ctx_t ctx = {
+        .predicate = predicate,
+        .location = NTH_LOC(ARGC == 2 ? 1 : 0),
+        .failed = 0,
+    };
+    __gl_sort_range(&ctx, data, tmp, 0, size);
     free(tmp);
+
+    if (ctx.failed) {
+        free(data);
+        return NULL;
+    }
 
     gl_value_t *res = NULL;
     if (coll->type == GL_VAL_CONS) {

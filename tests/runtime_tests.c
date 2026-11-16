@@ -621,6 +621,20 @@ void test_sort(void) {
     TEST(gl_value_get_int(eval_str("(get (sort-by (lambda (x) (- 0 x)) [3 1 2]) 0)")) == 3,
          "sort-by preserves the array type");
     TEST(eval_str("(sort-by identity nil)")->type == GL_VAL_NIL, "sort-by of nil");
+
+    TEST(gl_value_get_int(eval_str("(car (sort (list 3 1 2) >))")) == 3, "sort with a predicate");
+    TEST(gl_value_get_int(eval_str("(car (sort (list 1 2 3) (lambda (a b) nil)))")) == 1,
+         "sort with an all-false predicate keeps the order");
+    TEST(strcmp(gl_value_get_string(eval_str("(car (sort (list \"bb\" \"a\" \"ccc\") "
+                                             "(lambda (a b) (< (len a) (len b)))))")),
+                "a") == 0,
+         "sort compares by a computed key");
+    TEST(gl_value_get_int(eval_str("(car (car (sort (list (list 2 \"b\") (list 1 \"a\")) "
+                                   "(lambda (x y) (< (car x) (car y))))))")) == 1,
+         "sort with a predicate over records");
+    TEST(eval_expr("(sort (list 1 2) (lambda (a b) (car 1)))") == NULL,
+         "a failing predicate aborts the sort");
+    TEST(gl_value_get_int(eval_str("(len (sort nil >))")) == 0, "sort of nil with a predicate");
     TEST(gl_value_get_int(eval_str("(car (sort '(3 1 2)))")) == 1, "sort list");
     TEST(gl_value_get_int(eval_str("(get (sort {5 4 6}) 1)")) == 5, "sort vector");
     TEST(strcmp(gl_value_get_string(eval_str("(get (sort (list \"b\" \"a\" \"c\")) 0)")), "a") == 0,

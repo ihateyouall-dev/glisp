@@ -285,7 +285,7 @@ argument is always equal to itself.
 | `(set-at collection index value)` / `(aset ...)` | Replaces an element of an array or vector and returns the new value. |
 | `(push vector value ...)` / `(vector-push ...)` | Appends values and returns the vector. |
 | `(pop vector)` / `(vector-pop vector)` | Removes and returns the last element; an empty vector is an error. |
-| `(sort collection)` | Returns a sorted copy of a list, array or vector, in ascending order. Stable, and the source is left unchanged. |
+| `(sort collection [less?])` | Returns a sorted copy of a list, array or vector. Without `less?` the order is ascending by the language comparison; with it, `(less? a b)` decides whether `a` comes first. Stable, and the source is left unchanged. |
 
 ### Hashmaps
 
