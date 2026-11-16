@@ -299,6 +299,23 @@ void test_hashmap(void) {
          "Hashmap contents after GC");
 }
 
+void test_logic_forms(void) {
+    TEST(gl_value_get_bool(eval_str("(and)")) == 1, "and without operands is true");
+    TEST(eval_str("(or)")->type == GL_VAL_NIL, "or without operands is nil");
+    TEST(gl_value_get_bool(eval_str("(and 1 2)")) == 1, "and of true operands");
+    TEST(gl_value_get_bool(eval_str("(and 1 nil)")) == 0, "and stops at nil");
+    TEST(gl_value_get_bool(eval_str("(or nil 3)")) == 1, "or of a true operand");
+    TEST(eval_str("(or nil nil)")->type == GL_VAL_NIL, "or of only nil");
+
+    // Both forms short-circuit, so the undefined call is never reached.
+    TEST(eval_str("(and nil (undefined-thing))")->type == GL_VAL_NIL, "and short-circuits");
+    TEST(gl_value_get_bool(eval_str("(or t (undefined-thing))")) == 1, "or short-circuits");
+
+    // A failure inside a reached operand has to propagate instead of crashing.
+    TEST(eval_expr("(and (undefined-thing) t)") == NULL, "and reports a failing operand");
+    TEST(eval_expr("(or (undefined-thing) t)") == NULL, "or reports a failing operand");
+}
+
 void test_copy(void) {
     eval_str("(set copy-source {1 2})");
     eval_str("(set copy-alias copy-source)");
@@ -1413,6 +1430,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_hashmap();
+    test_logic_forms();
     test_copy();
     test_float_printing();
     test_typeid();
