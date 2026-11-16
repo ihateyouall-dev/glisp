@@ -64,3 +64,6 @@ GL_SPECIAL_FORM(add_to_list);
 
 // Defines an immutable global constant (alias: defconstant).
 GL_SPECIAL_FORM(defconst);
+
+// Declares a global variable and initializes it only when it is unbound.
+GL_SPECIAL_FORM(defvar);

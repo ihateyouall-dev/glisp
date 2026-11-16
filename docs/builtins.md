@@ -156,6 +156,28 @@ returns it; `lambda` returns an anonymous closure without binding it.
   (list greeting who extra))
 ```
 
+### `defvar`
+
+```
+(defvar name [value [docstring]])
+```
+
+Declares a global variable. If `name` is already bound globally, `defvar` leaves
+the existing value untouched and does not evaluate `value`. Otherwise it
+evaluates `value` in the current environment (or binds `nil` when `value` is
+omitted), stores it in the global frame, and returns it. Constants cannot be
+redefined. The optional docstring is currently accepted and ignored.
+
+```lisp
+(defvar *limit* 10)
+(defvar *limit* 20)     ; *limit* remains 10
+(set *limit* 30)
+(defvar *limit* 40)     ; still 30
+```
+
+Unlike `set`, `defvar` always targets the global frame; unlike `set-global`, it
+does not overwrite an existing binding.
+
 ### `defconst`
 
 ```

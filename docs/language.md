@@ -124,6 +124,7 @@ GLisp uses lexical scope with chained environment frames.
 ```lisp
 (set x 10)          ; nearest binding, or a new binding in the current frame
 (set-global y 20)   ; always the global frame
+(defvar z 30)       ; global, but only when z is not bound yet
 
 (let ((a 1) (b 2)) (+ a b))          ; parallel bindings
 (let* ((a 5) (b (* a 2))) (+ a b))   ; sequential bindings
@@ -133,6 +134,10 @@ GLisp uses lexical scope with chained environment frames.
 - `let*` evaluates each initializer with the previous bindings visible.
 - `set` updates the nearest existing variable binding; if the name is unbound,
   it defines the variable in the current frame.
+- `defvar` declares a global variable. If the global name is already bound, its
+  value and the init form are left untouched; otherwise the init form is
+  evaluated in the current environment and stored globally. This makes `defvar`
+  safe to re-evaluate when a file is loaded again.
 - Functions capture the environment in which they are created, so closures see
   the bindings that were visible at definition time.
 
