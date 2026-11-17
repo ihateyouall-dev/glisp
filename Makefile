@@ -1,4 +1,4 @@
-.PHONY: all build clean test configure install-deps install package
+.PHONY: all build clean test examples configure install-deps install package
 
 CMAKE_PRESET ?= release
 CMAKE_CONFIGURE_PRESET ?= $(CMAKE_PRESET)
@@ -58,6 +58,13 @@ $(HOME)/.conan2/profiles/default:
 
 test:
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
+
+# Every example checks its own results with assert, so running them is a test.
+examples: build
+	@for example in examples/*.lisp; do \
+		echo "$$example"; \
+		$(BUILD_DIR)/glisp "$$example" > /dev/null || exit 1; \
+	done
 
 install:
 	cmake --install $(BUILD_DIR)

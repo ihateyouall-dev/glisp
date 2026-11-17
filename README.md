@@ -223,6 +223,7 @@ glisp/
 │   │   ├── specforms.c/.h Special forms
 │   │   └── pragma.c/.h    Runtime directives
 │   └── utils/             Typed containers and terminal helpers
+├── examples/              Small programs that check themselves
 ├── std/                   Lisp standard library
 ├── tests/                 C test suites, Lisp fixtures, and the leak-check script
 └── docs/                  Language, builtin, stdlib, and C API references
@@ -251,6 +252,25 @@ The macOS `leaks` tool can be used to check a run for leaked allocations:
 make BUILD_TYPE=Leaks
 leaks --atExit -- ./build/glisp tests/leak.lisp
 ```
+
+## Examples
+
+The `examples/` directory holds small programs that double as tests: each one
+asserts its own results, so running them is a check.
+
+```bash
+make examples
+```
+
+| Example | Shows |
+| :--- | :--- |
+| `fizzbuzz.lisp` | `cond`, `%`, `range`, `map` |
+| `primes.lisp` | a growable vector mutated in place, `while`, `dotimes` |
+| `wordcount.lisp` | hash maps, `string-lines`, sorting pairs with a predicate |
+| `calc.lisp` | `read` and `eval` turning text into running code |
+| `loop.lisp` | a hundred thousand tail calls in constant stack |
+
+Run one directly with `./build/glisp examples/primes.lisp`.
 
 ## Continuous integration
 
