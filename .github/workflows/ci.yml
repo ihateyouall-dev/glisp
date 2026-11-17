@@ -97,6 +97,9 @@ jobs:
       - name: Smoke test (Release)
         run: ./build/glisp tests/leak.lisp > /dev/null
 
+      - name: Run the examples
+        run: make examples
+
   macos:
     name: macOS (Apple Clang, ASan/UBSan)
     runs-on: macos-latest
