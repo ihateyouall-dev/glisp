@@ -246,8 +246,13 @@ is the way to sort entries: `(sort-by car (hash->alist map))`.
 | `(print-err ...)` | Writes arguments to `*stderr*`. |
 | `(println-err ...)` | Writes arguments and a newline to `*stderr*`. |
 | `(eprintln-err ...)` | Writes each argument on its own line to `*stderr*`. |
+| `(printf fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `*stdout*`; returns `nil`. |
+| `(fprintf file fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `file`. |
+| `(printf-err fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `*stderr*`. |
 
-`write` uses `to-string`, which prints strings verbatim without quotes.
+`write` uses `to-string`, which prints strings verbatim without quotes. The
+`printf` family builds on `format` (see [Strings](#strings)), so it has no
+escape for a literal `{}` either.
 
 ### Input
 

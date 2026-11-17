@@ -16,6 +16,10 @@
   (write-each args)
   nil)
 
+(defun printf (fmt &rest args)
+  "Print FMT replacing each {} with the next argument."
+  (print (apply format fmt args)))
+
 (defun println (&rest args)
   "Print ARGS and write new line."
   (apply print args)
@@ -32,6 +36,10 @@
   (assert (file? file) "FILE must be file")
   (write-each args file)
   nil)
+
+(defun fprintf (file fmt &rest args)
+  "Print FMT replacing each {} with the next argument to FILE."
+  (fprint file (apply format fmt args)))
 
 (defun fprintln (file &rest args)
   "Print ARGS to FILE and write new line."
@@ -50,6 +58,10 @@
   "Print ARGS to *stderr*."
   (write-each args *stderr*)
   nil)
+
+(defun printf-err (fmt &rest args)
+  "Print FMT replacing each {} with the next argument to *stderr*."
+  (print-err (apply format fmt args)))
 
 (defun println-err (&rest args)
   "Print ARGS and write new line to *stderr*."

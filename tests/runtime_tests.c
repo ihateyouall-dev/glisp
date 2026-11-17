@@ -1747,6 +1747,29 @@ void test_io(void) {
     snprintf(src, sizeof(src), "(open \"%s\" 8)", path);
     TEST(eval_expr(src) == NULL, "open rejects unknown mode bits");
 
+    TEST(gl_value_get_bool(eval_str("(function? printf)")) == 1, "printf is a function");
+    TEST(gl_value_get_bool(eval_str("(function? fprintf)")) == 1, "fprintf is a function");
+    TEST(gl_value_get_bool(eval_str("(function? printf-err)")) == 1, "printf-err is a function");
+
+    snprintf(src, sizeof(src), "(set io-file (open-write \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open file for fprintf test");
+    TEST(eval_str("(fprintf io-file \"{} {}\\n\" 1 2)") != NULL, "fprintf writes formatted output");
+    TEST(eval_str("(apply fprintf io-file \"{}\" (list 42))") != NULL,
+         "fprintf works through apply");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-read \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "reopen file after fprintf");
+    gl_value_t *formatted = eval_str("(read-line io-file)");
+    TEST(formatted != NULL && formatted->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(formatted), "1 2") == 0,
+         "fprintf substitutes placeholders");
+    gl_value_t *applied = eval_str("(read-line io-file)");
+    TEST(applied != NULL && applied->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(applied), "42") == 0,
+         "fprintf result through apply");
+    eval_str("(close io-file)");
+
     remove(path);
 }
 
