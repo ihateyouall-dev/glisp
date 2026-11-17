@@ -19,10 +19,6 @@ typedef struct gl_env_t gl_env_t;
 
 GL_SPECIAL_FORM(if);
 
-GL_SPECIAL_FORM(when);
-
-GL_SPECIAL_FORM(unless);
-
 GL_SPECIAL_FORM(defun);
 
 GL_SPECIAL_FORM(defmacro);
@@ -55,17 +51,7 @@ GL_SPECIAL_FORM(let_star);
 // Runtime directives such as GC control.
 GL_SPECIAL_FORM(pragma);
 
-GL_SPECIAL_FORM(cond);
-
-GL_SPECIAL_FORM(case);
-
 GL_SPECIAL_FORM(for);
-
-GL_SPECIAL_FORM(dotimes);
-
-GL_SPECIAL_FORM(and);
-
-GL_SPECIAL_FORM(or);
 
 // Mutates a variable holding a list, prepending or appending an element.
 GL_SPECIAL_FORM(add_to_list);

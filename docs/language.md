@@ -223,6 +223,10 @@ that expansion in the caller's environment.
 
 ## Control flow
 
+`when`, `unless`, `cond`, `case`, `and`, `or`, and `dotimes` are macros provided
+by `std/core.lisp`; they require the standard library (`--no-stdlib` omits
+them). `if`, `while`, and `for` are part of the bare runtime.
+
 ### `if`
 
 ```lisp

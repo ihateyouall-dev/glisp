@@ -25,6 +25,22 @@ the I/O helpers.
 | `(identity x)` | Returns `x`. |
 | `(id x)` | Returns `x`. |
 
+### Control macros
+
+`core.lisp` defines the standard control forms as macros. They are available
+whenever the standard library is loaded and are not part of the bare runtime
+(use `--no-stdlib` to omit them).
+
+| Signature | Description |
+| :--- | :--- |
+| `(and expr ...)` | Short-circuiting boolean AND; `(and)` is `t`. |
+| `(or expr ...)` | Short-circuiting boolean OR; `(or)` is `nil`. |
+| `(when test body ...)` | Evaluates the body only when `test` is true. |
+| `(unless test body ...)` | Evaluates the body only when `test` is false. |
+| `(cond (test body ...) ... (else body ...))` | Multi-branch conditional; a clause with an empty body returns its test value. |
+| `(case value (key body ...) ... (else body ...))` | Compares `value` with evaluated keys using `=`; first match wins. |
+| `(dotimes (variable count [result]) body ...)` | Loops `variable` from `0` to `count - 1`; `result` sees the final binding. |
+
 ## math.lisp
 
 ### Constants

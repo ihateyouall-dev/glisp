@@ -31,6 +31,7 @@ const size_t GL_MAX_EVAL_DEPTH = 1000;
 static size_t gl_eval_depth = 0;
 static size_t gl_macro_depth = 0;
 static const size_t GL_MAX_MACRO_DEPTH = 1000;
+static const size_t GL_MAX_MACRO_EXPANSIONS = 100000;
 static uintptr_t gl_stack_base = 0;
 static size_t gl_stack_budget = 0;
 
@@ -285,11 +286,41 @@ static gl_value_t *__gl_eval_leading_forms(gl_ast_node_t *body, gl_ast_node_t **
     return res;
 }
 
+// ASTs produced by macro expansion while evaluating a tail chain. They must
+// outlive the loop, so they are collected here and freed when the chain ends.
+typedef struct {
+    gl_ast_node_t **items;
+    size_t size;
+    size_t capacity;
+} gl_owned_ast_t;
+
+static int __gl_owned_ast_push(gl_owned_ast_t *owned, gl_ast_node_t *ast) {
+    if (owned->size == owned->capacity) {
+        size_t capacity = owned->capacity == 0 ? 8 : owned->capacity * 2;
+        gl_ast_node_t **grown = realloc(owned->items, capacity * sizeof(*grown));
+        if (grown == NULL) {
+            return 0;
+        }
+        owned->items = grown;
+        owned->capacity = capacity;
+    }
+    owned->items[owned->size++] = ast;
+    return 1;
+}
+
+static void __gl_owned_ast_destroy(gl_owned_ast_t *owned) {
+    for (size_t i = 0; i < owned->size; ++i) {
+        gl_ast_destroy(owned->items[i]);
+    }
+    free(owned->items);
+}
+
 // Evaluates NODE in tail position. A call to a user function replaces the
-// current call frame instead of stacking a new one, and the forms that only
-// select one of their sub-expressions are looked through, so a recursion that
-// ends in if/cond/when/unless/progn runs in constant C stack.
-static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
+// current call frame instead of stacking a new one, and the core forms that
+// only select one of their sub-expressions are looked through, so a recursion
+// that ends in if/progn runs in constant C stack. Macro expansions continue in
+// tail position; their ASTs are kept in OWNED until the chain finishes.
+static gl_value_t *__gl_eval_tail_impl(gl_ast_node_t *node, gl_owned_ast_t *owned) {
     while (node != NULL) {
         if (node->type != GL_AST_CONS) {
             return gl_eval(node);
@@ -332,66 +363,13 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
                     continue;
                 }
 
-                if (strcmp(name, "progn") == 0 || strcmp(name, "when") == 0 ||
-                    strcmp(name, "unless") == 0) {
-                    gl_ast_node_t *forms = body;
-
-                    if (strcmp(name, "progn") != 0) {
-                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(body, 0));
-                        if (test == NULL) {
-                            return NULL;
-                        }
-
-                        int taken = gl_value_get_bool(test);
-                        if (strcmp(name, "unless") == 0) {
-                            taken = !taken;
-                        }
-                        if (!taken) {
-                            return gl_value_make_nil();
-                        }
-                        forms = gl_ast_cons_nth_cdr(body, 1);
-                    }
-                    if (forms == NULL || forms->type == GL_AST_NIL) {
+                if (strcmp(name, "progn") == 0) {
+                    if (body == NULL || body->type == GL_AST_NIL) {
                         return gl_value_make_nil();
                     }
 
                     gl_ast_node_t *last = NULL;
-                    gl_value_t *res = __gl_eval_leading_forms(forms, &last);
-                    if (res == NULL) {
-                        return NULL;
-                    }
-                    node = last;
-                    continue;
-                }
-
-                if (strcmp(name, "cond") == 0) {
-                    gl_ast_node_t *clause = body;
-                    gl_value_t *matched = NULL;
-
-                    while (clause != NULL && clause->type == GL_AST_CONS) {
-                        gl_ast_node_t *entry = clause->value.cons.car;
-                        gl_value_t *test = gl_eval(gl_ast_cons_nth_car(entry, 0));
-                        if (test == NULL) {
-                            return NULL;
-                        }
-                        if (gl_value_get_bool(test)) {
-                            matched = test;
-                            break;
-                        }
-                        clause = clause->value.cons.cdr;
-                    }
-
-                    if (matched == NULL) {
-                        return gl_value_make_nil();
-                    }
-
-                    gl_ast_node_t *clause_body = clause->value.cons.car->value.cons.cdr;
-                    if (clause_body->type == GL_AST_NIL) {
-                        return matched;
-                    }
-
-                    gl_ast_node_t *last = NULL;
-                    gl_value_t *res = __gl_eval_leading_forms(clause_body, &last);
+                    gl_value_t *res = __gl_eval_leading_forms(body, &last);
                     if (res == NULL) {
                         return NULL;
                     }
@@ -402,24 +380,26 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
         }
 
         if (callee != NULL && callee->type == GL_VAL_MACRO) {
-            if (gl_macro_depth >= GL_MAX_MACRO_DEPTH) {
+            if (owned->size >= GL_MAX_MACRO_EXPANSIONS) {
                 gl_diagnostic_report_error(gl_make_error(GL_RECURSION_ERROR, GL_ERROR,
                                                          head->location,
-                                                         "Maximum macro expansion depth exceeded"));
+                                                         "Maximum macro expansion chain exceeded"));
                 return NULL;
             }
 
-            ++gl_macro_depth;
             gl_ast_node_t *expansion = __gl_macro_expand_ast(callee, body, head->location, head);
             if (expansion == NULL) {
-                --gl_macro_depth;
+                return NULL;
+            }
+            if (!__gl_owned_ast_push(owned, expansion)) {
+                gl_ast_destroy(expansion);
+                gl_diagnostic_report_error(gl_make_error(GL_TYPE_ERROR, GL_ERROR, head->location,
+                                                         "Out of memory during macro expansion"));
                 return NULL;
             }
 
-            gl_value_t *res = __gl_eval_tail(expansion);
-            gl_ast_destroy(expansion);
-            --gl_macro_depth;
-            return res;
+            node = expansion;
+            continue;
         }
 
         // Everything else is a call or not a call at all. A call to a user
@@ -471,6 +451,14 @@ static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
 
     return gl_value_make_nil();
 }
+
+static gl_value_t *__gl_eval_tail(gl_ast_node_t *node) {
+    gl_owned_ast_t owned = {0};
+    gl_value_t *res = __gl_eval_tail_impl(node, &owned);
+    __gl_owned_ast_destroy(&owned);
+    return res;
+}
+
 // Binds parameters in the call frame environment, then evaluates the body.
 static gl_value_t *__gl_eval_function(gl_function_t *function, gl_function_args_t *args) {
     gl_value_t *env = gl_current_env();

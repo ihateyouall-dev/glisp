@@ -148,8 +148,6 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("if", if);
-    DEFINE_SPECFORM("when", when);
-    DEFINE_SPECFORM("unless", unless);
     DEFINE_SPECFORM("defun", defun);
     DEFINE_SPECFORM("defmacro", defmacro);
     DEFINE_SPECFORM("lambda", lambda);
@@ -165,12 +163,7 @@ static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("let", let);
     DEFINE_SPECFORM("let*", let_star);
     DEFINE_SPECFORM("pragma", pragma);
-    DEFINE_SPECFORM("cond", cond);
-    DEFINE_SPECFORM("case", case);
     DEFINE_SPECFORM("for", for);
-    DEFINE_SPECFORM("dotimes", dotimes);
-    DEFINE_SPECFORM("and", and);
-    DEFINE_SPECFORM("or", or);
     DEFINE_SPECFORM("add-to-list", add_to_list);
     DEFINE_SPECFORM("defconst", defconst);
     DEFINE_SPECFORM("defconstant", defconst);

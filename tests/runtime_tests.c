@@ -1417,6 +1417,10 @@ void test_control_forms(void) {
     TEST(eval_expr("(while (len 5) 0)") == NULL, "While stops when the condition fails");
     TEST(gl_value_get_int(eval_str("(let ((i 0)) (while (< i 3) (set i (+ i 1))) i)")) == 3,
          "While still runs normally");
+
+    eval_str("(defun cond-count (n) (cond ((= n 0) 0) (else (cond-count (- n 1)))))");
+    TEST(gl_value_get_int(eval_str("(cond-count 5000)")) == 0,
+         "tail recursion through cond runs in constant stack");
     TEST(gl_value_get_int(eval_str("(when t 1 2 3)")) == 3, "When returns last body value");
     gl_value_t *when_nil = eval_str("(when nil 1)");
     TEST(when_nil != NULL && when_nil->type == GL_VAL_NIL, "When false returns nil");
@@ -1443,6 +1447,27 @@ void test_control_forms(void) {
     eval_str("(set case_ran 0)");
     eval_str("(case 1 (1 (set case_ran 1)) (2 (set case_ran 2)))");
     TEST(gl_value_get_int(eval_str("case_ran")) == 1, "Case skips other bodies");
+
+    eval_str("(set case_val_calls 0)");
+    eval_str("(case (progn (set case_val_calls (+ case_val_calls 1)) 2) (1 10) (2 20))");
+    TEST(gl_value_get_int(eval_str("case_val_calls")) == 1, "Case evaluates its value once");
+
+    eval_str("(set case_key_calls 0)");
+    TEST(gl_value_get_int(
+             eval_str("(case 2 ((progn (set case_key_calls (+ case_key_calls 1)) 1) 10) "
+                      "        ((progn (set case_key_calls (+ case_key_calls 1)) 2) 20) "
+                      "        ((progn (set case_key_calls (+ case_key_calls 1)) 3) 30))")) == 20,
+         "Case evaluates keys until the match");
+    TEST(gl_value_get_int(eval_str("case_key_calls")) == 2, "Case skips later keys");
+
+    eval_str("(set cond_calls 0)");
+    TEST(gl_value_get_int(eval_str(
+             "(cond ((progn (set cond_calls (+ cond_calls 1)) nil) 1) (else cond_calls))")) == 1,
+         "Cond evaluates a test once");
+
+    eval_str("(set dot_count_calls 0)");
+    eval_str("(dotimes (i (progn (set dot_count_calls (+ dot_count_calls 1)) 3) nil))");
+    TEST(gl_value_get_int(eval_str("dot_count_calls")) == 1, "Dotimes evaluates count once");
 
     eval_str("(set dot_seq nil)");
     eval_str("(dotimes (i 3) (set dot_seq (cons i dot_seq)))");

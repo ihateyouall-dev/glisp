@@ -28,6 +28,9 @@ GL_SPECIAL_FORM(if) {
     assert(args->type == GL_AST_CONS);
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
     gl_value_t *condition_val = gl_eval(condition);
+    if (condition_val == NULL) {
+        return NULL;
+    }
 
     // If have no actions, return boolean
     if (args->value.cons.cdr->type == GL_AST_NIL) {
@@ -42,6 +45,9 @@ GL_SPECIAL_FORM(if) {
         gl_value_t *res = gl_value_make_nil();
         while (if_false->type != GL_AST_NIL) {
             res = gl_eval(gl_ast_cons_nth_car(if_false, 0));
+            if (res == NULL) {
+                return NULL;
+            }
             if_false = gl_ast_cons_nth_cdr(if_false, 0);
         }
         return res;
@@ -349,13 +355,20 @@ GL_SPECIAL_FORM(set_global) {
 
 GL_SPECIAL_FORM(progn) {
     assert(args);
+
+    if (args->type == GL_AST_NIL) {
+        return gl_value_make_nil();
+    }
     assert(args->type == GL_AST_CONS);
 
     gl_ast_node_t *current = args;
-    gl_value_t *res = NULL;
+    gl_value_t *res = gl_value_make_nil();
 
     while (current->type != GL_AST_NIL) {
         res = gl_eval(current->value.cons.car);
+        if (res == NULL) {
+            return NULL;
+        }
         current = current->value.cons.cdr;
     }
     return res;
@@ -821,44 +834,6 @@ static gl_value_t *__gl_eval_body(gl_ast_node_t *body) {
     return res;
 }
 
-// when evaluates the test once and only touches the body when it is true.
-GL_SPECIAL_FORM(when) {
-    if (!args || args->type != GL_AST_CONS) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "when requires a test expression");
-        return NULL;
-    }
-
-    gl_value_t *test_val = gl_eval(gl_ast_cons_nth_car(args, 0));
-    if (!test_val) {
-        return NULL;
-    }
-    if (!gl_value_get_bool(test_val)) {
-        return gl_value_make_nil();
-    }
-
-    return __gl_eval_body(args->value.cons.cdr);
-}
-
-// unless is when with the test inverted; the body stays unevaluated.
-GL_SPECIAL_FORM(unless) {
-    if (!args || args->type != GL_AST_CONS) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "unless requires a test expression");
-        return NULL;
-    }
-
-    gl_value_t *test_val = gl_eval(gl_ast_cons_nth_car(args, 0));
-    if (!test_val) {
-        return NULL;
-    }
-    if (gl_value_get_bool(test_val)) {
-        return gl_value_make_nil();
-    }
-
-    return __gl_eval_body(args->value.cons.cdr);
-}
-
 // let evaluates initializers in the enclosing scope (parallel binding semantics).
 GL_SPECIAL_FORM(let) {
     if (!args || args->type != GL_AST_CONS) {
@@ -1043,173 +1018,6 @@ GL_SPECIAL_FORM(pragma) {
     return res;
 }
 
-GL_SPECIAL_FORM(cond) {
-    if (!args || args->type == GL_AST_NIL) {
-        return gl_value_make_nil();
-    }
-    if (args->type != GL_AST_CONS) {
-        __emit_syntax_error(args->location, "Malformed cond form: expected a list of clauses");
-        return NULL;
-    }
-
-    gl_ast_node_t *clause_node = args;
-    while (clause_node && clause_node->type == GL_AST_CONS) {
-        gl_ast_node_t *clause = clause_node->value.cons.car;
-        if (!clause || clause->type != GL_AST_CONS) {
-            __emit_syntax_error(clause ? clause->location : args->location,
-                                "cond clause must be a non-empty list");
-            return NULL;
-        }
-
-        gl_ast_node_t *test_node = clause->value.cons.car;
-        int is_else =
-            (test_node->type == GL_AST_SYMBOL && strcmp(test_node->value.symbol, "else") == 0);
-
-        gl_value_t *test_val = NULL;
-        if (is_else) {
-            test_val = gl_value_make_bool(1);
-        } else {
-            test_val = gl_eval(test_node);
-            if (!test_val) {
-                return NULL;
-            }
-        }
-
-        if (gl_value_get_bool(test_val)) {
-            gl_ast_node_t *body = clause->value.cons.cdr;
-            if (body->type == GL_AST_NIL) {
-                return test_val;
-            }
-            return __gl_eval_body(body);
-        }
-
-        clause_node = clause_node->value.cons.cdr;
-    }
-
-    if (clause_node && clause_node->type != GL_AST_NIL) {
-        __emit_syntax_error(clause_node->location, "Malformed cond clauses list");
-        return NULL;
-    }
-
-    return gl_value_make_nil();
-}
-
-// case evaluates keys in order and only evaluates the selected body.
-GL_SPECIAL_FORM(case) {
-    if (!args || args->type != GL_AST_CONS) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "case requires a value and clauses");
-        return NULL;
-    }
-
-    size_t root_mark = gl_gc_root_mark();
-    gl_value_t *val = gl_eval(gl_ast_cons_nth_car(args, 0));
-    if (!val) {
-        return NULL;
-    }
-    gl_gc_push_root(val);
-
-    gl_ast_node_t *curr = args->value.cons.cdr;
-    while (curr && curr->type == GL_AST_CONS) {
-        gl_ast_node_t *clause = curr->value.cons.car;
-        if (!clause || clause->type != GL_AST_CONS) {
-            __emit_syntax_error(clause ? clause->location : args->location,
-                                "case clause must be a non-empty list");
-            gl_gc_roots_release(root_mark);
-            return NULL;
-        }
-
-        gl_ast_node_t *key_node = clause->value.cons.car;
-        int is_else =
-            key_node->type == GL_AST_SYMBOL && strcmp(key_node->value.symbol, "else") == 0;
-        int match = is_else;
-        if (!is_else) {
-            gl_value_t *key = gl_eval(key_node);
-            if (!key) {
-                gl_gc_roots_release(root_mark);
-                return NULL;
-            }
-            match = gl_value_compare(val, key) == 0;
-        }
-        if (match) {
-            gl_value_t *res = __gl_eval_body(clause->value.cons.cdr);
-            gl_gc_roots_release(root_mark);
-            return res;
-        }
-        curr = curr->value.cons.cdr;
-    }
-
-    if (curr && curr->type != GL_AST_NIL) {
-        __emit_syntax_error(curr->location, "Malformed case clauses list");
-        gl_gc_roots_release(root_mark);
-        return NULL;
-    }
-    gl_gc_roots_release(root_mark);
-    return gl_value_make_nil();
-}
-
-// dotimes binds the counter in a fresh frame and evaluates its result there.
-GL_SPECIAL_FORM(dotimes) {
-    if (!args || args->type != GL_AST_CONS) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "dotimes requires a binding list");
-        return NULL;
-    }
-
-    gl_ast_node_t *spec = args->value.cons.car;
-    size_t spec_len = gl_ast_cons_length(spec);
-    if (spec->type != GL_AST_CONS || spec_len < 2 || spec_len > 3) {
-        __emit_syntax_error(spec->location, "dotimes binding must be (variable count [result])");
-        return NULL;
-    }
-    gl_ast_node_t *name_node = gl_ast_cons_nth_car(spec, 0);
-    if (name_node->type != GL_AST_SYMBOL) {
-        __emit_syntax_error(name_node->location, "Variable name in dotimes form must be a symbol");
-        return NULL;
-    }
-    const char *var_name = name_node->value.symbol;
-    if (gl_env_is_const(env, var_name)) {
-        char buf[256];
-        snprintf(buf, sizeof(buf), "Cannot bind constant '%s'", var_name);
-        __emit_syntax_error(name_node->location, buf);
-        return NULL;
-    }
-
-    gl_ast_node_t *count_node = gl_ast_cons_nth_car(spec, 1);
-    gl_value_t *count_val = gl_eval(count_node);
-    if (!count_val) {
-        return NULL;
-    }
-    if (count_val->type != GL_VAL_INT || gl_value_get_int(count_val) < 0) {
-        char buf[128] = "Dotimes count must be a non-negative integer";
-        gl_diagnostic_report_error(
-            gl_make_error(GL_TYPE_ERROR, GL_ERROR, count_node->location, buf));
-        return NULL;
-    }
-    int64_t count = gl_value_get_int(count_val);
-
-    gl_value_t *parent_env = gl_current_env();
-    gl_env_t *new_env = gl_make_env(parent_env);
-    gl_value_t *new_env_val = gl_value_make_env(new_env);
-    gl_call_stack_push_env(new_env_val, spec, "dotimes");
-    gl_env_set_var(new_env, var_name, gl_value_make_int(0));
-
-    gl_ast_node_t *body = args->value.cons.cdr;
-    gl_value_t *res = gl_value_make_nil();
-    for (int64_t i = 0; i < count; ++i) {
-        gl_env_set_var(new_env, var_name, gl_value_make_int(i));
-        if (!__gl_eval_body(body)) {
-            gl_call_stack_pop_env();
-            return NULL;
-        }
-    }
-    if (spec_len == 3) {
-        res = gl_eval(gl_ast_cons_nth_car(spec, 2));
-    }
-    gl_call_stack_pop_env();
-    return res;
-}
-
 // for binds a fresh variable in a new frame and copies each element.
 GL_SPECIAL_FORM(for) {
     if (!args || args->type == GL_AST_NIL) {
@@ -1342,47 +1150,6 @@ GL_SPECIAL_FORM(for) {
     gl_call_stack_pop_env();
     gl_gc_roots_release(root_mark);
     return gl_value_make_nil();
-}
-
-GL_SPECIAL_FORM(and) {
-    // With no operands the identity holds: nothing failed.
-    if (!args || args->type == GL_AST_NIL) {
-        return gl_value_make_bool(1);
-    }
-
-    gl_ast_node_t *current = args;
-    while (current->type != GL_AST_NIL) {
-        gl_value_t *current_val = gl_eval(current->value.cons.car);
-        if (current_val == NULL) {
-            return NULL;
-        }
-
-        if (!gl_value_get_bool(current_val)) {
-            return gl_value_make_bool(0);
-        }
-        current = current->value.cons.cdr;
-    }
-    return gl_value_make_bool(1);
-}
-
-GL_SPECIAL_FORM(or) {
-    if (!args || args->type == GL_AST_NIL) {
-        return gl_value_make_nil();
-    }
-
-    gl_ast_node_t *current = args;
-    while (current->type != GL_AST_NIL) {
-        gl_value_t *current_val = gl_eval(current->value.cons.car);
-        if (current_val == NULL) {
-            return NULL;
-        }
-
-        if (gl_value_get_bool(current_val)) {
-            return gl_value_make_bool(1);
-        }
-        current = current->value.cons.cdr;
-    }
-    return gl_value_make_bool(0);
 }
 
 // Mutates the nearest binding of a list variable, avoiding duplicates.
