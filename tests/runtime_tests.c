@@ -299,6 +299,39 @@ void test_hashmap(void) {
          "Hashmap contents after GC");
 }
 
+void test_name_suggestions(void) {
+    gl_env_t *global = (gl_env_t *)gl_global_env->val;
+
+    char *suggestion = gl_env_suggest_name(global, "lenght");
+    TEST(suggestion != NULL && strcmp(suggestion, "length") == 0, "suggests length for lenght");
+    free(suggestion);
+
+    suggestion = gl_env_suggest_name(global, "printn");
+    TEST(suggestion != NULL && strcmp(suggestion, "print") == 0, "suggests print for printn");
+    free(suggestion);
+
+    suggestion = gl_env_suggest_name(global, "cont");
+    TEST(suggestion != NULL && strcmp(suggestion, "cond") == 0, "suggests cond for cont");
+    free(suggestion);
+
+    suggestion = gl_env_suggest_name(global, "zzz");
+    TEST(suggestion == NULL, "no suggestion for a name that is far from everything");
+    free(suggestion);
+
+    suggestion = gl_env_suggest_name(global, "qqqqq");
+    TEST(suggestion == NULL, "no suggestion for a name with nothing close");
+    free(suggestion);
+
+    // The search crosses frames: a local binding is suggested from an inner one.
+    gl_env_t *inner = gl_make_env(gl_global_env);
+    gl_env_set_var(inner, "local-counter", gl_value_make_int(1));
+    suggestion = gl_env_suggest_name(inner, "local-counterr");
+    TEST(suggestion != NULL && strcmp(suggestion, "local-counter") == 0,
+         "suggests a binding from an enclosing frame");
+    free(suggestion);
+    gl_env_destroy(inner);
+}
+
 void test_std_integer_math(void) {
     TEST(gl_value_get_int(eval_str("(mod 10 3)")) == 1, "mod of positive numbers");
     TEST(gl_value_get_int(eval_str("(mod -10 3)")) == 2, "mod follows the divisor sign");
@@ -1736,6 +1769,7 @@ int main(void) {
     test_array_vector_comparison();
     test_array_vector_gc();
     test_hashmap();
+    test_name_suggestions();
     test_std_integer_math();
     test_arithmetic_builtins();
     test_comparison_builtins();

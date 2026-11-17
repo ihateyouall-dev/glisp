@@ -305,3 +305,100 @@ gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
     }
     return res;
 }
+
+// Levenshtein distance, abandoned as soon as it can no longer stay under the
+// limit. Names in this language are short, so a small cap is enough.
+static size_t __gl_edit_distance(const char *a, const char *b, size_t limit) {
+    size_t len_a = strlen(a);
+    size_t len_b = strlen(b);
+
+    if (len_a > len_b + limit || len_b > len_a + limit) {
+        return limit + 1;
+    }
+
+    size_t prev[64];
+    size_t curr[64];
+    if (len_b + 1 > sizeof(prev) / sizeof(prev[0])) {
+        return limit + 1;
+    }
+
+    for (size_t j = 0; j <= len_b; ++j) {
+        prev[j] = j;
+    }
+
+    for (size_t i = 1; i <= len_a; ++i) {
+        curr[0] = i;
+        size_t best = curr[0];
+        for (size_t j = 1; j <= len_b; ++j) {
+            size_t cost = a[i - 1] == b[j - 1] ? 0 : 1;
+            size_t deletion = prev[j] + 1;
+            size_t insertion = curr[j - 1] + 1;
+            size_t substitution = prev[j - 1] + cost;
+
+            size_t value = deletion < insertion ? deletion : insertion;
+            if (substitution < value) {
+                value = substitution;
+            }
+            curr[j] = value;
+            if (value < best) {
+                best = value;
+            }
+        }
+        if (best > limit) {
+            return limit + 1;
+        }
+        for (size_t j = 0; j <= len_b; ++j) {
+            prev[j] = curr[j];
+        }
+    }
+
+    return prev[len_b];
+}
+
+static void __gl_consider_name(const char *candidate, const char *sym, size_t *best_distance,
+                               char **best) {
+    // Short names get a tighter limit, otherwise a three-letter typo matches
+    // half the standard library.
+    size_t limit = strlen(sym) <= 3 ? 1 : 2;
+    size_t distance = __gl_edit_distance(sym, candidate, limit);
+
+    if (distance > limit) {
+        return;
+    }
+    if (*best == NULL || distance < *best_distance) {
+        free(*best);
+        *best = strdup(candidate);
+        *best_distance = distance;
+    }
+}
+
+static void __gl_scan_table(gl_value_table_t *table, const char *sym, size_t *best_distance,
+                            char **best) {
+    if (table == NULL || table->buckets == NULL) {
+        return;
+    }
+
+    for (size_t i = 0; i < table->buckets_count; ++i) {
+        gl_value_tableBucket_t *bucket = &table->buckets[i];
+        for (size_t j = 0; j < bucket->size; ++j) {
+            gl_value_tableEntry_t *entry = gl_value_tableBucket_at(bucket, j);
+            if (entry != NULL) {
+                __gl_consider_name(entry->key, sym, best_distance, best);
+            }
+        }
+    }
+}
+
+char *gl_env_suggest_name(gl_env_t *env, const char *sym) {
+    size_t best_distance = 3;
+    char *best = NULL;
+
+    while (env != NULL) {
+        __gl_scan_table(env->functions, sym, &best_distance, &best);
+        __gl_scan_table(env->variables, sym, &best_distance, &best);
+
+        env = env->parent ? (gl_env_t *)env->parent->val : NULL;
+    }
+
+    return best;
+}

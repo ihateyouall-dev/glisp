@@ -65,3 +65,15 @@ gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym);
  * function of the same name.
  */
 gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym);
+
+/**
+ * Returns the bound name closest to @p sym in the function and variable tables
+ * of @p env and
+ * its parents, or NULL when nothing is close enough.
+ *
+ * The result is heap-allocated and owned
+ * by the caller. It is used to explain a
+ * failed lookup: "undefined function 'printn' (did you
+ * mean 'println'?)".
+ */
+char *gl_env_suggest_name(gl_env_t *env, const char *sym);

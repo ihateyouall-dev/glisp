@@ -309,6 +309,11 @@ the current form by propagating `NULL` up the evaluator. A diagnostic includes
 the source location, a colored source snippet, and a call stack for function
 calls.
 
+A failed name lookup adds a suggestion when a bound name is close enough:
+`undefined function 'printn' (did you mean 'print'?)`. The search covers the
+variable and function namespaces of every enclosing frame and uses an edit
+distance of two, tightened to one for names of three characters or fewer.
+
 ```lisp
 (assert (= (+ 2 2) 4) "arithmetic broke")
 (assert fact "message")
