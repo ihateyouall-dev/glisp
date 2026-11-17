@@ -84,8 +84,14 @@ static gl_value_t *__gl_eval_symbol(gl_ast_node_t *node) {
 
     if (!res) {
         char buf[1024] = "";
-        const char *fmt = "undefined variable '%s'";
-        snprintf(buf, sizeof(buf), fmt, node->value.symbol);
+        char *suggestion = gl_env_suggest_name((gl_env_t *)env->val, node->value.symbol);
+        if (suggestion != NULL) {
+            snprintf(buf, sizeof(buf), "undefined variable '%s' (did you mean '%s'?)",
+                     node->value.symbol, suggestion);
+            free(suggestion);
+        } else {
+            snprintf(buf, sizeof(buf), "undefined variable '%s'", node->value.symbol);
+        }
         gl_diagnostic_report_error(gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, node->location, buf));
         return NULL;
     }
@@ -480,9 +486,15 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         const char *func_name = func_node->value.symbol;
         func_val = gl_env_get_callable((gl_env_t *)env->val, func_name);
         if (!func_val) {
-            const char *fmt = "undefined function '%s'";
             char buf[1024];
-            snprintf(buf, sizeof(buf), fmt, func_name);
+            char *suggestion = gl_env_suggest_name((gl_env_t *)env->val, func_name);
+            if (suggestion != NULL) {
+                snprintf(buf, sizeof(buf), "undefined function '%s' (did you mean '%s'?)",
+                         func_name, suggestion);
+                free(suggestion);
+            } else {
+                snprintf(buf, sizeof(buf), "undefined function '%s'", func_name);
+            }
             gl_error_t *err = gl_make_error(GL_SYMBOL_ERROR, GL_ERROR, func_node->location, buf);
             gl_diagnostic_report_error(err);
             return NULL;
