@@ -1068,11 +1068,103 @@ void test_read_eval(void) {
     TEST(gl_value_get_bool(eval_str("(eq (eval \"a\\\\b\") \"a\\\\b\")")) == 1,
          "Eval preserves string contents");
 
+    printed = gl_value_to_string(eval_str("(read \"(1 (2 3) [4 5] {6})\")"));
+    TEST(strcmp(printed, "(1 (2 3) [4 5] {6})") == 0, "Read preserves nested syntax");
+    free(printed);
+
+    TEST(gl_value_get_int(eval_str("(get (eval (read \"[1 (+ 1 2)]\")) 1)")) == 3,
+         "Eval of a read array");
+    TEST(gl_value_get_bool(eval_str("(= (eval (read \"{1 2}\")) {1 2})")) == 1,
+         "Eval of a read vector");
+    TEST(eval_expr("(eval car)") == NULL, "Eval rejects a builtin");
+
     TEST(eval_str("(read \"\")")->type == GL_VAL_NIL, "Empty input reads as nil");
     TEST(gl_value_get_int(eval_str("(read \"1 2\")")) == 1, "Trailing text is ignored");
 
     TEST(eval_expr("(read \"(1 2\")") == NULL, "Read reports a syntax error");
     TEST(eval_expr("(eval sq)") == NULL, "Eval rejects a function");
+}
+
+void test_quasiquote(void) {
+    TEST(gl_value_get_bool(eval_str("(= `(1 2 3) '(1 2 3))")) == 1, "quasiquote literal list");
+    TEST(eval_str("`()")->type == GL_VAL_NIL, "quasiquote empty list");
+
+    eval_str("(set qq-x 10)");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,qq-x 3) '(1 10 3))")) == 1, "unquote");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@(list 2 3) 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing a list");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@[2 3] 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing an array");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@{2 3} 4) '(1 2 3 4))")) == 1,
+         "unquote-splicing a vector");
+    TEST(gl_value_get_bool(eval_str("(= `(1 ,@nil 2) '(1 2))")) == 1, "unquote-splicing nil");
+
+    TEST(gl_value_get_bool(eval_str("(= `(a `(b ,qq-x)) '(a (quasiquote (b (unquote qq-x)))))")) ==
+             1,
+         "nested quasiquote keeps inner unquote as data");
+    TEST(gl_value_get_bool(eval_str("(= `[,qq-x 2] [10 2])")) == 1, "unquote in an array");
+    TEST(gl_value_get_bool(eval_str("(= `{,qq-x 2} {10 2})")) == 1, "unquote in a vector");
+    TEST(gl_value_get_bool(eval_str("(= `[,@(list 1 2) 3] [1 2 3])")) == 1,
+         "unquote-splicing in an array");
+
+    TEST(eval_expr("`,@(list 1 2)") == NULL, "splicing outside a sequence fails");
+    TEST(eval_expr(",qq-x") == NULL, "unquote outside quasiquote fails");
+    TEST(eval_expr(",@(list 1)") == NULL, "unquote-splicing outside quasiquote fails");
+    TEST(eval_expr("`(1 ,@42)") == NULL, "splicing a non-sequence fails");
+    TEST(eval_expr("`(1 ,@(cons 1 2))") == NULL, "splicing an improper list fails");
+}
+
+void test_macros(void) {
+    TEST(eval_str("(defmacro my-unless (test &rest body) `(if ,test nil (progn ,@body)))") != NULL,
+         "defmacro defines a macro");
+    TEST(gl_value_get_int(eval_str("(my-unless nil 1 2)")) == 2, "macro expands and evaluates");
+    TEST(gl_value_get_int(eval_str("(let ((n 5)) (my-unless nil n))")) == 5,
+         "macro expansion sees the caller environment");
+
+    TEST(gl_value_get_bool(eval_str("(macro? my-unless)")) == 1, "macro? on a macro");
+    TEST(gl_value_get_bool(eval_str("(function? my-unless)")) == 0, "macro is not a function");
+    TEST(gl_value_get_bool(eval_str("(= (typeof my-unless) macro-t)")) == 1, "typeof macro");
+    TEST(gl_value_get_bool(eval_str("(= my-unless my-unless)")) == 1, "macro identity equality");
+    TEST(gl_value_get_bool(eval_str("(macro? (id my-unless))")) == 1,
+         "copying a macro preserves its type");
+
+    char *printed = gl_value_to_string(eval_str("(macroexpand-1 '(my-unless nil 1 2))"));
+    TEST(strcmp(printed, "(if nil nil (progn 1 2))") == 0, "macroexpand-1 expands one step");
+    free(printed);
+
+    printed = gl_value_to_string(eval_str("(macroexpand-1 '(1 2))"));
+    TEST(strcmp(printed, "(1 2)") == 0, "macroexpand-1 leaves non-macros alone");
+    free(printed);
+
+    eval_str("(defmacro m1 (x) `(m2 ,x))");
+    eval_str("(defmacro m2 (x) `(+ ,x 1))");
+    printed = gl_value_to_string(eval_str("(macroexpand '(m1 41))"));
+    TEST(strcmp(printed, "(+ 41 1)") == 0, "macroexpand expands repeatedly");
+    free(printed);
+    TEST(gl_value_get_int(eval_str("(m1 41)")) == 42, "nested macro evaluates");
+
+    eval_str("(defmacro with-temp (value &rest body) "
+             "  (let ((tmp (gensym \"tmp\"))) `(let ((,tmp ,value)) ,@body)))");
+    TEST(gl_value_get_int(eval_str("(let ((tmp 7)) (with-temp 1 tmp))")) == 7,
+         "gensym prevents macro capture");
+    TEST(gl_value_get_int(eval_str("(with-temp 5 (+ 1 2))")) == 3, "macro body forms");
+
+    TEST(gl_value_get_int(
+             eval_str("(let ((n 3)) (defmacro local-m (x) `(+ ,x 10)) (local-m n))")) == 13,
+         "local macro is callable in its scope");
+    TEST(eval_expr("(local-m 1)") == NULL, "local macro is not visible outside its scope");
+
+    TEST(eval_expr("(apply my-unless (list nil 1))") == NULL, "apply rejects a macro");
+
+    eval_str("(defmacro no-args () 1)");
+    TEST(eval_expr("(no-args 2)") == NULL, "macro arity is checked");
+
+    eval_str("(defmacro endless-macro () '(endless-macro))");
+    TEST(eval_expr("(endless-macro)") == NULL, "runaway macro expansion reports an error");
+
+    eval_str("(defmacro endless-tail () '(endless-tail))");
+    eval_str("(defun tail-macro-loop () (endless-tail))");
+    TEST(eval_expr("(tail-macro-loop)") == NULL, "runaway tail macro expansion reports an error");
 }
 
 void test_load_relative(void) {
@@ -1358,6 +1450,10 @@ void test_control_forms(void) {
     TEST(eval_expr("(while (len 5) 0)") == NULL, "While stops when the condition fails");
     TEST(gl_value_get_int(eval_str("(let ((i 0)) (while (< i 3) (set i (+ i 1))) i)")) == 3,
          "While still runs normally");
+
+    eval_str("(defun cond-count (n) (cond ((= n 0) 0) (else (cond-count (- n 1)))))");
+    TEST(gl_value_get_int(eval_str("(cond-count 5000)")) == 0,
+         "tail recursion through cond runs in constant stack");
     TEST(gl_value_get_int(eval_str("(when t 1 2 3)")) == 3, "When returns last body value");
     gl_value_t *when_nil = eval_str("(when nil 1)");
     TEST(when_nil != NULL && when_nil->type == GL_VAL_NIL, "When false returns nil");
@@ -1384,6 +1480,27 @@ void test_control_forms(void) {
     eval_str("(set case_ran 0)");
     eval_str("(case 1 (1 (set case_ran 1)) (2 (set case_ran 2)))");
     TEST(gl_value_get_int(eval_str("case_ran")) == 1, "Case skips other bodies");
+
+    eval_str("(set case_val_calls 0)");
+    eval_str("(case (progn (set case_val_calls (+ case_val_calls 1)) 2) (1 10) (2 20))");
+    TEST(gl_value_get_int(eval_str("case_val_calls")) == 1, "Case evaluates its value once");
+
+    eval_str("(set case_key_calls 0)");
+    TEST(gl_value_get_int(
+             eval_str("(case 2 ((progn (set case_key_calls (+ case_key_calls 1)) 1) 10) "
+                      "        ((progn (set case_key_calls (+ case_key_calls 1)) 2) 20) "
+                      "        ((progn (set case_key_calls (+ case_key_calls 1)) 3) 30))")) == 20,
+         "Case evaluates keys until the match");
+    TEST(gl_value_get_int(eval_str("case_key_calls")) == 2, "Case skips later keys");
+
+    eval_str("(set cond_calls 0)");
+    TEST(gl_value_get_int(eval_str(
+             "(cond ((progn (set cond_calls (+ cond_calls 1)) nil) 1) (else cond_calls))")) == 1,
+         "Cond evaluates a test once");
+
+    eval_str("(set dot_count_calls 0)");
+    eval_str("(dotimes (i (progn (set dot_count_calls (+ dot_count_calls 1)) 3) nil))");
+    TEST(gl_value_get_int(eval_str("dot_count_calls")) == 1, "Dotimes evaluates count once");
 
     eval_str("(set dot_seq nil)");
     eval_str("(dotimes (i 3) (set dot_seq (cons i dot_seq)))");
@@ -1663,6 +1780,29 @@ void test_io(void) {
     snprintf(src, sizeof(src), "(open \"%s\" 8)", path);
     TEST(eval_expr(src) == NULL, "open rejects unknown mode bits");
 
+    TEST(gl_value_get_bool(eval_str("(function? printf)")) == 1, "printf is a function");
+    TEST(gl_value_get_bool(eval_str("(function? fprintf)")) == 1, "fprintf is a function");
+    TEST(gl_value_get_bool(eval_str("(function? printf-err)")) == 1, "printf-err is a function");
+
+    snprintf(src, sizeof(src), "(set io-file (open-write \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "open file for fprintf test");
+    TEST(eval_str("(fprintf io-file \"{} {}\\n\" 1 2)") != NULL, "fprintf writes formatted output");
+    TEST(eval_str("(apply fprintf io-file \"{}\" (list 42))") != NULL,
+         "fprintf works through apply");
+    eval_str("(close io-file)");
+
+    snprintf(src, sizeof(src), "(set io-file (open-read \"%s\"))", path);
+    TEST(eval_str(src) != NULL, "reopen file after fprintf");
+    gl_value_t *formatted = eval_str("(read-line io-file)");
+    TEST(formatted != NULL && formatted->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(formatted), "1 2") == 0,
+         "fprintf substitutes placeholders");
+    gl_value_t *applied = eval_str("(read-line io-file)");
+    TEST(applied != NULL && applied->type == GL_VAL_STRING &&
+             strcmp(gl_value_get_string(applied), "42") == 0,
+         "fprintf result through apply");
+    eval_str("(close io-file)");
+
     remove(path);
 }
 
@@ -1798,6 +1938,8 @@ int main(void) {
     test_cons();
     test_apply();
     test_read_eval();
+    test_quasiquote();
+    test_macros();
     test_load_relative();
     test_load_failure();
     test_stdlib();

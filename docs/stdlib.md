@@ -25,6 +25,22 @@ the I/O helpers.
 | `(identity x)` | Returns `x`. |
 | `(id x)` | Returns `x`. |
 
+### Control macros
+
+`core.lisp` defines the standard control forms as macros. They are available
+whenever the standard library is loaded and are not part of the bare runtime
+(use `--no-stdlib` to omit them).
+
+| Signature | Description |
+| :--- | :--- |
+| `(and expr ...)` | Short-circuiting boolean AND; `(and)` is `t`. |
+| `(or expr ...)` | Short-circuiting boolean OR; `(or)` is `nil`. |
+| `(when test body ...)` | Evaluates the body only when `test` is true. |
+| `(unless test body ...)` | Evaluates the body only when `test` is false. |
+| `(cond (test body ...) ... (else body ...))` | Multi-branch conditional; a clause with an empty body returns its test value. |
+| `(case value (key body ...) ... (else body ...))` | Compares `value` with evaluated keys using `=`; first match wins. |
+| `(dotimes (variable count [result]) body ...)` | Loops `variable` from `0` to `count - 1`; `result` sees the final binding. |
+
 ## math.lisp
 
 ### Constants
@@ -207,6 +223,7 @@ is the way to sort entries: `(sort-by car (hash->alist map))`.
 | `(string? x)`, `(symbol? x)`, `(nil? x)` | Scalar predicates |
 | `(null? x)` | Alias for `nil?` |
 | `(function? x)` | True for functions, builtins, and special forms |
+| `(macro? x)` | True for macro values |
 | `(list? x)`, `(array? x)`, `(vector? x)` | Collection predicates |
 | `(collection? x)` | True for lists, arrays, and vectors |
 | `(file? x)` | True for file handles |
@@ -229,8 +246,13 @@ is the way to sort entries: `(sort-by car (hash->alist map))`.
 | `(print-err ...)` | Writes arguments to `*stderr*`. |
 | `(println-err ...)` | Writes arguments and a newline to `*stderr*`. |
 | `(eprintln-err ...)` | Writes each argument on its own line to `*stderr*`. |
+| `(printf fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `*stdout*`; returns `nil`. |
+| `(fprintf file fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `file`. |
+| `(printf-err fmt arg ...)` | Replaces each `{}` in `fmt` with the next argument and writes the result to `*stderr*`. |
 
-`write` uses `to-string`, which prints strings verbatim without quotes.
+`write` uses `to-string`, which prints strings verbatim without quotes. The
+`printf` family builds on `format` (see [Strings](#strings)), so it has no
+escape for a literal `{}` either.
 
 ### Input
 

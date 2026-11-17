@@ -31,7 +31,8 @@ typedef enum {
     GL_VAL_VECTOR,
     GL_VAL_TYPEID,
     GL_VAL_FILE,
-    GL_VAL_HASHMAP
+    GL_VAL_HASHMAP,
+    GL_VAL_MACRO
 } gl_value_type_t;
 
 /**
@@ -147,6 +148,10 @@ typedef struct {
 gl_value_t *gl_value_make_function(const char *name, gl_ast_node_t *tree,
                                    gl_function_params_t *params, gl_value_t *closure);
 
+/** Creates a macro value; the payload is the same closure structure as a function. */
+gl_value_t *gl_value_make_macro(const char *name, gl_ast_node_t *tree, gl_function_params_t *params,
+                                gl_value_t *closure);
+
 /** Signature of a special form; arguments are unevaluated AST nodes. */
 typedef gl_value_t *(*gl_special_form_t)(gl_env_t *, gl_ast_node_t *);
 
@@ -194,6 +199,8 @@ gl_file_t *gl_value_get_file(gl_value_t *val);
 gl_builtin_t gl_value_get_builtin(gl_value_t *val);
 
 gl_function_t *gl_value_get_function(gl_value_t *val);
+
+gl_function_t *gl_value_get_macro(gl_value_t *val);
 
 gl_special_form_t gl_value_get_specform(gl_value_t *val);
 

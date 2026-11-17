@@ -121,6 +121,45 @@ static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
         return gl_ast_make_funquote(operand);
     }
 
+    if (token.type == GL_LEX_QUASIQUOTE) {
+        gl_location_t quote_location = token.location;
+        __gl_parser_advance(parser);
+
+        gl_ast_node_t *operand = __gl_parser_parse_expression(parser);
+        if (operand == NULL) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, quote_location,
+                                                     "Expected an expression after `"));
+            return NULL;
+        }
+        return gl_ast_make_quasiquote(operand);
+    }
+
+    if (token.type == GL_LEX_UNQUOTE) {
+        gl_location_t quote_location = token.location;
+        __gl_parser_advance(parser);
+
+        gl_ast_node_t *operand = __gl_parser_parse_expression(parser);
+        if (operand == NULL) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, quote_location,
+                                                     "Expected an expression after ,"));
+            return NULL;
+        }
+        return gl_ast_make_unquote(operand);
+    }
+
+    if (token.type == GL_LEX_UNQUOTE_SPLICING) {
+        gl_location_t quote_location = token.location;
+        __gl_parser_advance(parser);
+
+        gl_ast_node_t *operand = __gl_parser_parse_expression(parser);
+        if (operand == NULL) {
+            gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, quote_location,
+                                                     "Expected an expression after ,@"));
+            return NULL;
+        }
+        return gl_ast_make_unquote_splicing(operand);
+    }
+
     if (token.type == GL_LEX_LPAREN) {
         return __gl_parser_parse_list(parser);
     }

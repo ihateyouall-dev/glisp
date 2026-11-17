@@ -112,7 +112,8 @@ static void __gl_trace_value(gl_value_t *val) {
     val->gc_marked = 1;
 
     switch (val->type) {
-    case GL_VAL_FUNCTION: {
+    case GL_VAL_FUNCTION:
+    case GL_VAL_MACRO: {
         gl_function_t *func = val->val;
         if (func && func->closure) {
             __gl_trace_value(func->closure);

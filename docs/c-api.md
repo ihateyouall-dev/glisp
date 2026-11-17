@@ -89,6 +89,9 @@ and vector nodes. Every node stores a `gl_location_t`.
 - `gl_ast_cons_nth_car` / `gl_ast_cons_nth_cdr` index into a cons list.
 - `gl_ast_cons_length` counts list elements.
 - `gl_ast_make_quote` / `gl_ast_make_funquote` build quote nodes.
+- `gl_ast_make_quasiquote`, `gl_ast_make_unquote`, and
+  `gl_ast_make_unquote_splicing` desugar the corresponding reader tokens into
+  `(quasiquote ...)`, `(unquote ...)`, and `(unquote-splicing ...)` forms.
 
 ### `diagnostics.h`
 
@@ -118,8 +121,11 @@ typedef struct gl_value_t {
 - `GL_VAL_*` enumerates all value types.
 - Constructors: `gl_value_make_int`, `_float`, `_symbol`, `_cons`,
   `_cons_raw`, `_string`, `_nil`, `_bool`, `_typeid`, `_file`, `_builtin`,
-  `_specform`, `_function`, `_env`, `_array`, `_array_from`, `_vector`,
-  `_vector_from`.
+  `_specform`, `_function`, `_macro`, `_env`, `_array`, `_array_from`,
+  `_vector`, `_vector_from`.
+- `GL_VAL_MACRO` shares the `gl_function_t` payload with `GL_VAL_FUNCTION`;
+  use `gl_value_get_macro` to access it. Macros are not callable through
+  `gl_call_function`/`apply`.
 - Accessors validate the type with `assert` and return the payload:
   `gl_value_get_*`.
 - `gl_value_copy(value)` deep-copies the value (lists are copied recursively).
@@ -132,6 +138,19 @@ typedef struct gl_value_t {
 `gl_function_t` describes a user function: AST body, parameter list, captured
 closure, name, and arity bounds. `gl_function_param_t` models required,
 optional, and rest parameters.
+
+### `syntax.h`
+
+Conversions between parsed AST nodes and runtime data (the "code as data"
+boundary used by `read`, `eval`, and future macro expansion).
+
+- `gl_ast_to_value(node)` converts a parsed tree into runtime data (symbols,
+  lists, arrays, vectors). The result is GC-managed.
+- `gl_value_to_ast(value, location)` converts runtime data back into syntax.
+  It rejects improper lists and values that cannot be code (functions,
+  builtins, environments, files). The caller owns the returned AST and must
+  free it with `gl_ast_destroy`. All produced nodes receive `location`, so macro
+  expansion can point diagnostics at the macro call site.
 
 ### `env.h`
 
@@ -172,7 +191,10 @@ environment and producing stack traces.
 - `gl_eval_args(args)` evaluates a list of argument AST nodes into a
   `gl_function_args_t`. It pushes each evaluated value as a temporary GC root.
 - `gl_call_function(loc, callable, argv)` invokes a callable with an existing
-  argument array.
+  argument array. It rejects macro values.
+- `gl_macro_expand_value(form, loc, did_expand)` expands one macro call in a
+  runtime form and returns the expansion value; non-macro forms are returned
+  unchanged with `did_expand` set to 0.
 
 ### `memory.h` (garbage collector)
 

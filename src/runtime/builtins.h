@@ -204,4 +204,8 @@ GL_BUILTIN(logxor);
 
 GL_BUILTIN(lognot);
 
+GL_BUILTIN(macroexpand_1);
+
+GL_BUILTIN(macroexpand);
+
 GL_BUILTIN(gensym);

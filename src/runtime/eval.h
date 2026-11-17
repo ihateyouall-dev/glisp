@@ -37,3 +37,12 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args);
 
 /** Invokes a builtin or function with an existing argument array. */
 gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_function_args_t *argv);
+
+/**
+ * Expands FORM once if its head resolves to a macro.
+ *
+ * FORM is a runtime value (as returned by quote/read), not an AST. The macro
+ * receives the elements of FORM as values. When FORM is not a macro call, it is
+ * returned unchanged and *did_expand is set to 0.
+ */
+gl_value_t *gl_macro_expand_value(gl_value_t *form, gl_location_t loc, int *did_expand);

@@ -2,7 +2,10 @@
 
 This reference covers the special forms and native builtins implemented in
 `src/runtime/specforms.c` and `src/runtime/builtins.c`. Higher-level functions
-written in Lisp are documented in [stdlib.md](stdlib.md).
+and macros written in Lisp are documented in [stdlib.md](stdlib.md).
+
+`when`, `unless`, `cond`, `case`, `and`, `or`, and `dotimes` are macros defined
+in `std/core.lisp`; they are not available with `--no-stdlib`.
 
 - Special forms receive unevaluated syntax tree nodes.
 - Builtins receive already-evaluated argument values.
@@ -26,60 +29,6 @@ alternate expressions in order. With no alternate the result is `nil`.
 (if (> 3 2) "yes" "no") ; => "yes"
 ```
 
-### `when`
-
-```
-(when test body ...)
-```
-
-Evaluates `test` once, then evaluates the unevaluated body forms in order when
-it is true and returns the last value. Returns `nil` and leaves the body
-untouched when `test` is false.
-
-### `unless`
-
-```
-(unless test body ...)
-```
-
-The inverse of `when`: evaluates `test` once, then evaluates the unevaluated
-body forms in order when it is false and returns the last value. Returns `nil`
-and leaves the body untouched when `test` is true.
-
-### `cond`
-
-```
-(cond (test body ...) ... (else body ...))
-```
-
-Tests clauses in order. The first true clause is selected and its body is
-evaluated. A clause with an empty body returns the test value. `else` is a
-constant that is always true. Returns `nil` when nothing matches.
-
-### `case`
-
-```
-(case value (key body ...) ... [(else body ...)])
-```
-
-Evaluates `value` once, then evaluates clause keys in order and selects the
-first one that compares equal with `=`. Keys are evaluated expressions, so
-`(+ 1 2)` may be used as a key; `else` is the fallback and is not evaluated.
-Only the selected clause's unevaluated body forms are evaluated, in order, and
-the last value is returned. Other clause bodies are untouched. Returns `nil`
-when no clause matches.
-
-### `and` / `or`
-
-```
-(and expr ...)
-(or expr ...)
-```
-
-Short-circuiting boolean forms. `and` returns `t` when every expression is true
-and `nil` otherwise. `or` returns `t` when any expression is true and `nil`
-otherwise. Both return booleans, not the operand values.
-
 ### `while`
 
 ```
@@ -97,18 +46,6 @@ Repeats `body` while `test` is true. Returns `nil`.
 Iterates over a list, array, vector, nil, or string. Strings yield
 one-character strings. The variable is bound in a fresh lexical frame to a copy
 of each element. Returns `nil`.
-
-### `dotimes`
-
-```
-(dotimes (variable count [result]) body ...)
-```
-
-Evaluates `count` once, which must be a non-negative integer, then evaluates the
-unevaluated body forms in order with `variable` bound in a fresh lexical frame
-to `0` through `count - 1`. Returns the value of `result`, evaluated in the loop
-frame so it sees the final binding, or `nil` when `result` is absent. Raises a
-type error when `count` is not a non-negative integer.
 
 ### `progn`
 
@@ -156,6 +93,19 @@ returns it; `lambda` returns an anonymous closure without binding it.
   (list greeting who extra))
 ```
 
+### `defmacro`
+
+```
+(defmacro name (parameters ...) body ...)
+```
+
+Defines a macro. Parameters use the same lambda list as `defun`; they are bound
+to the unevaluated argument forms converted to runtime data. The macro body must
+return a value representing code; it is converted to syntax and evaluated in the
+caller's environment. `defmacro` binds the macro in the current environment and
+returns it. Macros share the function namespace and are not callable through
+`apply`.
+
 ### `defvar`
 
 ```
@@ -197,6 +147,25 @@ protected.
 ```
 
 Returns `expr` as data. Symbols become symbol values; lists become lists.
+
+### `quasiquote` / `unquote` / `unquote-splicing`
+
+```
+(quasiquote expr)
+`expr
+(unquote expr)
+,expr
+(unquote-splicing expr)
+,@expr
+```
+
+Builds a runtime value from a template. Everything is treated as data except
+`(unquote ...)`, which evaluates its argument, and `(unquote-splicing ...)`,
+which evaluates its argument and splices the elements of a list, array, vector,
+or `nil` into the surrounding sequence. Nested quasiquotes raise the quoting
+depth; `unquote` and `unquote-splicing` at that depth remain data. Using
+`unquote` or `unquote-splicing` outside a quasiquote is an error, and so is
+splicing a non-sequence.
 
 ### `function`
 
@@ -409,6 +378,18 @@ All bitwise builtins require int arguments.
 
 ## Metaprogramming
 
+### `macroexpand-1` / `macroexpand`
+
+```
+(macroexpand-1 form)
+(macroexpand form)
+```
+
+`macroexpand-1` expands the outermost macro call in the runtime value `form`
+once and returns the expansion as data; if `form` is not a macro call, it is
+returned unchanged. `macroexpand` repeats this until the head is no longer a
+macro. Neither evaluates the expansion.
+
 ### `gensym`
 
 ```
@@ -422,5 +403,7 @@ All bitwise builtins require int arguments.
 ; " #:tmp<counter>"
 ```
 
-Returns symbol with leading space at the beginning to avoid collisions in macros (WIP),
-pass TEXT to generate symbol like that. COUNTER increments on every call.
+Returns a unique symbol whose name starts with a hidden leading space, so it
+cannot collide with symbols written in source. Pass TEXT to include a readable
+prefix. The counter increments on every call. Intended for macros that introduce
+bindings.

@@ -22,12 +22,13 @@ typedef enum {
     GL_LEX_SYMBOL,
     GL_LEX_UNKNOWN,
     GL_LEX_STRLITERAL,
-    // Square parentheses
     GL_LEX_LSPAREN,
     GL_LEX_RSPAREN,
-    // Figure parentheses
     GL_LEX_LFPAREN,
-    GL_LEX_RFPAREN
+    GL_LEX_RFPAREN,
+    GL_LEX_QUASIQUOTE,
+    GL_LEX_UNQUOTE,
+    GL_LEX_UNQUOTE_SPLICING
 } gl_lex_token_type_t;
 
 /** Whether a token was read successfully. */

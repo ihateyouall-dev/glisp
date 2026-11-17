@@ -67,6 +67,15 @@ gl_ast_node_t *gl_ast_make_quote(gl_ast_node_t *node);
 /** Wraps @p node in a (function ...) form. */
 gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node);
 
+/** Wraps @p node in a (quasiquote ...) form. */
+gl_ast_node_t *gl_ast_make_quasiquote(gl_ast_node_t *node);
+
+/** Wraps @p node in an (unquote ...) form. */
+gl_ast_node_t *gl_ast_make_unquote(gl_ast_node_t *node);
+
+/** Wraps @p node in an (unquote-splicing ...) form. */
+gl_ast_node_t *gl_ast_make_unquote_splicing(gl_ast_node_t *node);
+
 gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location);
 gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location);
 gl_ast_node_t *gl_ast_make_symbol(const char *sym, gl_location_t location);

@@ -30,6 +30,9 @@ evaluated in order; the value of a file is the value of its last expression.
 | `[a b c]` | fixed-size array literal |
 | `{a b c}` | dynamic vector literal |
 | `'expr` | quote: `(quote expr)` |
+| `` `expr `` | quasiquote: `(quasiquote expr)` |
+| `,expr` | unquote: `(unquote expr)` |
+| `,@expr` | unquote-splicing: `(unquote-splicing expr)` |
 | `#'name` | function quote: `(function name)` |
 | `nil` | the empty list and the only false value |
 
@@ -52,8 +55,12 @@ could read back.
 The reader does not recognize dotted-pair syntax (`(a . b)`); improper lists can
 only be built programmatically with `cons`.
 
-There is no quasiquote (`\``, `,`, `,@`). A quote is a single token, not a
-reader macro that composes with other forms.
+Quasiquote is a template form: outside an `unquote`, symbols and lists are
+taken as data; `,expr` evaluates `expr` and inserts the resulting value, while
+`,@expr` evaluates `expr` and splices the elements of a list, array, vector, or
+`nil`. Nested quasiquotes increase the quoting depth, so only unquotes at the
+matching depth are evaluated. Quasiquote produces runtime data, which makes it
+the natural tool for constructing code in macros.
 
 ## Values
 
@@ -69,6 +76,7 @@ reader macro that composes with other forms.
 | vector | `vector-t` | `{1 2 3}` | growable, amortized O(1) push |
 | hashmap | `hashmap-t` | `(hash)` | string keys, values of any type; identity equality |
 | function | `function-t` | `(lambda (x) x)` | closure |
+| macro | `macro-t` | result of `defmacro` | expands in call position; not `apply`-able |
 | builtin | — | `+`, `car` | implemented in C |
 | special form | — | `if`, `let` | implemented in C |
 | typeid | `typeid-t` | `int-t`, `file-t` | result of `typeof` |
@@ -176,10 +184,48 @@ A function body is a sequence of expressions; the value of the last one is
 returned. `defun` returns the newly created function, `lambda` returns an
 anonymous closure.
 
-There is no macro system. Documentation strings are ordinary string expressions
-in a body; they are evaluated for their side effects (none) and are not stored.
+Documentation strings are ordinary string expressions in a body; they are
+evaluated for their side effects (none) and are not stored.
+
+## Macros
+
+```lisp
+(defmacro name (parameters ...) body ...)
+```
+
+A macro is a function from **unevaluated forms** to a form. In call position the
+evaluator does not evaluate the arguments: it converts them to runtime data,
+runs the macro body, converts the returned data back to syntax, and evaluates
+that expansion in the caller's environment.
+
+```lisp
+(defmacro my-unless (test &rest body)
+  `(if ,test nil (progn ,@body)))
+
+(my-unless nil (println "no") 42) ; => 42, println is not evaluated
+```
+
+- Macro expansion happens at evaluation time, so a macro must be defined before
+  the call is evaluated. Macros defined in an inner `let`/function frame are
+  visible to later forms in that frame and disappear with it.
+- Macros live in the same name space as functions and special forms: a
+  `defmacro` and a `defun` with the same name replace each other.
+- `(macroexpand-1 form)` expands one outermost macro call; `(macroexpand form)`
+  repeats until the head is no longer a macro. Both take and return runtime
+  data and do not evaluate the expansion.
+- `(macro? value)` is true for macro values, `(function? value)` is false, and
+  `(typeof value)` is `macro-t`. Macros cannot be passed to `apply` or used as
+  callbacks.
+- Macros are non-hygienic: use `(gensym)` for bindings introduced by an
+  expansion.
+- Runaway expansion is stopped by an expansion-depth limit and reported as a
+  recursion error.
 
 ## Control flow
+
+`when`, `unless`, `cond`, `case`, `and`, `or`, and `dotimes` are macros provided
+by `std/core.lisp`; they require the standard library (`--no-stdlib` omits
+them). `if`, `while`, and `for` are part of the bare runtime.
 
 ### `if`
 
@@ -328,7 +374,7 @@ error API is not implemented yet.
 - No `\uXXXX` escape; write a double quote as `\x22` because the tokenizer
   ends a string at the first raw `"`. Escapes produce single bytes, not code
   points.
-- No macros or quasiquote.
+- Macros are not hygienic; use `gensym` for introduced bindings.
 - Tail calls are eliminated only where the call is the last form of a function
   body or of an `if`, `cond`, `when`, `unless` or `progn` branch. A call inside
   `let`, `let*`, `and`, `or`, `while` or `for` still consumes the C stack, and a

@@ -149,11 +149,30 @@ void lexer_bracket_tokens_test(void) {
     gl_lex_token_vector_destroy(&tokens);
 }
 
+void lexer_macros_tokens_test(void) {
+    gl_lexer_t lexer = gl_make_lexer("`foo ,bar ,@baz foo@bar", "");
+    gl_lex_token_vector_t tokens = gl_lexer_tokenize(&lexer);
+
+    TEST(tokens.size == 8, "Macros tokens count");
+    TEST(gl_lex_token_vector_at(&tokens, 0)->type == GL_LEX_QUASIQUOTE, "QUASIQUOTE");
+    TEST(gl_lex_token_vector_at(&tokens, 1)->type == GL_LEX_SYMBOL, "SYMBOL after QUASIQUOTE");
+    TEST(gl_lex_token_vector_at(&tokens, 2)->type == GL_LEX_UNQUOTE, "UNQUOTE");
+    TEST(gl_lex_token_vector_at(&tokens, 3)->type == GL_LEX_SYMBOL, "SYMBOL after UNQUOTE");
+    TEST(gl_lex_token_vector_at(&tokens, 4)->type == GL_LEX_UNQUOTE_SPLICING, "UNQUOTE_SPLICING");
+    TEST(gl_lex_token_vector_at(&tokens, 5)->type == GL_LEX_SYMBOL,
+         "SYMBOL after UNQUOTE_SPLICING");
+    TEST(gl_lex_token_vector_at(&tokens, 6)->type == GL_LEX_SYMBOL, "SYMBOL with @");
+    TEST(gl_lex_token_vector_at(&tokens, 7)->type == GL_LEX_EOF, "EOF after macros tokens");
+
+    gl_lex_token_vector_destroy(&tokens);
+}
+
 int main(void) {
     lexer_test();
     lexer_tokenize_test();
     lexer_strliteral_test();
     lexer_bracket_tokens_test();
+    lexer_macros_tokens_test();
 
     return test_status;
 }

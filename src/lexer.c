@@ -92,7 +92,7 @@ begin:
 // Characters that terminate a symbol token.
 static int __issymbol(char ch) {
     return !isspace((unsigned char)ch) && ch != '(' && ch != ')' && ch != ';' && ch != '"' &&
-           ch != '\0' && ch != '[' && ch != ']' && ch != '{' && ch != '}';
+           ch != '\0' && ch != '[' && ch != ']' && ch != '{' && ch != '}' && ch != '`' && ch != ',';
 }
 
 static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
@@ -159,6 +159,20 @@ static gl_lex_token_t __lexer_read_token(gl_lexer_t *lexer) {
             return res;
         }
         break;
+    case '`':
+        res.type = GL_LEX_QUASIQUOTE;
+        gl_lexer_advance(lexer);
+        return res;
+    case ',':
+        if (gl_lexer_peek(lexer) == '@') {
+            res.type = GL_LEX_UNQUOTE_SPLICING;
+            gl_lexer_advance(lexer);
+            gl_lexer_advance(lexer);
+        } else {
+            res.type = GL_LEX_UNQUOTE;
+            gl_lexer_advance(lexer);
+        }
+        return res;
     case '\0':
         res.type = GL_LEX_EOF;
         return res;

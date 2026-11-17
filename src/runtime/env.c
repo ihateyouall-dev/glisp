@@ -140,31 +140,30 @@ static void __gl_global_env_define_builtins(gl_env_t *env) {
     DEFINE_BUILTIN("logior", logior);
     DEFINE_BUILTIN("logxor", logxor);
     DEFINE_BUILTIN("lognot", lognot);
+    DEFINE_BUILTIN("macroexpand-1", macroexpand_1);
+    DEFINE_BUILTIN("macroexpand", macroexpand);
 
     DEFINE_BUILTIN("gensym", gensym);
 }
 
 static void __gl_global_env_define_specforms(gl_env_t *env) {
     DEFINE_SPECFORM("if", if);
-    DEFINE_SPECFORM("when", when);
-    DEFINE_SPECFORM("unless", unless);
     DEFINE_SPECFORM("defun", defun);
+    DEFINE_SPECFORM("defmacro", defmacro);
     DEFINE_SPECFORM("lambda", lambda);
     DEFINE_SPECFORM("set", set);
     DEFINE_SPECFORM("set-global", set_global);
     DEFINE_SPECFORM("progn", progn);
     DEFINE_SPECFORM("while", while);
     DEFINE_SPECFORM("quote", quote);
+    DEFINE_SPECFORM("quasiquote", quasiquote);
+    DEFINE_SPECFORM("unquote", unquote);
+    DEFINE_SPECFORM("unquote-splicing", unquote_splicing);
     DEFINE_SPECFORM("function", function);
     DEFINE_SPECFORM("let", let);
     DEFINE_SPECFORM("let*", let_star);
     DEFINE_SPECFORM("pragma", pragma);
-    DEFINE_SPECFORM("cond", cond);
-    DEFINE_SPECFORM("case", case);
     DEFINE_SPECFORM("for", for);
-    DEFINE_SPECFORM("dotimes", dotimes);
-    DEFINE_SPECFORM("and", and);
-    DEFINE_SPECFORM("or", or);
     DEFINE_SPECFORM("add-to-list", add_to_list);
     DEFINE_SPECFORM("defconst", defconst);
     DEFINE_SPECFORM("defconstant", defconst);
@@ -193,6 +192,7 @@ gl_env_t *gl_make_global_env(void) {
     DEFINE_TYPEID("hashmap-t", GL_VAL_HASHMAP);
     DEFINE_TYPEID("file-t", GL_VAL_FILE);
     DEFINE_TYPEID("typeid-t", GL_VAL_TYPEID);
+    DEFINE_TYPEID("macro-t", GL_VAL_MACRO);
 
     gl_env_set_const(res, "*stdin*", gl_value_make_file(stdin, "<stdin>", 1, GL_FILE_READ));
     gl_env_set_const(res, "*stdout*", gl_value_make_file(stdout, "<stdout>", 1, GL_FILE_WRITE));
@@ -228,7 +228,7 @@ void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val) {
 
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
     assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION ||
-           val->type == GL_VAL_SPFORM);
+           val->type == GL_VAL_SPFORM || val->type == GL_VAL_MACRO);
     gl_value_table_insert(env->functions, sym, val);
 }
 

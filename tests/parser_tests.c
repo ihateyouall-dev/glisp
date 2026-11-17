@@ -237,6 +237,31 @@ void test_parse_nested_array_vector(void) {
     gl_parser_destroy(&parser);
 }
 
+void test_parse_quasiquote_sugar(void) {
+    gl_parser_t parser = gl_make_parser("`(a ,b ,@c)", "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+
+    TEST(node != NULL && node->type == GL_AST_CONS, "Quasiquote sugar form");
+    gl_ast_node_t *name = gl_ast_cons_nth_car(node, 0);
+    TEST(name != NULL && name->type == GL_AST_SYMBOL &&
+             strcmp(name->value.symbol, "quasiquote") == 0,
+         "Quasiquote sugar head");
+
+    gl_ast_node_t *body = gl_ast_cons_nth_car(node, 1);
+    gl_ast_node_t *unquote = gl_ast_cons_nth_car(body, 1);
+    gl_ast_node_t *splicing = gl_ast_cons_nth_car(body, 2);
+
+    TEST(unquote != NULL && unquote->type == GL_AST_CONS &&
+             strcmp(unquote->value.cons.car->value.symbol, "unquote") == 0,
+         "Unquote sugar");
+    TEST(splicing != NULL && splicing->type == GL_AST_CONS &&
+             strcmp(splicing->value.cons.car->value.symbol, "unquote-splicing") == 0,
+         "Unquote-splicing sugar");
+
+    gl_ast_destroy(node);
+    gl_parser_destroy(&parser);
+}
+
 void test_parse_dangling_quote(void) {
     gl_parser_t parser = gl_make_parser("'", "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
@@ -246,6 +271,21 @@ void test_parse_dangling_quote(void) {
     parser = gl_make_parser("#'", "");
     node = gl_parser_parse(&parser);
     TEST(node == NULL, "Dangling funquote is rejected");
+    gl_parser_destroy(&parser);
+
+    parser = gl_make_parser("`", "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Dangling quasiquote is rejected");
+    gl_parser_destroy(&parser);
+
+    parser = gl_make_parser(",", "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Dangling unquote is rejected");
+    gl_parser_destroy(&parser);
+
+    parser = gl_make_parser(",@", "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Dangling unquote-splicing is rejected");
     gl_parser_destroy(&parser);
 }
 
@@ -264,6 +304,7 @@ void parser_test(void) {
     test_parse_vector();
     test_parse_empty_vector();
     test_parse_nested_array_vector();
+    test_parse_quasiquote_sugar();
     test_parse_dangling_quote();
 }
 

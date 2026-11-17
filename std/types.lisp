@@ -31,6 +31,9 @@
 (defun function? (x)
   (instanceof? function-t x))
 
+(defun macro? (x)
+  (instanceof? macro-t x))
+
 (defun list? (x)
   (instanceof? list-t x))
 

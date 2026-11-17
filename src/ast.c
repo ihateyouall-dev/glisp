@@ -82,6 +82,26 @@ gl_ast_node_t *gl_ast_make_funquote(gl_ast_node_t *node) {
                             node->location);
 }
 
+// Desugars `x into (quasiquote x)
+gl_ast_node_t *gl_ast_make_quasiquote(gl_ast_node_t *node) {
+    return gl_ast_make_cons(gl_ast_make_symbol("quasiquote", node->location),
+                            gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
+                            node->location);
+}
+
+// Desugars ,x into (unquote x)
+gl_ast_node_t *gl_ast_make_unquote(gl_ast_node_t *node) {
+    return gl_ast_make_cons(gl_ast_make_symbol("unquote", node->location),
+                            gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
+                            node->location);
+}
+// Desugars ,@x into (unquote-splicing x)
+gl_ast_node_t *gl_ast_make_unquote_splicing(gl_ast_node_t *node) {
+    return gl_ast_make_cons(gl_ast_make_symbol("unquote-splicing", node->location),
+                            gl_ast_make_cons(node, gl_ast_make_nil(node->location), node->location),
+                            node->location);
+}
+
 gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
