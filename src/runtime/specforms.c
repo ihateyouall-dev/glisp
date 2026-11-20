@@ -449,7 +449,7 @@ static int __gl_qq_unary(gl_ast_node_t *node, gl_ast_node_t **out_arg) {
 static int __gl_qq_items_push(gl_qq_items_t *items, gl_value_t *value) {
     if (items->size == items->capacity) {
         size_t capacity = items->capacity == 0 ? 8 : items->capacity * 2;
-        gl_value_t **grown = realloc(items->data, capacity * sizeof(*grown));
+        gl_value_t **grown = realloc(items->data, capacity * sizeof(gl_value_t *));
         if (grown == NULL) {
             return 0;
         }
@@ -547,6 +547,12 @@ static gl_value_t *__gl_qq_list(gl_ast_node_t *node, size_t depth) {
 
     while (cur != NULL && cur->type == GL_AST_CONS) {
         gl_ast_node_t *elem = cur->value.cons.car;
+        if (elem == NULL) {
+            __emit_syntax_error(cur->location, "Malformed quasiquote list");
+            gl_gc_roots_release(root_mark);
+            free(items.data);
+            return NULL;
+        }
 
         if (depth == 1 && __gl_qq_is_named(elem, "unquote-splicing")) {
             gl_ast_node_t *arg = NULL;
