@@ -271,6 +271,7 @@ make examples
 | `wordcount.lisp` | hash maps, `string-lines`, sorting pairs with a predicate |
 | `calc.lisp` | `read` and `eval` turning text into running code |
 | `loop.lisp` | a hundred thousand tail calls in constant stack |
+| `macros.lisp` | `defmacro` with quasiquote, a recursive macro, and `gensym` |
 
 Run one directly with `./build/glisp examples/primes.lisp`.
 
