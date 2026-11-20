@@ -303,7 +303,7 @@ typedef struct {
 static int __gl_owned_ast_push(gl_owned_ast_t *owned, gl_ast_node_t *ast) {
     if (owned->size == owned->capacity) {
         size_t capacity = owned->capacity == 0 ? 8 : owned->capacity * 2;
-        gl_ast_node_t **grown = realloc(owned->items, capacity * sizeof(*grown));
+        gl_ast_node_t **grown = realloc(owned->items, capacity * sizeof(gl_ast_node_t *));
         if (grown == NULL) {
             return 0;
         }
