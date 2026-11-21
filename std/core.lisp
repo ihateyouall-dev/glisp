@@ -104,3 +104,13 @@
          ,@body
          (set ,idx (+ ,idx 1)))
        ,@(if result (cons result nil) nil))))
+
+;; These are macros rather than functions because they have to update the
+;; caller's binding: a function only ever sees a copy of its argument.
+(defmacro incf (place &optional (delta 1))
+  "Adds DELTA to the variable PLACE and returns the new value."
+  `(set ,place (+ ,place ,delta)))
+
+(defmacro decf (place &optional (delta 1))
+  "Subtracts DELTA from the variable PLACE and returns the new value."
+  `(set ,place (- ,place ,delta)))

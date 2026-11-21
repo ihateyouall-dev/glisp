@@ -1444,6 +1444,28 @@ void test_for(void) {
     TEST(gl_value_get_int(eval_str("i")) == 999, "for variable does not leak");
 }
 
+void test_update_macros(void) {
+    eval_str("(set upd-counter 0)");
+    TEST(gl_value_get_int(eval_str("(incf upd-counter)")) == 1, "incf returns the new value");
+    TEST(gl_value_get_int(eval_str("upd-counter")) == 1, "incf updates the binding");
+    TEST(gl_value_get_int(eval_str("(incf upd-counter 10)")) == 11, "incf with a delta");
+    TEST(gl_value_get_int(eval_str("(decf upd-counter)")) == 10, "decf returns the new value");
+    TEST(gl_value_get_int(eval_str("(decf upd-counter 4)")) == 6, "decf with a delta");
+    TEST(gl_value_get_int(eval_str("upd-counter")) == 6, "decf updates the binding");
+
+    // The macro expands to set, so it updates locals as well as globals.
+    TEST(gl_value_get_int(eval_str("(let ((n 1)) (incf n 2) n)")) == 3, "incf on a let binding");
+    eval_str("(defun bump (n) (incf n) n)");
+    TEST(gl_value_get_int(eval_str("(bump 41)")) == 42, "incf on a parameter");
+
+    // The delta is evaluated once, not once per mention.
+    eval_str("(set upd-evals 0)");
+    eval_str("(defun next-delta () (set upd-evals (+ upd-evals 1)) 5)");
+    TEST(gl_value_get_int(eval_str("(let ((n 0)) (incf n (next-delta)) n)")) == 5,
+         "incf applies the delta");
+    TEST(gl_value_get_int(eval_str("upd-evals")) == 1, "incf evaluates the delta once");
+}
+
 void test_control_forms(void) {
     TEST(eval_expr("(let ((i 0)) (while (< i 3) (len 5)))") == NULL,
          "While stops when the body fails");
@@ -1948,6 +1970,7 @@ int main(void) {
     test_cond();
     test_optional_and_rest();
     test_for();
+    test_update_macros();
     test_control_forms();
     test_add_to_list();
     test_defconst();
