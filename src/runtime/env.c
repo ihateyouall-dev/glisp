@@ -18,7 +18,10 @@ HASHMAP_DEFINE(gl_value_t *, gl_value_table) // NOLINT(clang-analyzer-core.NullD
 
 gl_value_t *gl_global_env = NULL;
 
-// Each frame has separate variable/function tables; constants are created lazily.
+// Each frame has separate variable and function tables. The function table and
+// the constants table are created on first use: a function frame binds
+// parameters far more often than it defines functions, and an empty table per
+// frame is not free.
 gl_env_t *gl_make_env(gl_value_t *parent) {
     gl_env_t *res = malloc(sizeof(gl_env_t));
     res->parent = parent;
@@ -27,13 +30,18 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
     gl_value_table_init(values, NULL, gl_value_copy);
     res->variables = values;
 
-    gl_value_table_t *functions = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(functions, NULL, gl_value_copy);
-    res->functions = functions;
-
+    res->functions = NULL;
     res->constants = NULL;
 
     return res;
+}
+
+static gl_value_table_t *__gl_env_functions(gl_env_t *env) {
+    if (env->functions == NULL) {
+        env->functions = malloc(sizeof(gl_value_table_t));
+        gl_value_table_init(env->functions, NULL, gl_value_copy);
+    }
+    return env->functions;
 }
 
 #define DEFINE_BUILTIN(Name, CName)                                                                \
@@ -211,8 +219,11 @@ void gl_env_destroy(gl_env_t *env) {
         return;
     gl_value_table_destroy(env->variables);
     free(env->variables);
-    gl_value_table_destroy(env->functions);
-    free(env->functions);
+    if (env->functions) {
+        gl_value_table_destroy(env->functions);
+        free(env->functions);
+        env->functions = NULL;
+    }
     if (env->constants) {
         gl_value_table_destroy(env->constants);
         free(env->constants);
@@ -229,7 +240,7 @@ void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val) {
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
     assert(val->type == GL_VAL_BUILTIN || val->type == GL_VAL_FUNCTION ||
            val->type == GL_VAL_SPFORM || val->type == GL_VAL_MACRO);
-    gl_value_table_insert(env->functions, sym, val);
+    gl_value_table_insert(__gl_env_functions(env), sym, val);
 }
 
 // Constants are stored both as variables and in the constants table.
@@ -275,7 +286,7 @@ gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
 
 gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym) {
     while (env != NULL) {
-        gl_value_t **fun = gl_value_table_get(env->functions, sym);
+        gl_value_t **fun = env->functions ? gl_value_table_get(env->functions, sym) : NULL;
         if (fun != NULL && *fun != NULL) {
             return *fun;
         }
@@ -291,7 +302,7 @@ gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym) {
 }
 
 gl_value_t *gl_env_get_fun(gl_env_t *env, const char *sym) {
-    gl_value_t **obj = gl_value_table_get(env->functions, sym);
+    gl_value_t **obj = env->functions ? gl_value_table_get(env->functions, sym) : NULL;
 
     gl_value_t *res = (obj != NULL ? *obj : NULL);
 

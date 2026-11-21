@@ -275,6 +275,22 @@ make examples
 
 Run one directly with `./build/glisp examples/primes.lisp`.
 
+## Benchmarks
+
+The `bench/` directory holds scripts that each print a result and assert it, so a
+run is also a correctness check.
+
+```bash
+time make bench
+```
+
+| Script | Measures |
+| :--- | :--- |
+| `calls.lisp` | two hundred thousand tail calls with arithmetic in the body |
+| `lists.lisp` | building a list through a recursive function, the copy-heavy case |
+| `hash.lisp` | three thousand string keys inserted and read back |
+| `strings.lisp` | twenty thousand calls passing a string argument |
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` builds and tests the project on:

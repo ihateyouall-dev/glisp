@@ -183,6 +183,31 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     return res;
 }
 
+// Values of these kinds never change in place, so a parameter can share the
+// argument instead of allocating a copy. Collections stay copied: a function
+// that pushes through a parameter must not change the caller's collection.
+static int __gl_value_is_immutable(gl_value_t *val) {
+    switch (val->type) {
+    case GL_VAL_NIL:
+    case GL_VAL_INT:
+    case GL_VAL_FLOAT:
+    case GL_VAL_STRING:
+    case GL_VAL_SYMBOL:
+    case GL_VAL_TYPEID:
+    case GL_VAL_BUILTIN:
+    case GL_VAL_SPFORM:
+    case GL_VAL_MACRO:
+    case GL_VAL_FUNCTION:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static gl_value_t *__gl_bind_argument(gl_value_t *val) {
+    return __gl_value_is_immutable(val) ? val : gl_value_copy(val);
+}
+
 static void __gl_define_function_args(const gl_function_t *function, gl_function_args_t *args,
                                       gl_env_t *env) {
     if (!function->params) {
@@ -196,17 +221,18 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
         gl_function_param_t *p = function->params->data[i];
         if (p->kind == GL_PARAM_REQUIRED) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, gl_value_copy(args->data[arg_idx]->val));
+                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             }
         } else if (p->kind == GL_PARAM_OPTIONAL) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, gl_value_copy(args->data[arg_idx]->val));
+                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             } else {
                 if (p->default_val) {
                     gl_value_t *val = gl_eval(p->default_val);
-                    gl_env_set_var(env, p->name, val ? gl_value_copy(val) : gl_value_make_nil());
+                    gl_env_set_var(env, p->name,
+                                   val ? __gl_bind_argument(val) : gl_value_make_nil());
                 } else {
                     gl_env_set_var(env, p->name, gl_value_make_nil());
                 }
