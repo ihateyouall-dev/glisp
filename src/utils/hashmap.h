@@ -83,7 +83,7 @@
         map->buckets_count = new_buckets_count;                                                    \
     }                                                                                              \
     void Name##_init(Name##_t *map, void (*destroy_fn)(T *), T (*copy_fn)(T)) {                    \
-        map->buckets_count = 32;                                                                   \
+        map->buckets_count = 4;                                                                    \
         map->buckets = calloc(map->buckets_count, sizeof(Name##Bucket_t));                         \
         for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
             Name##Bucket_init(&map->buckets[i], &Name##Entry_destroy);                             \

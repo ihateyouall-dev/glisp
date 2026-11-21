@@ -1,4 +1,4 @@
-.PHONY: all build clean test examples configure install-deps install package
+.PHONY: all build clean test examples bench configure install-deps install package
 
 CMAKE_PRESET ?= release
 CMAKE_CONFIGURE_PRESET ?= $(CMAKE_PRESET)
@@ -64,6 +64,14 @@ examples: build
 	@for example in examples/*.lisp; do \
 		echo "$$example"; \
 		$(BUILD_DIR)/glisp "$$example" > /dev/null || exit 1; \
+	done
+
+# The scripts in bench/ print their result and check it, so the run is also a
+# correctness check. Time it from the outside: time make bench
+bench: build
+	@for script in bench/*.lisp; do \
+		echo "== $$script"; \
+		$(BUILD_DIR)/glisp "$$script" || exit 1; \
 	done
 
 install:
