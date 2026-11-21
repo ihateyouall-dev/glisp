@@ -40,6 +40,8 @@ whenever the standard library is loaded and are not part of the bare runtime
 | `(cond (test body ...) ... (else body ...))` | Multi-branch conditional; a clause with an empty body returns its test value. |
 | `(case value (key body ...) ... (else body ...))` | Compares `value` with evaluated keys using `=`; first match wins. |
 | `(dotimes (variable count [result]) body ...)` | Loops `variable` from `0` to `count - 1`; `result` sees the final binding. |
+| `(incf place [delta])` | Adds `delta` (default `1`) to the variable `place` and returns the new value. |
+| `(decf place [delta])` | Subtracts `delta` (default `1`) from the variable `place` and returns the new value. |
 
 ## math.lisp
 
