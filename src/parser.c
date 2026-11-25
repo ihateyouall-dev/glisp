@@ -43,7 +43,7 @@ static gl_lex_token_t __gl_parser_current_token(gl_parser_t *parser) {
 
 static void __gl_parser_advance(gl_parser_t *parser) { ++parser->pos; }
 
-// Parses an integer literal; overflow is fatal.
+// Parses an integer literal. Values outside int64_t become bignum literals.
 static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
@@ -51,13 +51,10 @@ static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     errno = 0;
     int64_t val = strtoll(token.value, &endptr, 10);
 
-    if (errno == ERANGE) {
-        gl_diagnostic_report_error(
-            gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location, "Numeric overflow"));
-        return NULL;
-    }
-
     __gl_parser_advance(parser);
+    if (errno == ERANGE) {
+        return gl_ast_make_bignum(token.value, token.location);
+    }
     return gl_ast_make_int(val, token.location);
 }
 

@@ -16,6 +16,7 @@
 /** Kinds of AST nodes produced by the parser. */
 typedef enum {
     GL_AST_INT,
+    GL_AST_BIGNUM,
     GL_AST_FLOAT,
     GL_AST_SYMBOL,
     GL_AST_CONS,
@@ -39,6 +40,7 @@ typedef struct gl_ast_node_t {
 
     union {
         int64_t integral;
+        char *bigint; /**< Decimal text that does not fit in int64_t. */
         long double floating;
         char *symbol;
         char *string;
@@ -77,6 +79,8 @@ gl_ast_node_t *gl_ast_make_unquote(gl_ast_node_t *node);
 gl_ast_node_t *gl_ast_make_unquote_splicing(gl_ast_node_t *node);
 
 gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location);
+/** Creates a literal node from decimal text too large for int64_t. */
+gl_ast_node_t *gl_ast_make_bignum(const char *digits, gl_location_t location);
 gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location);
 gl_ast_node_t *gl_ast_make_symbol(const char *sym, gl_location_t location);
 gl_ast_node_t *gl_ast_make_cons(gl_ast_node_t *car, gl_ast_node_t *cdr, gl_location_t location);

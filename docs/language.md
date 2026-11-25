@@ -22,7 +22,7 @@ evaluated in order; the value of a file is the value of its last expression.
 
 | Form | Meaning |
 | :--- | :--- |
-| `123` | 64-bit signed integer |
+| `123` | integer (64-bit, or arbitrary precision when it does not fit) |
 | `3.14` | long-double float (a decimal point is required) |
 | `"text"` | string |
 | `symbol` | symbol |
@@ -38,9 +38,12 @@ evaluated in order; the value of a file is the value of its last expression.
 
 Numbers are decimal. Scientific notation (`1e9`), hexadecimal, and digit
 separators are not supported. A leading `-` is recognized only when followed by
-a digit. Integer literals must fit in a 64-bit signed integer; a literal or
-arithmetic result outside that range is reported as an error instead of
-wrapping or terminating the interpreter.
+a digit. Integers that do not fit in 64 bits become arbitrary-precision
+bignums instead of wrapping or terminating the interpreter, and arithmetic
+promotes to a bignum whenever an integer result would overflow. Bignums print
+as plain digits, compare exactly with other numbers, and report their type as
+`bignum`; they are not limited to any fixed width. A float literal must fit in a
+`long double`, and an overflowing float literal is reported as an error.
 
 String literals are copied verbatim up to the next double quote; escapes are
 processed afterwards, when the parser builds the string node. Supported
@@ -70,6 +73,7 @@ the natural tool for constructing code in macros.
 | :--- | :--- | :--- | :--- |
 | nil | `nil-t` | `nil`, `'()` | singleton; false |
 | int | `int-t` | `42` | `int64_t` |
+| bignum | `bignum-t` | `9223372036854775808` | arbitrary-precision integer |
 | float | `float-t` | `3.14` | `long double` |
 | symbol | `symbol-t` | `foo` | compared by name |
 | string | `string-t` | `"hi"` | immutable, NUL-terminated |

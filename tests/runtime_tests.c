@@ -348,6 +348,13 @@ void test_std_integer_math(void) {
     TEST(gl_value_get_bool(eval_str("(approx= (rem -5.5 2) -1.5)")) == 1, "rem of floats");
 }
 
+static int __gl_has_text(gl_value_t *val, const char *expected) {
+    char *text = gl_value_to_string(val);
+    int same = text != NULL && strcmp(text, expected) == 0;
+    free(text);
+    return same;
+}
+
 void test_arithmetic_builtins(void) {
     TEST(gl_value_get_int(eval_str("(% 10 3)")) == 1, "modulo of positive numbers");
     TEST(gl_value_get_int(eval_str("(% -10 3)")) == -1, "modulo keeps the dividend sign");
@@ -360,11 +367,16 @@ void test_arithmetic_builtins(void) {
     TEST(gl_value_get_int(eval_str("(/ 7 2)")) == 3, "integer division truncates");
     TEST(eval_expr("(/ 1 0)") == NULL, "division by integer zero is an error");
     TEST(eval_expr("(% 1 0)") == NULL, "modulo by zero is an error");
-    TEST(eval_expr("(+ 9223372036854775807 1)") == NULL, "addition overflow is an error");
-    TEST(eval_expr("(- 0 9223372036854775807 2)") == NULL, "subtraction overflow is an error");
-    TEST(eval_expr("(* 9223372036854775807 2)") == NULL, "multiplication overflow is an error");
-    TEST(eval_expr("(- (- 0 9223372036854775807 1))") == NULL, "negation overflow is an error");
-    TEST(eval_expr("(/ (- 0 9223372036854775807 1) -1)") == NULL, "division overflow is an error");
+    TEST(__gl_has_text(eval_expr("(+ 9223372036854775807 1)"), "9223372036854775808"),
+         "addition overflow promotes to a bignum");
+    TEST(__gl_has_text(eval_expr("(- 0 9223372036854775807 2)"), "-9223372036854775809"),
+         "subtraction overflow promotes to a bignum");
+    TEST(__gl_has_text(eval_expr("(* 9223372036854775807 2)"), "18446744073709551614"),
+         "multiplication overflow promotes to a bignum");
+    TEST(__gl_has_text(eval_expr("(- (- 0 9223372036854775807 1))"), "9223372036854775808"),
+         "negation overflow promotes to a bignum");
+    TEST(__gl_has_text(eval_expr("(/ (- 0 9223372036854775807 1) -1)"), "9223372036854775808"),
+         "division overflow promotes to a bignum");
     TEST(gl_value_get_int(eval_expr("(% (- 0 9223372036854775807 1) -1)")) == 0,
          "remainder of the minimum int by -1 is zero");
     TEST(eval_expr("(int (* 1.0 10000000000.0 1000000000000.0))") == NULL,
@@ -372,6 +384,55 @@ void test_arithmetic_builtins(void) {
     TEST(eval_expr("(int (/ 0.0 0.0))") == NULL, "int conversion of NaN is an error");
     TEST(gl_value_get_int(eval_str("(+ 9223372036854775806 1)")) == INT64_MAX,
          "addition up to the limit stays exact");
+}
+
+void test_bignum_arithmetic(void) {
+    TEST(__gl_has_text(eval_str("(* 99999999999999999999 99999999999999999999)"),
+                       "9999999999999999999800000000000000000001"),
+         "big multiplication is exact");
+    TEST(__gl_has_text(eval_str("(/ 100000000000000000000 3)"), "33333333333333333333"),
+         "big division is exact");
+    TEST(gl_value_get_int(eval_str("(% 100000000000000000000 7)")) == 2, "big remainder is exact");
+    TEST(gl_value_get_int(eval_str("(% -100000000000000000000 7)")) == -2,
+         "big remainder keeps the dividend sign");
+    TEST(__gl_has_text(eval_str("(- 0 9223372036854775808)"), "-9223372036854775808"),
+         "a bignum result that fits is reduced to int");
+    TEST(gl_value_get_int(eval_str("(- 9223372036854775808 9223372036854775807)")) == 1,
+         "mixed bignum and int subtraction");
+    TEST(gl_value_get_bool(eval_str("(= 4294967296 0)")) == 0,
+         "equality does not truncate integers to 32 bits");
+    TEST(gl_value_get_bool(eval_str("(< 4294967296 4294967297)")) == 1,
+         "comparison does not truncate integers to 32 bits");
+    TEST(gl_value_get_bool(eval_str("(> 9223372036854775808 9223372036854775807)")) == 1,
+         "bignum compares above the int64 limit");
+    TEST(gl_value_get_bool(eval_str("(< -9223372036854775809 -9223372036854775808)")) == 1,
+         "negative bignum compares below the int64 limit");
+    TEST(gl_value_get_bool(
+             eval_str("(approx= (float 9223372036854775808) 9223372036854775808.0)")) == 1,
+         "float conversion accepts bignums");
+    TEST(eval_expr("(int 9223372036854775808)") == NULL,
+         "int conversion rejects an out-of-range bignum");
+    TEST(__gl_has_text(
+             eval_str("(factorial 100)"),
+             "933262154439441526816992388562667004907159682643816214685929638952175999932299"
+             "15608941463976156518286253697920827223758251185210916864000000000000000000000000"),
+         "factorial of 100 is exact");
+    TEST(__gl_has_text(eval_str("(typeof (factorial 100))"), "bignum"),
+         "a large factorial has the bignum type");
+    TEST(gl_value_get_bool(eval_str("(int? (factorial 100))")) == 1,
+         "bignums satisfy the integer predicate");
+    TEST(gl_value_get_bool(eval_str("(bignum? 1)")) == 0, "small integers are not bignums");
+    TEST(gl_value_get_int(eval_str("(mod (factorial 50) 97)")) == 65,
+         "floored mod keeps bignum precision");
+    TEST(gl_value_get_int(eval_str("(rem (factorial 50) 97)")) == 65,
+         "remainder keeps bignum precision");
+    TEST(gl_value_get_int(eval_str("(gcd (factorial 100) (- (factorial 100) 1))")) == 1,
+         "gcd handles bignums");
+    TEST(__gl_has_text(eval_str("(string->number \"9223372036854775808\")"), "9223372036854775808"),
+         "string->number produces bignums");
+    TEST(__gl_has_text(eval_str("(string->number \"-9223372036854775809\")"),
+                       "-9223372036854775809"),
+         "string->number accepts negative bignums");
 }
 
 void test_comparison_builtins(void) {
@@ -702,8 +763,9 @@ void test_strings(void) {
          "string->number trailing text");
     TEST(eval_str("(string->number \"1e9\")")->type == GL_VAL_NIL, "string->number exponent");
     TEST(eval_str("(string->number \"1.\")")->type == GL_VAL_NIL, "string->number bare dot");
-    TEST(eval_str("(string->number \"99999999999999999999999\")")->type == GL_VAL_NIL,
-         "string->number overflow");
+    TEST(__gl_has_text(eval_str("(string->number \"99999999999999999999999\")"),
+                       "99999999999999999999999"),
+         "string->number large integer becomes a bignum");
 }
 
 void test_std_strings(void) {
@@ -1946,6 +2008,7 @@ int main(void) {
     test_name_suggestions();
     test_std_integer_math();
     test_arithmetic_builtins();
+    test_bignum_arithmetic();
     test_comparison_builtins();
     test_sequence_aliases();
     test_math_builtins();

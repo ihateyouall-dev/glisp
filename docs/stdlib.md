@@ -221,7 +221,7 @@ is the way to sort entries: `(sort-by car (hash->alist map))`.
 | :--- | :--- |
 | `(typeid? x)` | True when `x` is a typeid. |
 | `(instanceof? type x)` | True when `x` has the given typeid. |
-| `(int? x)`, `(float? x)`, `(number? x)` | Numeric predicates |
+| `(int? x)`, `(bignum? x)`, `(float? x)`, `(number? x)` | Numeric predicates; `int?` also accepts bignums |
 | `(string? x)`, `(symbol? x)`, `(nil? x)` | Scalar predicates |
 | `(null? x)` | Alias for `nil?` |
 | `(function? x)` | True for functions, builtins, and special forms |

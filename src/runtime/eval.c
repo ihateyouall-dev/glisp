@@ -190,6 +190,7 @@ static int __gl_value_is_immutable(gl_value_t *val) {
     switch (val->type) {
     case GL_VAL_NIL:
     case GL_VAL_INT:
+    case GL_VAL_BIGNUM:
     case GL_VAL_FLOAT:
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
@@ -919,6 +920,8 @@ static gl_value_t *__gl_eval_node(gl_ast_node_t *node) {
     switch (node->type) {
     case GL_AST_INT:
         return __gl_eval_int(node);
+    case GL_AST_BIGNUM:
+        return gl_value_make_bignum(gl_bignum_from_string(node->value.bigint));
     case GL_AST_FLOAT:
         return __gl_eval_float(node);
     case GL_AST_SYMBOL:

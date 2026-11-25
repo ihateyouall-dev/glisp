@@ -6,6 +6,7 @@
  */
 
 #include "ast.h"
+#include "bignum.h"
 #include "utils/array.h"
 #include "utils/cons.h"
 #include "utils/hashmap.h"
@@ -19,6 +20,7 @@
 typedef enum {
     GL_VAL_NIL,
     GL_VAL_INT,
+    GL_VAL_BIGNUM,
     GL_VAL_FLOAT,
     GL_VAL_SYMBOL,
     GL_VAL_FUNCTION,
@@ -67,6 +69,12 @@ void gl_value_destroy(gl_value_t **val);
 gl_value_t *gl_value_copy(gl_value_t *val);
 
 gl_value_t *gl_value_make_int(int64_t num);
+
+/**
+ * Wraps a bignum payload, taking ownership of it. Values that fit in an
+ * int64_t are reduced to GL_VAL_INT so the type stays canonical.
+ */
+gl_value_t *gl_value_make_bignum(gl_bignum_t *num);
 
 gl_value_t *gl_value_make_float(long double num);
 
@@ -177,6 +185,8 @@ void gl_value_print(gl_value_t *val);
 char *gl_value_to_string(gl_value_t *val);
 
 int64_t gl_value_get_int(gl_value_t *val);
+
+gl_bignum_t *gl_value_get_bignum(gl_value_t *val);
 
 long double gl_value_get_float(gl_value_t *val);
 

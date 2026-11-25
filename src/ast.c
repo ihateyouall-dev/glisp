@@ -111,6 +111,15 @@ gl_ast_node_t *gl_ast_make_int(int64_t num, gl_location_t location) {
     return res;
 }
 
+gl_ast_node_t *gl_ast_make_bignum(const char *digits, gl_location_t location) {
+    gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
+    assert(res);
+    res->type = GL_AST_BIGNUM;
+    res->value.bigint = strdup(digits);
+    res->location = location;
+    return res;
+}
+
 gl_ast_node_t *gl_ast_make_float(long double num, gl_location_t location) {
     gl_ast_node_t *res = malloc(sizeof(gl_ast_node_t));
     assert(res);
@@ -218,6 +227,9 @@ gl_ast_node_t *gl_ast_copy(gl_ast_node_t *node) {
     case GL_AST_FLOAT:
         res->value = node->value;
         break;
+    case GL_AST_BIGNUM:
+        res->value.bigint = strdup(node->value.bigint);
+        break;
     case GL_AST_SYMBOL:
         res->value.symbol = strdup(node->value.symbol);
         break;
@@ -275,6 +287,9 @@ void gl_ast_destroy(gl_ast_node_t *node) {
     case GL_AST_SYMBOL:
     case GL_AST_STRING:
         free(node->value.symbol);
+        break;
+    case GL_AST_BIGNUM:
+        free(node->value.bigint);
         break;
     default:
         // INT, FLOAT, NIL - no dynamic memory to free per node.
