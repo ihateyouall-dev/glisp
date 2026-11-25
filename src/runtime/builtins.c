@@ -290,6 +290,53 @@ GL_BUILTIN(cons) {
     return gl_value_make_cons_raw(NTH_VAL(0), NTH_VAL(1));
 }
 
+// Signed overflow is undefined behavior in C. Arithmetic reports it as an
+// error instead of letting the result wrap.
+static gl_value_t *__gl_report_overflow(gl_location_t called_at) {
+    gl_diagnostic_report_error(gl_make_error(GL_OVERFLOW_ERROR, GL_ERROR, called_at,
+                                             "Cannot represent result as an integer"));
+    return NULL;
+}
+
+// Computes LHS + RHS; returns 1 when the result does not fit in an int64_t.
+static int __gl_int_add(int64_t lhs, int64_t rhs, int64_t *out) {
+    if ((rhs > 0 && lhs > INT64_MAX - rhs) || (rhs < 0 && lhs < INT64_MIN - rhs)) {
+        return 1;
+    }
+    *out = lhs + rhs;
+    return 0;
+}
+
+// Computes LHS - RHS; returns 1 when the result does not fit in an int64_t.
+static int __gl_int_sub(int64_t lhs, int64_t rhs, int64_t *out) {
+    if ((rhs < 0 && lhs > INT64_MAX + rhs) || (rhs > 0 && lhs < INT64_MIN + rhs)) {
+        return 1;
+    }
+    *out = lhs - rhs;
+    return 0;
+}
+
+// Computes LHS * RHS; returns 1 when the result does not fit in an int64_t.
+static int __gl_int_mul(int64_t lhs, int64_t rhs, int64_t *out) {
+    if (lhs > 0) {
+        if (rhs > 0) {
+            if (lhs > INT64_MAX / rhs) {
+                return 1;
+            }
+        } else if (rhs < INT64_MIN / lhs) {
+            return 1;
+        }
+    } else if (rhs > 0) {
+        if (lhs < INT64_MIN / rhs) {
+            return 1;
+        }
+    } else if (lhs != 0 && rhs < INT64_MAX / lhs) {
+        return 1;
+    }
+    *out = lhs * rhs;
+    return 0;
+}
+
 // Arithmetic promotes to float as soon as one operand is a float.
 GL_BUILTIN(add) {
     if (ARGC == 0) {
@@ -306,8 +353,8 @@ GL_BUILTIN(add) {
             if (current->type == GL_VAL_FLOAT) {
                 is_float = 1;
                 fsum = (long double)isum + gl_value_get_float(current);
-            } else {
-                isum += gl_value_get_int(current);
+            } else if (__gl_int_add(isum, gl_value_get_int(current), &isum)) {
+                return __gl_report_overflow(called_at);
             }
         } else {
             fsum += gl_value_get_float(current);
@@ -334,6 +381,9 @@ GL_BUILTIN(sub) {
     // Unary operator handling
     if (ARGC == 1) {
         if (!is_float) {
+            if (isum == INT64_MIN) {
+                return __gl_report_overflow(called_at);
+            }
             return gl_value_make_int(-isum);
         } else {
             return gl_value_make_float(-fsum);
@@ -346,8 +396,8 @@ GL_BUILTIN(sub) {
             if (current->type == GL_VAL_FLOAT) {
                 is_float = 1;
                 fsum = (long double)isum - gl_value_get_float(current);
-            } else {
-                isum -= gl_value_get_int(current);
+            } else if (__gl_int_sub(isum, gl_value_get_int(current), &isum)) {
+                return __gl_report_overflow(called_at);
             }
         } else {
             fsum -= gl_value_get_float(current);
@@ -378,8 +428,8 @@ GL_BUILTIN(mul) {
             if (current->type == GL_VAL_FLOAT) {
                 is_float = 1;
                 fsum = (long double)isum * gl_value_get_float(current);
-            } else {
-                isum *= gl_value_get_int(current);
+            } else if (__gl_int_mul(isum, gl_value_get_int(current), &isum)) {
+                return __gl_report_overflow(called_at);
             }
         } else {
             fsum *= gl_value_get_float(current);
@@ -416,7 +466,11 @@ GL_BUILTIN(div) {
                 is_float = 1;
                 fsum = (long double)isum / gl_value_get_float(current);
             } else {
-                isum /= gl_value_get_int(current);
+                int64_t divisor = gl_value_get_int(current);
+                if (isum == INT64_MIN && divisor == -1) {
+                    return __gl_report_overflow(called_at);
+                }
+                isum /= divisor;
             }
         } else {
             fsum /= gl_value_get_float(current);
@@ -443,7 +497,16 @@ GL_BUILTIN(mod) {
         return NULL;
     }
 
-    return gl_value_make_int(gl_value_get_int(lhs) % gl_value_get_int(rhs));
+    int64_t lhs_num = gl_value_get_int(lhs);
+    int64_t rhs_num = gl_value_get_int(rhs);
+
+    // INT64_MIN % -1 is undefined in C because the intermediate quotient
+    // overflows, but the remainder itself is defined: it is zero.
+    if (lhs_num == INT64_MIN && rhs_num == -1) {
+        return gl_value_make_int(0);
+    }
+
+    return gl_value_make_int(lhs_num % rhs_num);
 }
 
 GL_BUILTIN(eq) {
@@ -559,7 +622,17 @@ GL_BUILTIN(int_con) {
     if (val->type == GL_VAL_INT) {
         return val;
     }
-    return gl_value_make_int((int64_t)gl_value_get_float(val));
+
+    long double num = gl_value_get_float(val);
+
+    // Casting a float outside the int64_t range, or NaN, is undefined in C.
+    if (num != num || num >= 9223372036854775808.0L || num < -9223372036854775808.0L) {
+        gl_diagnostic_report_error(gl_make_error(GL_OVERFLOW_ERROR, GL_ERROR, called_at,
+                                                 "Cannot represent float as an integer"));
+        return NULL;
+    }
+
+    return gl_value_make_int((int64_t)num);
 }
 
 GL_BUILTIN(float_con) {

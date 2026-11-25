@@ -162,6 +162,9 @@ void gl_diagnostic_report_error(gl_error_t *err) {
     case GL_DIVISION_BY_ZERO:
         fprintf(stderr, "Division by zero: ");
         break;
+    case GL_OVERFLOW_ERROR:
+        fprintf(stderr, "Overflow error: ");
+        break;
     case GL_RECURSION_ERROR:
         fprintf(stderr, "Recursion error: ");
         break;

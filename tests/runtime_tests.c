@@ -360,6 +360,18 @@ void test_arithmetic_builtins(void) {
     TEST(gl_value_get_int(eval_str("(/ 7 2)")) == 3, "integer division truncates");
     TEST(eval_expr("(/ 1 0)") == NULL, "division by integer zero is an error");
     TEST(eval_expr("(% 1 0)") == NULL, "modulo by zero is an error");
+    TEST(eval_expr("(+ 9223372036854775807 1)") == NULL, "addition overflow is an error");
+    TEST(eval_expr("(- 0 9223372036854775807 2)") == NULL, "subtraction overflow is an error");
+    TEST(eval_expr("(* 9223372036854775807 2)") == NULL, "multiplication overflow is an error");
+    TEST(eval_expr("(- (- 0 9223372036854775807 1))") == NULL, "negation overflow is an error");
+    TEST(eval_expr("(/ (- 0 9223372036854775807 1) -1)") == NULL, "division overflow is an error");
+    TEST(gl_value_get_int(eval_expr("(% (- 0 9223372036854775807 1) -1)")) == 0,
+         "remainder of the minimum int by -1 is zero");
+    TEST(eval_expr("(int (* 1.0 10000000000.0 1000000000000.0))") == NULL,
+         "int conversion overflow is an error");
+    TEST(eval_expr("(int (/ 0.0 0.0))") == NULL, "int conversion of NaN is an error");
+    TEST(gl_value_get_int(eval_str("(+ 9223372036854775806 1)")) == INT64_MAX,
+         "addition up to the limit stays exact");
 }
 
 void test_comparison_builtins(void) {
