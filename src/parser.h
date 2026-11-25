@@ -13,6 +13,7 @@ typedef struct gl_parser_t {
     const char *src;              /**< Borrowed source buffer. */
     gl_lex_token_vector_t tokens; /**< Owned token stream. */
     size_t pos;                   /**< Index of the next token. */
+    size_t depth;                 /**< Current nesting depth of the recursive descent. */
 } gl_parser_t;
 
 /** Initializes a parser and tokenizes @p src. */
