@@ -237,6 +237,24 @@ void test_parse_nested_array_vector(void) {
     gl_parser_destroy(&parser);
 }
 
+// The parser recurses once per bracket, so deep input must be rejected instead
+// of overflowing the C stack.
+void test_parse_nesting_limit(void) {
+    char src[4001];
+    size_t depth = 2000;
+
+    for (size_t i = 0; i < depth; ++i) {
+        src[i] = '(';
+        src[depth + i] = ')';
+    }
+    src[depth * 2] = '\0';
+
+    gl_parser_t parser = gl_make_parser(src, "");
+    gl_ast_node_t *node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Deep nesting is rejected");
+    gl_parser_destroy(&parser);
+}
+
 void test_parse_quasiquote_sugar(void) {
     gl_parser_t parser = gl_make_parser("`(a ,b ,@c)", "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
@@ -304,6 +322,7 @@ void parser_test(void) {
     test_parse_vector();
     test_parse_empty_vector();
     test_parse_nested_array_vector();
+    test_parse_nesting_limit();
     test_parse_quasiquote_sugar();
     test_parse_dangling_quote();
 }

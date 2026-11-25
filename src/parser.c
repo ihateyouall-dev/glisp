@@ -14,11 +14,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Deeper nesting than this is reported as an error: the parser recurses once
+// per bracket, so a runaway input has to end with a diagnostic instead of a
+// crash.
+static const size_t GL_MAX_PARSE_DEPTH = 1000;
+
 void gl_parser_init(gl_parser_t *parser, const char *src, const char *name) {
     gl_lexer_t lexer = gl_make_lexer(src, name); // NOLINT
     parser->tokens = gl_lexer_tokenize(&lexer);
     parser->src = src;
     parser->pos = 0;
+    parser->depth = 0;
 }
 
 gl_parser_t gl_make_parser(const char *src, const char *name) {
@@ -89,10 +95,26 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
 static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser);
 static gl_ast_node_t *__gl_parser_parse_array(gl_parser_t *parser);
 static gl_ast_node_t *__gl_parser_parse_vector(gl_parser_t *parser);
+static gl_ast_node_t *__gl_parser_parse_form(gl_parser_t *parser);
+
+// Parses one expression and keeps the recursive descent within its budget.
+static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
+    if (parser->depth >= GL_MAX_PARSE_DEPTH) {
+        gl_lex_token_t token = __gl_parser_current_token(parser);
+        gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location,
+                                                 "Maximum nesting depth exceeded"));
+        return NULL;
+    }
+
+    ++parser->depth;
+    gl_ast_node_t *res = __gl_parser_parse_form(parser);
+    --parser->depth;
+    return res;
+}
 
 // Decides which parser function to call for the current token.
 // Quote and funquote are prefix forms: they wrap the next expression.
-static gl_ast_node_t *__gl_parser_parse_expression(gl_parser_t *parser) {
+static gl_ast_node_t *__gl_parser_parse_form(gl_parser_t *parser) {
     gl_lex_token_t token = __gl_parser_current_token(parser);
 
     if (token.type == GL_LEX_QUOTE) {
@@ -228,6 +250,7 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
         if (token.type == GL_LEX_EOF) { // List is not closed
             gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, lparen.location,
                                                      "Expected ')' to close expression"));
+            gl_ast_destroy(list_head);
             return NULL;
         }
 
@@ -235,6 +258,7 @@ static gl_ast_node_t *__gl_parser_parse_list(gl_parser_t *parser) {
 
         // Terminating if we got error in node parsing
         if (new_node == NULL) {
+            gl_ast_destroy(list_head);
             return NULL;
         }
 
