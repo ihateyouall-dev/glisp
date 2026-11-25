@@ -221,16 +221,17 @@ terminating the interpreter.
 
 | Signature | Description |
 | :--- | :--- |
-| `(+ ...)` | Sum; `(+)` is `0`. Promotes to float if any argument is a float. |
-| `(- x ...)` | Subtraction. With one argument, negation. |
-| `(* ...)` | Product; `(*)` is `1`. Promotes to float if any argument is a float. |
-| `(/ x ...)` | Left-associative division. Integer division truncates toward zero. Division by integer zero and integer overflow are errors. |
-| `(% a b)` | Integer remainder (C semantics; sign follows the dividend). |
-| `(int x)` | Converts a number to int, truncating toward zero. Returns ints unchanged. Floats outside the integer range, and NaN, are errors. |
-| `(float x)` | Converts a number to float. Returns floats unchanged. |
+| `(+ ...)` | Sum; `(+)` is `0`. Promotes to float if any argument is a float, and to a bignum when an integer result exceeds 64 bits. |
+| `(- x ...)` | Subtraction. With one argument, negation. Promotes like `+`. |
+| `(* ...)` | Product; `(*)` is `1`. Promotes to float if any argument is a float, and to a bignum when an integer result exceeds 64 bits. |
+| `(/ x ...)` | Left-associative division. Integer division truncates toward zero; a result that exceeds 64 bits becomes a bignum. Division by zero is an error. |
+| `(% a b)` | Integer remainder (C semantics; sign follows the dividend). Accepts ints and bignums. |
+| `(int x)` | Converts a number to int, truncating toward zero. Returns ints unchanged. Floats outside the integer range, NaN, and bignums that do not fit in 64 bits are errors. |
+| `(float x)` | Converts a number to float, including bignums. Returns floats unchanged. |
 
-Integer arithmetic is checked: a result that does not fit in 64 bits reports
-an error instead of wrapping.
+Integer arithmetic is arbitrary precision. A result that does not fit in 64 bits
+becomes a bignum instead of wrapping; bignums print as plain digits, compare
+exactly, and report their type as `bignum`.
 
 ### Math
 
@@ -331,7 +332,7 @@ equal.
 | `(substring string start [end])` | Returns the bytes in `[start, end)`; `end` defaults to the string length. Raises when the range is out of bounds. |
 | `(string-upcase string)` | Returns a copy with ASCII letters uppercased. |
 | `(string-downcase string)` | Returns a copy with ASCII letters lowercased. |
-| `(string->number string)` | Parses the reader's number syntax: an optional `-`, digits, and an optional fractional part. Returns `nil` for anything else, including out-of-range values. |
+| `(string->number string)` | Parses the reader's number syntax: an optional `-`, digits, and an optional fractional part. Integer values beyond 64 bits become bignums; returns `nil` for anything else, including overflowing floats. |
 
 ### I/O
 

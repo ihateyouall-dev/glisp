@@ -255,14 +255,17 @@ void test_parse_nesting_limit(void) {
     gl_parser_destroy(&parser);
 }
 
-// Literals that do not fit their type become diagnostics instead of killing
-// the process.
+// Integers that do not fit in int64_t become bignum literals; floats that
+// overflow their type become diagnostics instead of killing the process.
 void test_parse_numeric_overflow(void) {
     gl_ast_node_t *node = NULL;
 
     gl_parser_t parser = gl_make_parser("9223372036854775808", "");
     node = gl_parser_parse(&parser);
-    TEST(node == NULL, "Integer literal overflow is rejected");
+    TEST(node != NULL && node->type == GL_AST_BIGNUM, "Integer literal overflow becomes a bignum");
+    TEST(node != NULL && strcmp(node->value.bigint, "9223372036854775808") == 0,
+         "Bignum literal keeps its digits");
+    gl_ast_destroy(node);
     gl_parser_destroy(&parser);
 
     // long double reaches about 1e4932, so the literal needs more digits.

@@ -190,6 +190,7 @@ gl_env_t *gl_make_global_env(void) {
     // Basic type identifiers
     DEFINE_TYPEID("nil-t", GL_VAL_NIL);
     DEFINE_TYPEID("int-t", GL_VAL_INT);
+    DEFINE_TYPEID("bignum-t", GL_VAL_BIGNUM);
     DEFINE_TYPEID("float-t", GL_VAL_FLOAT);
     DEFINE_TYPEID("symbol-t", GL_VAL_SYMBOL);
     DEFINE_TYPEID("string-t", GL_VAL_STRING);

@@ -69,6 +69,14 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
         }                                                                                          \
     } while (0)
 
+#define EXPECT_INTEGER(val)                                                                        \
+    do {                                                                                           \
+        if (val->type != GL_VAL_INT && val->type != GL_VAL_BIGNUM) {                               \
+            __emit_type_error(called_at, "integer", __gl_value_get_type_name(val));                \
+            return NULL;                                                                           \
+        }                                                                                          \
+    } while (0)
+
 #define EXPECT_FLOAT(val)                                                                          \
     do {                                                                                           \
         if (val->type != GL_VAL_FLOAT) {                                                           \
@@ -79,7 +87,7 @@ ARRAY_DEFINE(gl_function_arg_t *, gl_function_args)
 
 #define EXPECT_NUMBER(val)                                                                         \
     do {                                                                                           \
-        if (val->type != GL_VAL_INT && val->type != GL_VAL_FLOAT) {                                \
+        if (val->type != GL_VAL_INT && val->type != GL_VAL_BIGNUM && val->type != GL_VAL_FLOAT) {  \
             __emit_type_error(called_at, "number", __gl_value_get_type_name(val));                 \
             return NULL;                                                                           \
         }                                                                                          \
@@ -204,6 +212,8 @@ static const char *__gl_value_get_type_name(gl_value_t *val) {
     switch (val->type) {
     case GL_VAL_INT:
         return "int";
+    case GL_VAL_BIGNUM:
+        return "bignum";
     case GL_VAL_FLOAT:
         return "float";
     case GL_VAL_TYPEID:
@@ -290,13 +300,8 @@ GL_BUILTIN(cons) {
     return gl_value_make_cons_raw(NTH_VAL(0), NTH_VAL(1));
 }
 
-// Signed overflow is undefined behavior in C. Arithmetic reports it as an
-// error instead of letting the result wrap.
-static gl_value_t *__gl_report_overflow(gl_location_t called_at) {
-    gl_diagnostic_report_error(gl_make_error(GL_OVERFLOW_ERROR, GL_ERROR, called_at,
-                                             "Cannot represent result as an integer"));
-    return NULL;
-}
+// Signed overflow is undefined behavior in C. The checked helpers below return
+// 1 instead, which makes the caller promote the operation to a bignum.
 
 // Computes LHS + RHS; returns 1 when the result does not fit in an int64_t.
 static int __gl_int_add(int64_t lhs, int64_t rhs, int64_t *out) {
@@ -337,7 +342,16 @@ static int __gl_int_mul(int64_t lhs, int64_t rhs, int64_t *out) {
     return 0;
 }
 
-// Arithmetic promotes to float as soon as one operand is a float.
+// Converts an integer value into an owned bignum payload.
+static gl_bignum_t *__gl_value_as_bignum(gl_value_t *val) {
+    if (val->type == GL_VAL_BIGNUM) {
+        return gl_bignum_copy(gl_value_get_bignum(val));
+    }
+    return gl_bignum_from_int(gl_value_get_int(val));
+}
+
+// Arithmetic promotes to float as soon as one operand is a float, and to a
+// bignum when an integer result no longer fits in 64 bits.
 GL_BUILTIN(add) {
     if (ARGC == 0) {
         return gl_value_make_int(0);
@@ -346,22 +360,36 @@ GL_BUILTIN(add) {
     int is_float = 0;
     int64_t isum = 0;
     long double fsum = 0;
+    gl_bignum_t *bsum = NULL;
     for (size_t i = 0; i < ARGC; ++i) {
         gl_value_t *current = NTH_VAL(i);
         EXPECT_NUMBER(current);
-        if (!is_float) {
-            if (current->type == GL_VAL_FLOAT) {
-                is_float = 1;
-                fsum = (long double)isum + gl_value_get_float(current);
-            } else if (__gl_int_add(isum, gl_value_get_int(current), &isum)) {
-                return __gl_report_overflow(called_at);
-            }
-        } else {
+        if (is_float) {
             fsum += gl_value_get_float(current);
+        } else if (current->type == GL_VAL_FLOAT) {
+            is_float = 1;
+            fsum =
+                (bsum ? gl_bignum_to_float(bsum) : (long double)isum) + gl_value_get_float(current);
+        } else if (bsum == NULL && current->type == GL_VAL_INT &&
+                   !__gl_int_add(isum, gl_value_get_int(current), &isum)) {
+            continue;
+        } else {
+            if (bsum == NULL) {
+                bsum = gl_bignum_from_int(isum);
+            }
+            gl_bignum_t *term = __gl_value_as_bignum(current);
+            gl_bignum_t *sum = gl_bignum_add(bsum, term);
+            gl_bignum_free(bsum);
+            gl_bignum_free(term);
+            bsum = sum;
         }
     }
     if (is_float) {
+        gl_bignum_free(bsum);
         return gl_value_make_float(fsum);
+    }
+    if (bsum != NULL) {
+        return gl_value_make_bignum(bsum);
     }
     return gl_value_make_int(isum);
 }
@@ -375,36 +403,64 @@ GL_BUILTIN(sub) {
     EXPECT_NUMBER(first);
 
     int is_float = (first->type == GL_VAL_FLOAT);
-    int64_t isum = is_float ? 0 : gl_value_get_int(first);
-    long double fsum = is_float ? gl_value_get_float(first) : 0;
+    int64_t isum = 0;
+    long double fsum = 0;
+    gl_bignum_t *bsum = NULL;
+    if (is_float) {
+        fsum = gl_value_get_float(first);
+    } else if (first->type == GL_VAL_BIGNUM) {
+        bsum = gl_bignum_copy(gl_value_get_bignum(first));
+    } else {
+        isum = gl_value_get_int(first);
+    }
 
     // Unary operator handling
     if (ARGC == 1) {
-        if (!is_float) {
-            if (isum == INT64_MIN) {
-                return __gl_report_overflow(called_at);
-            }
-            return gl_value_make_int(-isum);
-        } else {
+        if (is_float) {
             return gl_value_make_float(-fsum);
         }
+        if (bsum != NULL) {
+            gl_bignum_t *neg = gl_bignum_neg(bsum);
+            gl_bignum_free(bsum);
+            return gl_value_make_bignum(neg);
+        }
+        if (isum == INT64_MIN) {
+            gl_bignum_t *big = gl_bignum_from_int(isum);
+            gl_bignum_t *neg = gl_bignum_neg(big);
+            gl_bignum_free(big);
+            return gl_value_make_bignum(neg);
+        }
+        return gl_value_make_int(-isum);
     }
     for (size_t i = 1; i < ARGC; ++i) {
         gl_value_t *current = NTH_VAL(i);
         EXPECT_NUMBER(current);
-        if (!is_float) {
-            if (current->type == GL_VAL_FLOAT) {
-                is_float = 1;
-                fsum = (long double)isum - gl_value_get_float(current);
-            } else if (__gl_int_sub(isum, gl_value_get_int(current), &isum)) {
-                return __gl_report_overflow(called_at);
-            }
-        } else {
+        if (is_float) {
             fsum -= gl_value_get_float(current);
+        } else if (current->type == GL_VAL_FLOAT) {
+            is_float = 1;
+            fsum =
+                (bsum ? gl_bignum_to_float(bsum) : (long double)isum) - gl_value_get_float(current);
+        } else if (bsum == NULL && current->type == GL_VAL_INT &&
+                   !__gl_int_sub(isum, gl_value_get_int(current), &isum)) {
+            continue;
+        } else {
+            if (bsum == NULL) {
+                bsum = gl_bignum_from_int(isum);
+            }
+            gl_bignum_t *term = __gl_value_as_bignum(current);
+            gl_bignum_t *diff = gl_bignum_sub(bsum, term);
+            gl_bignum_free(bsum);
+            gl_bignum_free(term);
+            bsum = diff;
         }
     }
     if (is_float) {
+        gl_bignum_free(bsum);
         return gl_value_make_float(fsum);
+    }
+    if (bsum != NULL) {
+        return gl_value_make_bignum(bsum);
     }
     return gl_value_make_int(isum);
 }
@@ -418,27 +474,55 @@ GL_BUILTIN(mul) {
     EXPECT_NUMBER(first);
 
     int is_float = (first->type == GL_VAL_FLOAT);
-    int64_t isum = is_float ? 0 : gl_value_get_int(first);
-    long double fsum = is_float ? gl_value_get_float(first) : 0;
+    int64_t isum = 0;
+    long double fsum = 0;
+    gl_bignum_t *bsum = NULL;
+    if (is_float) {
+        fsum = gl_value_get_float(first);
+    } else if (first->type == GL_VAL_BIGNUM) {
+        bsum = gl_bignum_copy(gl_value_get_bignum(first));
+    } else {
+        isum = gl_value_get_int(first);
+    }
 
     for (size_t i = 1; i < ARGC; ++i) {
         gl_value_t *current = NTH_VAL(i);
         EXPECT_NUMBER(current);
-        if (!is_float) {
-            if (current->type == GL_VAL_FLOAT) {
-                is_float = 1;
-                fsum = (long double)isum * gl_value_get_float(current);
-            } else if (__gl_int_mul(isum, gl_value_get_int(current), &isum)) {
-                return __gl_report_overflow(called_at);
-            }
-        } else {
+        if (is_float) {
             fsum *= gl_value_get_float(current);
+        } else if (current->type == GL_VAL_FLOAT) {
+            is_float = 1;
+            fsum =
+                (bsum ? gl_bignum_to_float(bsum) : (long double)isum) * gl_value_get_float(current);
+        } else if (bsum == NULL && current->type == GL_VAL_INT &&
+                   !__gl_int_mul(isum, gl_value_get_int(current), &isum)) {
+            continue;
+        } else {
+            if (bsum == NULL) {
+                bsum = gl_bignum_from_int(isum);
+            }
+            gl_bignum_t *term = __gl_value_as_bignum(current);
+            gl_bignum_t *prod = gl_bignum_mul(bsum, term);
+            gl_bignum_free(bsum);
+            gl_bignum_free(term);
+            bsum = prod;
         }
     }
     if (is_float) {
+        gl_bignum_free(bsum);
         return gl_value_make_float(fsum);
     }
+    if (bsum != NULL) {
+        return gl_value_make_bignum(bsum);
+    }
     return gl_value_make_int(isum);
+}
+
+static int __gl_integer_is_zero(gl_value_t *val) {
+    if (val->type == GL_VAL_INT) {
+        return gl_value_get_int(val) == 0;
+    }
+    return gl_bignum_compare_int(gl_value_get_bignum(val), 0) == 0;
 }
 
 GL_BUILTIN(div) {
@@ -448,36 +532,64 @@ GL_BUILTIN(div) {
     EXPECT_NUMBER(first);
 
     int is_float = (first->type == GL_VAL_FLOAT);
-    int64_t isum = is_float ? 0 : gl_value_get_int(first);
-    long double fsum = is_float ? gl_value_get_float(first) : 0;
+    int64_t isum = 0;
+    long double fsum = 0;
+    gl_bignum_t *bsum = NULL;
+    if (is_float) {
+        fsum = gl_value_get_float(first);
+    } else if (first->type == GL_VAL_BIGNUM) {
+        bsum = gl_bignum_copy(gl_value_get_bignum(first));
+    } else {
+        isum = gl_value_get_int(first);
+    }
 
     for (size_t i = 1; i < ARGC; ++i) {
         gl_value_t *current = NTH_VAL(i);
         EXPECT_NUMBER(current);
 
-        if (current->type == GL_VAL_INT && gl_value_get_int(current) == 0) {
+        if (current->type != GL_VAL_FLOAT && __gl_integer_is_zero(current)) {
             gl_diagnostic_report_error(
                 gl_make_error(GL_DIVISION_BY_ZERO, GL_ERROR, called_at, "Cannot divide by 0"));
+            gl_bignum_free(bsum);
             return NULL;
         }
 
-        if (!is_float) {
-            if (current->type == GL_VAL_FLOAT) {
-                is_float = 1;
-                fsum = (long double)isum / gl_value_get_float(current);
-            } else {
-                int64_t divisor = gl_value_get_int(current);
-                if (isum == INT64_MIN && divisor == -1) {
-                    return __gl_report_overflow(called_at);
-                }
-                isum /= divisor;
-            }
-        } else {
-            fsum /= gl_value_get_float(current);
+        if (!is_float && current->type == GL_VAL_FLOAT) {
+            is_float = 1;
+            fsum = bsum ? gl_bignum_to_float(bsum) : (long double)isum;
         }
+
+        if (is_float) {
+            fsum /= gl_value_get_float(current);
+            continue;
+        }
+
+        if (bsum == NULL && current->type == GL_VAL_INT) {
+            int64_t divisor = gl_value_get_int(current);
+            if (isum != INT64_MIN || divisor != -1) {
+                isum /= divisor;
+                continue;
+            }
+            bsum = gl_bignum_from_int(isum);
+        }
+
+        if (bsum == NULL) {
+            bsum = gl_bignum_from_int(isum);
+        }
+        gl_bignum_t *term = __gl_value_as_bignum(current);
+        gl_bignum_t *rem = NULL;
+        gl_bignum_t *quot = gl_bignum_div(bsum, term, &rem);
+        gl_bignum_free(bsum);
+        gl_bignum_free(term);
+        gl_bignum_free(rem);
+        bsum = quot;
     }
     if (is_float) {
+        gl_bignum_free(bsum);
         return gl_value_make_float(fsum);
+    }
+    if (bsum != NULL) {
+        return gl_value_make_bignum(bsum);
     }
     return gl_value_make_int(isum);
 }
@@ -488,25 +600,36 @@ GL_BUILTIN(mod) {
     gl_value_t *lhs = NTH_VAL(0);
     gl_value_t *rhs = NTH_VAL(1);
 
-    EXPECT_INT(lhs);
-    EXPECT_INT(rhs);
+    EXPECT_INTEGER(lhs);
+    EXPECT_INTEGER(rhs);
 
-    if (gl_value_get_int(rhs) == 0) {
+    if (__gl_integer_is_zero(rhs)) {
         gl_diagnostic_report_error(
             gl_make_error(GL_DIVISION_BY_ZERO, GL_ERROR, called_at, "Cannot take modulus by 0"));
         return NULL;
     }
 
-    int64_t lhs_num = gl_value_get_int(lhs);
-    int64_t rhs_num = gl_value_get_int(rhs);
+    if (lhs->type == GL_VAL_INT && rhs->type == GL_VAL_INT) {
+        int64_t lhs_num = gl_value_get_int(lhs);
+        int64_t rhs_num = gl_value_get_int(rhs);
 
-    // INT64_MIN % -1 is undefined in C because the intermediate quotient
-    // overflows, but the remainder itself is defined: it is zero.
-    if (lhs_num == INT64_MIN && rhs_num == -1) {
-        return gl_value_make_int(0);
+        // INT64_MIN % -1 is undefined in C because the intermediate quotient
+        // overflows, but the remainder itself is defined: it is zero.
+        if (lhs_num == INT64_MIN && rhs_num == -1) {
+            return gl_value_make_int(0);
+        }
+
+        return gl_value_make_int(lhs_num % rhs_num);
     }
 
-    return gl_value_make_int(lhs_num % rhs_num);
+    gl_bignum_t *lhs_big = __gl_value_as_bignum(lhs);
+    gl_bignum_t *rhs_big = __gl_value_as_bignum(rhs);
+    gl_bignum_t *rem = NULL;
+    gl_bignum_t *quot = gl_bignum_div(lhs_big, rhs_big, &rem);
+    gl_bignum_free(quot);
+    gl_bignum_free(lhs_big);
+    gl_bignum_free(rhs_big);
+    return gl_value_make_bignum(rem);
 }
 
 GL_BUILTIN(eq) {
@@ -622,6 +745,15 @@ GL_BUILTIN(int_con) {
     if (val->type == GL_VAL_INT) {
         return val;
     }
+    if (val->type == GL_VAL_BIGNUM) {
+        int64_t out = 0;
+        if (!gl_bignum_fits_int64(gl_value_get_bignum(val), &out)) {
+            gl_diagnostic_report_error(gl_make_error(GL_OVERFLOW_ERROR, GL_ERROR, called_at,
+                                                     "Cannot represent bignum as an integer"));
+            return NULL;
+        }
+        return gl_value_make_int(out);
+    }
 
     long double num = gl_value_get_float(val);
 
@@ -644,7 +776,7 @@ GL_BUILTIN(float_con) {
     if (val->type == GL_VAL_FLOAT) {
         return val;
     }
-    return gl_value_make_float((long double)gl_value_get_int(val));
+    return gl_value_make_float(gl_value_get_float(val));
 }
 
 GL_BUILTIN(list_con) {
@@ -1242,7 +1374,10 @@ GL_BUILTIN(string_to_number) {
     }
 
     long long num = strtoll(str, NULL, 10);
-    return errno == ERANGE ? gl_value_make_nil() : gl_value_make_int((int64_t)num);
+    if (errno == ERANGE) {
+        return gl_value_make_bignum(gl_bignum_from_string(str));
+    }
+    return gl_value_make_int((int64_t)num);
 }
 
 // The final argument is a collection whose elements are appended to the call.

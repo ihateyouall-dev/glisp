@@ -30,6 +30,20 @@ gl_value_t *gl_value_make_int(int64_t num) {
     return res;
 }
 
+gl_value_t *gl_value_make_bignum(gl_bignum_t *num) {
+    int64_t small = 0;
+    if (gl_bignum_fits_int64(num, &small)) {
+        gl_bignum_free(num);
+        return gl_value_make_int(small);
+    }
+
+    gl_value_t *res = malloc(sizeof(gl_value_t));
+    res->type = GL_VAL_BIGNUM;
+    res->val = num;
+    gl_register_value(res);
+    return res;
+}
+
 gl_value_t *gl_value_make_float(long double num) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_FLOAT;
@@ -56,6 +70,8 @@ static gl_value_t *__gl_ast_value(gl_ast_node_t *node) {
     switch (node->type) {
     case GL_AST_INT:
         return gl_value_make_int(node->value.integral);
+    case GL_AST_BIGNUM:
+        return gl_value_make_bignum(gl_bignum_from_string(node->value.bigint));
     case GL_AST_FLOAT:
         return gl_value_make_float(node->value.floating);
     case GL_AST_SYMBOL:
@@ -123,6 +139,8 @@ static gl_value_t *__gl_value_from_ast(gl_ast_node_t *node) {
     switch (node->type) {
     case GL_AST_INT:
         return gl_value_make_int(node->value.integral);
+    case GL_AST_BIGNUM:
+        return gl_value_make_bignum(gl_bignum_from_string(node->value.bigint));
     case GL_AST_FLOAT:
         return gl_value_make_float(node->value.floating);
     case GL_AST_SYMBOL:
@@ -331,6 +349,9 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         res->val = malloc(sizeof(int64_t));
         *(int64_t *)res->val = *(int64_t *)val->val;
         break;
+    case GL_VAL_BIGNUM:
+        res->val = gl_bignum_copy(val->val);
+        break;
     case GL_VAL_FLOAT:
         res->val = malloc(sizeof(long double));
         *(long double *)res->val = *(long double *)val->val;
@@ -456,6 +477,10 @@ void gl_value_destroy(gl_value_t **val) {
     }
 
     switch ((*val)->type) {
+    case GL_VAL_BIGNUM:
+        gl_bignum_free((*val)->val);
+        (*val)->val = NULL;
+        break;
     case GL_VAL_INT:
     case GL_VAL_FLOAT:
     case GL_VAL_TYPEID:
@@ -614,6 +639,8 @@ static const char *__gl_typeid_str(gl_value_type_t type) {
     switch (type) {
     case GL_VAL_INT:
         return "int";
+    case GL_VAL_BIGNUM:
+        return "bignum";
     case GL_VAL_FLOAT:
         return "float";
     case GL_VAL_TYPEID:
@@ -671,6 +698,12 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
     case GL_VAL_INT:
         fprintf(file, "%lld", (*(int64_t *)val->val));
         break;
+    case GL_VAL_BIGNUM: {
+        char *text = gl_bignum_to_string(val->val);
+        fputs(text, file);
+        free(text);
+        break;
+    }
     case GL_VAL_FLOAT:
         __gl_fprint_float(file, *(long double *)val->val);
         break;
@@ -803,9 +836,18 @@ int64_t gl_value_get_int(gl_value_t *val) {
     assert(val->type == GL_VAL_INT);
     return *(int64_t *)val->val;
 }
+
+gl_bignum_t *gl_value_get_bignum(gl_value_t *val) {
+    assert(val->type == GL_VAL_BIGNUM);
+    return val->val;
+}
+
 long double gl_value_get_float(gl_value_t *val) {
     if (val->type == GL_VAL_INT) {
         return (long double)gl_value_get_int(val);
+    }
+    if (val->type == GL_VAL_BIGNUM) {
+        return gl_bignum_to_float(val->val);
     }
     assert(val->type == GL_VAL_FLOAT);
     return *(long double *)val->val;
@@ -905,57 +947,38 @@ void gl_value_set_specform(gl_value_t *val, gl_special_form_t specform) {
 }
 
 static int __gl_value_is_number(gl_value_t *val) {
-    return val->type == GL_VAL_INT || val->type == GL_VAL_FLOAT;
+    return val->type == GL_VAL_INT || val->type == GL_VAL_BIGNUM || val->type == GL_VAL_FLOAT;
+}
+
+static int __gl_compare_ld(long double lhs, long double rhs) {
+    if (lhs == rhs) {
+        return 0;
+    }
+    return lhs > rhs ? 1 : -1;
 }
 
 static int __gl_value_compare_numbers(gl_value_t *lhs, gl_value_t *rhs) {
-    if (lhs->type == GL_VAL_INT) {
-        int lhs_val = gl_value_get_int(lhs);
-        if (rhs->type == GL_VAL_INT) { // Comparing INT to INT
-            int rhs_val = gl_value_get_int(rhs);
-
-            if (lhs_val == rhs_val) {
-                return 0;
-            } else if (lhs_val > rhs_val) {
-                return 1;
-            } else {
-                return -1;
-            }
-        } else { // Comparing INT to FLOAT
-            long double rhs_val = gl_value_get_float(rhs);
-
-            if ((long double)lhs_val == rhs_val) {
-                return 0;
-            } else if ((long double)lhs_val > rhs_val) {
-                return 1;
-            } else {
-                return -1;
-            }
+    if (lhs->type == GL_VAL_BIGNUM) {
+        if (rhs->type == GL_VAL_BIGNUM) {
+            return gl_bignum_compare(lhs->val, rhs->val);
         }
-    } else {
-        long double lhs_val = gl_value_get_float(lhs);
-        if (rhs->type == GL_VAL_INT) { // Comparing FLOAT to INT
-            int rhs_val = gl_value_get_int(rhs);
-
-            if (lhs_val == (long double)rhs_val) {
-                return 0;
-            } else if (lhs_val > (long double)rhs_val) {
-                return 1;
-            } else {
-                return -1;
-            }
-        } else { // Comparing FLOAT to FLOAT
-            long double rhs_val = gl_value_get_float(rhs);
-
-            if (lhs_val == rhs_val) {
-                return 0;
-            } else if (lhs_val > rhs_val) {
-                return 1;
-            } else {
-                return -1;
-            }
+        if (rhs->type == GL_VAL_INT) {
+            return gl_bignum_compare_int(lhs->val, gl_value_get_int(rhs));
         }
+        return __gl_compare_ld(gl_bignum_to_float(lhs->val), gl_value_get_float(rhs));
     }
+    if (rhs->type == GL_VAL_BIGNUM) {
+        if (lhs->type == GL_VAL_INT) {
+            return -gl_bignum_compare_int(rhs->val, gl_value_get_int(lhs));
+        }
+        return __gl_compare_ld(gl_value_get_float(lhs), gl_bignum_to_float(rhs->val));
+    }
+    if (lhs->type == GL_VAL_INT && rhs->type == GL_VAL_INT) {
+        int64_t lhs_val = gl_value_get_int(lhs);
+        int64_t rhs_val = gl_value_get_int(rhs);
+        return lhs_val == rhs_val ? 0 : (lhs_val > rhs_val ? 1 : -1);
+    }
+    return __gl_compare_ld(gl_value_get_float(lhs), gl_value_get_float(rhs));
 }
 
 // Structural equality: numbers by value (mixed int/float allowed), symbols and

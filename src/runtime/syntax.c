@@ -21,6 +21,8 @@ gl_value_t *gl_ast_to_value(gl_ast_node_t *node) {
     switch (node->type) {
     case GL_AST_INT:
         return gl_value_make_int(node->value.integral);
+    case GL_AST_BIGNUM:
+        return gl_value_make_bignum(gl_bignum_from_string(node->value.bigint));
     case GL_AST_FLOAT:
         return gl_value_make_float(node->value.floating);
     case GL_AST_SYMBOL:
@@ -84,6 +86,8 @@ static const char *__gl_value_type_name(gl_value_t *val) {
         return "nil";
     case GL_VAL_INT:
         return "int";
+    case GL_VAL_BIGNUM:
+        return "bignum";
     case GL_VAL_FLOAT:
         return "float";
     case GL_VAL_SYMBOL:
@@ -152,6 +156,12 @@ gl_ast_node_t *gl_value_to_ast(gl_value_t *val, gl_location_t location) {
         return gl_ast_make_nil(location);
     case GL_VAL_INT:
         return gl_ast_make_int(gl_value_get_int(val), location);
+    case GL_VAL_BIGNUM: {
+        char *digits = gl_bignum_to_string(gl_value_get_bignum(val));
+        gl_ast_node_t *res = gl_ast_make_bignum(digits, location);
+        free(digits);
+        return res;
+    }
     case GL_VAL_FLOAT:
         return gl_ast_make_float(gl_value_get_float(val), location);
     case GL_VAL_SYMBOL:

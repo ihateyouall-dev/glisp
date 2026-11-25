@@ -72,7 +72,7 @@
 (defun trunc (x)
   "Truncates X toward zero and returns a float."
   (assert (number? x) "X must be number")
-  (float (int x)))
+  (if (bignum? x) (float x) (float (int x))))
 
 (defun signum (x)
   "-1 if X < 0, 0 if X = 0, 1 if X > 0"
@@ -85,14 +85,17 @@
 (defun rem (a b)
   "Returns the remainder of A divided by B, truncated toward zero."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
-  (let ((r (- a (* b (trunc (/ (float a) (float b)))))))
-    (if (and (int? a) (int? b)) (int r) r)))
+  (if (and (int? a) (int? b))
+      (% a b)
+      (- a (* b (trunc (/ (float a) (float b)))))))
 
 (defun mod (a b)
   "Returns the floored modulo of A by B; the sign follows B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
-  (let ((r (- a (* b (floor (/ (float a) (float b)))))))
-    (if (and (int? a) (int? b)) (int r) r)))
+  (if (and (int? a) (int? b))
+      (let ((r (% a b)))
+        (if (or (= r 0) (= (signum r) (signum b))) r (+ r b)))
+      (- a (* b (floor (/ (float a) (float b)))))))
 
 (defun approx= (a b &optional (rel-tol 0.0000001) (abs-tol 0.000000001))
   "Returns t if A is approximately equal to B."
@@ -106,8 +109,8 @@
 (defun gcd (a b)
   "Returns the greatest common divisor of A and B."
   (assert (and (number? a) (number? b)) "A and B must be numbers")
-  (let ((x (abs (int a)))
-        (y (abs (int b))))
+  (let ((x (abs (if (bignum? a) a (int a))))
+        (y (abs (if (bignum? b) b (int b)))))
     (if (= y 0)
         x
         (gcd y (% x y)))))
@@ -117,7 +120,8 @@
   (assert (and (number? a) (number? b)) "A and B must be numbers")
   (if (or (= a 0) (= b 0))
       0
-      (abs (* (/ (int a) (gcd a b)) (int b)))))
+      (abs (* (/ (if (bignum? a) a (int a)) (gcd a b))
+              (if (bignum? b) b (int b))))))
 
 (defun hypot (x y)
   "Returns sqrt(X^2 + Y^2) without intermediate overflow."

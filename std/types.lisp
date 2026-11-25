@@ -8,8 +8,12 @@
   (assert (typeid? type) "TYPE must be typeid")
   (= (typeof x) type))
 
+(defun bignum? (x)
+  (instanceof? bignum-t x))
+
 (defun int? (x)
-  (instanceof? int-t x))
+  (or (instanceof? int-t x)
+      (bignum? x)))
 
 (defun float? (x)
   (instanceof? float-t x))
