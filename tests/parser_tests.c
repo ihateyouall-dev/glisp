@@ -255,6 +255,29 @@ void test_parse_nesting_limit(void) {
     gl_parser_destroy(&parser);
 }
 
+// Literals that do not fit their type become diagnostics instead of killing
+// the process.
+void test_parse_numeric_overflow(void) {
+    gl_ast_node_t *node = NULL;
+
+    gl_parser_t parser = gl_make_parser("9223372036854775808", "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Integer literal overflow is rejected");
+    gl_parser_destroy(&parser);
+
+    // long double reaches about 1e4932, so the literal needs more digits.
+    char src[6000];
+    memset(src, '9', sizeof(src) - 3);
+    src[sizeof(src) - 3] = '.';
+    src[sizeof(src) - 2] = '0';
+    src[sizeof(src) - 1] = '\0';
+
+    parser = gl_make_parser(src, "");
+    node = gl_parser_parse(&parser);
+    TEST(node == NULL, "Float literal overflow is rejected");
+    gl_parser_destroy(&parser);
+}
+
 void test_parse_quasiquote_sugar(void) {
     gl_parser_t parser = gl_make_parser("`(a ,b ,@c)", "");
     gl_ast_node_t *node = gl_parser_parse(&parser);
@@ -323,6 +346,7 @@ void parser_test(void) {
     test_parse_empty_vector();
     test_parse_nested_array_vector();
     test_parse_nesting_limit();
+    test_parse_numeric_overflow();
     test_parse_quasiquote_sugar();
     test_parse_dangling_quote();
 }

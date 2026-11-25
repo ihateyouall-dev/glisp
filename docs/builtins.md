@@ -224,10 +224,13 @@ terminating the interpreter.
 | `(+ ...)` | Sum; `(+)` is `0`. Promotes to float if any argument is a float. |
 | `(- x ...)` | Subtraction. With one argument, negation. |
 | `(* ...)` | Product; `(*)` is `1`. Promotes to float if any argument is a float. |
-| `(/ x ...)` | Left-associative division. Integer division truncates toward zero. Division by integer zero is an error. |
+| `(/ x ...)` | Left-associative division. Integer division truncates toward zero. Division by integer zero and integer overflow are errors. |
 | `(% a b)` | Integer remainder (C semantics; sign follows the dividend). |
-| `(int x)` | Converts a number to int, truncating toward zero. Returns ints unchanged. |
+| `(int x)` | Converts a number to int, truncating toward zero. Returns ints unchanged. Floats outside the integer range, and NaN, are errors. |
 | `(float x)` | Converts a number to float. Returns floats unchanged. |
+
+Integer arithmetic is checked: a result that does not fit in 64 bits reports
+an error instead of wrapping.
 
 ### Math
 

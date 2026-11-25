@@ -15,6 +15,7 @@ typedef enum {
     GL_ARITY_ERROR,
     GL_ASSERTION_FAIL,
     GL_DIVISION_BY_ZERO,
+    GL_OVERFLOW_ERROR,
     GL_RECURSION_ERROR
 } gl_error_type_t;
 

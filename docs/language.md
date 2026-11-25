@@ -38,7 +38,9 @@ evaluated in order; the value of a file is the value of its last expression.
 
 Numbers are decimal. Scientific notation (`1e9`), hexadecimal, and digit
 separators are not supported. A leading `-` is recognized only when followed by
-a digit.
+a digit. Integer literals must fit in a 64-bit signed integer; a literal or
+arithmetic result outside that range is reported as an error instead of
+wrapping or terminating the interpreter.
 
 String literals are copied verbatim up to the next double quote; escapes are
 processed afterwards, when the parser builds the string node. Supported

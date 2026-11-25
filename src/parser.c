@@ -10,7 +10,6 @@
 #include "lexer.h"
 
 #include <errno.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -53,9 +52,9 @@ static gl_ast_node_t *__gl_parser_parse_int(gl_parser_t *parser) {
     int64_t val = strtoll(token.value, &endptr, 10);
 
     if (errno == ERANGE) {
-        fprintf(stderr, "Parser Error at line %zu, column %zu: Numeric overflow\n",
-                token.location.line, token.location.column);
-        exit(1);
+        gl_diagnostic_report_error(
+            gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location, "Numeric overflow"));
+        return NULL;
     }
 
     __gl_parser_advance(parser);
@@ -83,9 +82,9 @@ static gl_ast_node_t *__gl_parser_parse_float(gl_parser_t *parser) {
     long double val = strtold(token.value, &endptr);
 
     if (errno == ERANGE) {
-        fprintf(stderr, "Parser Error at line %zu, column %zu: Numeric overflow\n",
-                token.location.line, token.location.column);
-        exit(1);
+        gl_diagnostic_report_error(
+            gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, token.location, "Numeric overflow"));
+        return NULL;
     }
 
     __gl_parser_advance(parser);
