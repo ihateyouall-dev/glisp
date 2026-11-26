@@ -358,18 +358,13 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         return gl_value_make_bool(1);
     }
 
+    // Numeric payloads live inside the value block, so the constructors do
+    // exactly what a copy needs.
     if (val->type == GL_VAL_INT) {
-        gl_value_t *res = __gl_value_alloc_inline(GL_VAL_INT, sizeof(int64_t), _Alignof(int64_t));
-        *(int64_t *)res->val = *(int64_t *)val->val;
-        gl_register_value(res);
-        return res;
+        return gl_value_make_int(*(int64_t *)val->val);
     }
     if (val->type == GL_VAL_FLOAT) {
-        gl_value_t *res =
-            __gl_value_alloc_inline(GL_VAL_FLOAT, sizeof(long double), _Alignof(long double));
-        *(long double *)res->val = *(long double *)val->val;
-        gl_register_value(res);
-        return res;
+        return gl_value_make_float(*(long double *)val->val);
     }
 
     gl_value_t *res = malloc(sizeof(gl_value_t));
