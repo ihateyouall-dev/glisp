@@ -1989,6 +1989,11 @@ void test_recursion(void) {
 }
 
 void test_malformed_forms(void) {
+    TEST(eval_str("(if)") == NULL, "if without a condition is an error");
+    TEST(eval_str("(while)") == NULL, "while without a condition is an error");
+    TEST(eval_str("(set)") == NULL, "set without operands is an error");
+    TEST(eval_str("(set no-such-target)") == NULL, "set without a value is an error");
+    TEST(eval_str("(set-global)") == NULL, "set-global without operands is an error");
     TEST(eval_str("(quote)") == NULL, "quote without an argument is an error");
     TEST(eval_str("(quote 1 2)") == NULL, "quote rejects extra arguments");
     TEST(eval_str("(function)") == NULL, "function without an argument is an error");
