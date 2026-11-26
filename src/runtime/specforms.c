@@ -58,6 +58,22 @@ static void __emit_syntax_error(gl_location_t loc, const char *msg) {
     gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
 }
 
+// Returns the single operand of a special form, or NULL after reporting an
+// error when the operand is missing, extra operands follow it, or the form was
+// applied to something that is not an argument list.
+static gl_ast_node_t *__gl_single_operand(gl_ast_node_t *args, const char *form) {
+    gl_ast_node_t *node = gl_ast_cons_nth_car(args, 0);
+    gl_ast_node_t *rest = gl_ast_cons_nth_cdr(args, 0);
+
+    if (node == NULL || rest == NULL || rest->type != GL_AST_NIL) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%s requires exactly one argument", form);
+        __emit_syntax_error(args != NULL ? args->location : (gl_location_t){0}, buf);
+        return NULL;
+    }
+    return node;
+}
+
 // Grows the temporary parameter buffer. Reallocating through a separate
 // variable keeps the original block reachable when the allocator fails.
 static gl_function_param_t **__gl_realloc_params(gl_function_param_t **params, size_t capacity) {
@@ -418,12 +434,8 @@ GL_SPECIAL_FORM(while) {
 }
 
 GL_SPECIAL_FORM(quote) {
-    gl_ast_node_t *node = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_car(args, 0) : NULL;
-    gl_ast_node_t *rest = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_cdr(args, 0) : NULL;
-
-    if (node == NULL || rest == NULL || rest->type != GL_AST_NIL) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "quote requires exactly one argument");
+    gl_ast_node_t *node = __gl_single_operand(args, "quote");
+    if (node == NULL) {
         return NULL;
     }
 
@@ -782,12 +794,8 @@ GL_SPECIAL_FORM(unquote_splicing) {
 }
 
 GL_SPECIAL_FORM(function) {
-    gl_ast_node_t *func = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_car(args, 0) : NULL;
-    gl_ast_node_t *rest = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_cdr(args, 0) : NULL;
-
-    if (func == NULL || rest == NULL || rest->type != GL_AST_NIL) {
-        __emit_syntax_error(args ? args->location : (gl_location_t){0},
-                            "function requires exactly one argument");
+    gl_ast_node_t *func = __gl_single_operand(args, "function");
+    if (func == NULL) {
         return NULL;
     }
 
