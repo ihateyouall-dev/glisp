@@ -415,7 +415,10 @@ GL_SPECIAL_FORM(progn) {
     if (args == NULL || args->type == GL_AST_NIL) {
         return gl_value_make_nil();
     }
-    assert(args->type == GL_AST_CONS);
+    if (args->type != GL_AST_CONS) {
+        __emit_syntax_error(args->location, "progn requires a list of forms");
+        return NULL;
+    }
 
     gl_ast_node_t *current = args;
     gl_value_t *res = gl_value_make_nil();
