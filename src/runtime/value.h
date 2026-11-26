@@ -86,6 +86,9 @@ gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr);
 
 gl_value_t *gl_value_make_string(char *str);
 
+/** Wraps a heap-allocated string, taking ownership of it instead of copying. */
+gl_value_t *gl_value_make_string_owned(char *str);
+
 gl_value_t *gl_value_make_nil(void);
 
 gl_value_t *gl_value_make_bool(int b);

@@ -8,6 +8,9 @@
 #include "ast.h"
 #include "env.h"
 #include "memory.h"
+#include "utils/alloc.h"
+
+#include <inttypes.h>
 
 #ifdef _WIN32
 #include "utils/strdup.h"
@@ -21,10 +24,22 @@
 gl_value_t *gl_nil = NULL;
 gl_value_t *gl_t = NULL;
 
+// Integer and float payloads live in the same allocation as the value header.
+// Numeric values are the most common allocation in the interpreter, so one
+// block instead of two halves the allocator traffic on arithmetic-heavy code.
+static gl_value_t *__gl_value_alloc_inline(gl_value_type_t type, size_t payload_size,
+                                           size_t alignment) {
+    size_t offset = (sizeof(gl_value_t) + alignment - 1) / alignment * alignment;
+    unsigned char *block = gl_xmalloc(offset + payload_size);
+    gl_value_t *res = (gl_value_t *)block;
+
+    res->type = type;
+    res->val = block + offset;
+    return res;
+}
+
 gl_value_t *gl_value_make_int(int64_t num) {
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_INT;
-    res->val = malloc(sizeof(int64_t));
+    gl_value_t *res = __gl_value_alloc_inline(GL_VAL_INT, sizeof(int64_t), _Alignof(int64_t));
     *(int64_t *)res->val = num;
     gl_register_value(res);
     return res;
@@ -45,9 +60,8 @@ gl_value_t *gl_value_make_bignum(gl_bignum_t *num) {
 }
 
 gl_value_t *gl_value_make_float(long double num) {
-    gl_value_t *res = malloc(sizeof(gl_value_t));
-    res->type = GL_VAL_FLOAT;
-    res->val = malloc(sizeof(long double));
+    gl_value_t *res =
+        __gl_value_alloc_inline(GL_VAL_FLOAT, sizeof(long double), _Alignof(long double));
     *(long double *)res->val = num;
     gl_register_value(res);
     return res;
@@ -183,10 +197,12 @@ gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr) {
     return res;
 }
 
-gl_value_t *gl_value_make_string(char *str) {
+gl_value_t *gl_value_make_string(char *str) { return gl_value_make_string_owned(gl_xstrdup(str)); }
+
+gl_value_t *gl_value_make_string_owned(char *str) {
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_STRING;
-    res->val = strdup(str);
+    res->val = str;
     gl_register_value(res);
     return res;
 }
@@ -339,22 +355,28 @@ gl_value_t *gl_value_copy(gl_value_t *val) {
         return gl_value_make_bool(1);
     }
 
+    if (val->type == GL_VAL_INT) {
+        gl_value_t *res = __gl_value_alloc_inline(GL_VAL_INT, sizeof(int64_t), _Alignof(int64_t));
+        *(int64_t *)res->val = *(int64_t *)val->val;
+        gl_register_value(res);
+        return res;
+    }
+    if (val->type == GL_VAL_FLOAT) {
+        gl_value_t *res =
+            __gl_value_alloc_inline(GL_VAL_FLOAT, sizeof(long double), _Alignof(long double));
+        *(long double *)res->val = *(long double *)val->val;
+        gl_register_value(res);
+        return res;
+    }
+
     gl_value_t *res = malloc(sizeof(gl_value_t));
     assert(val->type == GL_VAL_NIL || val->val);
     res->type = val->type;
     res->gc_marked = val->gc_marked;
 
     switch (val->type) {
-    case GL_VAL_INT:
-        res->val = malloc(sizeof(int64_t));
-        *(int64_t *)res->val = *(int64_t *)val->val;
-        break;
     case GL_VAL_BIGNUM:
         res->val = gl_bignum_copy(val->val);
-        break;
-    case GL_VAL_FLOAT:
-        res->val = malloc(sizeof(long double));
-        *(long double *)res->val = *(long double *)val->val;
         break;
     case GL_VAL_TYPEID:
         res->val = malloc(sizeof(gl_value_type_t));
@@ -483,6 +505,8 @@ void gl_value_destroy(gl_value_t **val) {
         break;
     case GL_VAL_INT:
     case GL_VAL_FLOAT:
+        // The payload is stored in the value block and is released with it.
+        break;
     case GL_VAL_TYPEID:
     case GL_VAL_STRING:
     case GL_VAL_SYMBOL:
