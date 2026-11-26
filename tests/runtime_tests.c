@@ -1988,6 +1988,43 @@ void test_recursion(void) {
          "deep loop with set");
 }
 
+void test_malformed_forms(void) {
+    TEST(eval_str("(quote)") == NULL, "quote without an argument is an error");
+    TEST(eval_str("(quote 1 2)") == NULL, "quote rejects extra arguments");
+    TEST(eval_str("(function)") == NULL, "function without an argument is an error");
+    TEST(eval_str("(function missing-name)") == NULL, "function rejects an unknown name");
+    TEST(eval_str("(function + 1)") == NULL, "function rejects extra arguments");
+    TEST(eval_str("(function (1 2))") == NULL, "function rejects a failing expression");
+    TEST(eval_str("(defun broken-fn)") == NULL, "defun without parameters is an error");
+    TEST(eval_str("(defmacro broken-macro)") == NULL, "defmacro without parameters is an error");
+    TEST(eval_str("(lambda)") == NULL, "lambda without parameters is an error");
+}
+
+void test_file_name_owned(void) {
+    char path[512];
+    int created = gl_test_make_temp(path, sizeof(path));
+    TEST(created == 0, "create temporary file for the name ownership test");
+    if (created != 0) {
+        return;
+    }
+
+    char src[1024];
+    snprintf(src, sizeof(src), "(set owned-file (open \"%s\" \"r\"))", path);
+    TEST(eval_str(src) != NULL, "open file for the name ownership test");
+
+    // The path string is garbage after the call; the file value must still
+    // hold a readable copy of it once the collector has run.
+    gl_gc_collect();
+    gl_value_t *file = eval_str("owned-file");
+    TEST(file != NULL && file->type == GL_VAL_FILE, "file value stays bound");
+    if (file != NULL && file->type == GL_VAL_FILE) {
+        TEST(strcmp(gl_value_get_file(file)->name, path) == 0, "file name survives a collection");
+    }
+
+    eval_str("(close owned-file)");
+    remove(path);
+}
+
 int main(void) {
 #ifdef GLISP_SOURCE_DIR
     gl_test_chdir(GLISP_SOURCE_DIR);
@@ -2057,6 +2094,8 @@ int main(void) {
     test_list_hofs_large();
     test_gensym();
     test_recursion();
+    test_malformed_forms();
+    test_file_name_owned();
 
     gl_destroy_memory_heap();
     return test_status;
