@@ -122,7 +122,11 @@ typedef struct gl_value_t {
 - Constructors: `gl_value_make_int`, `_float`, `_symbol`, `_cons`,
   `_cons_raw`, `_string`, `_nil`, `_bool`, `_typeid`, `_file`, `_builtin`,
   `_specform`, `_function`, `_macro`, `_env`, `_array`, `_array_from`,
-  `_vector`, `_vector_from`.
+  `_vector`, `_vector_from`. Integer and float values store their payload in
+  the same block as the value, so they cost one allocation.
+- `gl_value_make_string` copies its argument. `gl_value_make_string_owned`
+  takes ownership of a `malloc`-allocated buffer and avoids the copy. A file
+  value keeps its own copy of the name, so the caller may release it.
 - `GL_VAL_MACRO` shares the `gl_function_t` payload with `GL_VAL_FUNCTION`;
   use `gl_value_get_macro` to access it. Macros are not callable through
   `gl_call_function`/`apply`.
@@ -155,14 +159,21 @@ boundary used by `read`, `eval`, and future macro expansion).
 ### `env.h`
 
 `gl_env_t` is a lexical frame with three hash tables (`variables`, `functions`,
-`constants`) and a `parent` pointer.
+`constants`), an array of call parameter slots (`params`), and a `parent`
+pointer. A frame and its variable table are one allocation, so creating a frame
+costs a single allocation.
 
-- `gl_make_env(parent)` allocates a frame.
+- `gl_make_env(parent)` allocates a frame. The table and parameter storage grow
+  on first use.
 - `gl_make_global_env()` builds the initial global frame with builtins,
   special forms, and constants.
 - `gl_init_global_env()` wraps the global frame in a `GL_VAL_ENV` and stores it
   in `gl_global_env`.
 - `gl_env_set_var` / `gl_env_set_fun` / `gl_env_set_const` insert bindings.
+- `gl_env_bind_param` binds a call parameter. The name is borrowed and must
+  outlive the frame. Parameters are looked up before the variable table and are
+  traced by the collector.
+- `gl_env_has_local_var` reports whether a name is bound in this frame alone.
 - `gl_env_get_var` / `gl_env_get_fun` search the frame chain.
 - `gl_env_get_callable` resolves a callable using the nearest lexical binding.
 - `gl_env_is_const` reports whether a name is protected.
