@@ -5,10 +5,10 @@
  * @brief Generic fixed-size array macros.
  */
 
+#include "alloc.h"
+
 #include <assert.h>
 #include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
 
 /**
  * Declares a fixed-size typed array named @p Name with elements of type @p T.
@@ -30,7 +30,7 @@
 
 #define ARRAY_DEFINE(T, Name)                                                                      \
     void Name##_init(Name##_t *arr, size_t size, void (*destroy_fn)(T *)) {                        \
-        arr->data = size > 0 ? malloc(sizeof(T) * size) : NULL;                                    \
+        arr->data = size > 0 ? gl_xmalloc(sizeof(T) * size) : NULL;                                \
         arr->size = size;                                                                          \
         arr->destroy_fn = destroy_fn;                                                              \
     }                                                                                              \
@@ -39,7 +39,7 @@
         return &arr->data[idx];                                                                    \
     }                                                                                              \
     Name##_t *Name##_copy(Name##_t *arr) {                                                         \
-        Name##_t *res = malloc(sizeof(Name##_t));                                                  \
+        Name##_t *res = gl_xmalloc(sizeof(Name##_t));                                              \
         Name##_init(res, arr->size, arr->destroy_fn);                                              \
         if (arr->size > 0 && arr->data) {                                                          \
             memcpy(res->data, arr->data, sizeof(T) * res->size);                                   \
