@@ -215,8 +215,11 @@ error:
 }
 
 GL_SPECIAL_FORM(defun) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "defun requires a name and a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -227,6 +230,10 @@ GL_SPECIAL_FORM(defun) {
     const char *name = name_node->value.symbol;
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
+    if (params == NULL) {
+        __emit_syntax_error(args->location, "defun requires a parameter list");
+        return NULL;
+    }
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
     if (params->type != GL_AST_NIL && !func_params) {
         return NULL;
@@ -241,8 +248,11 @@ GL_SPECIAL_FORM(defun) {
 }
 
 GL_SPECIAL_FORM(defmacro) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "defmacro requires a name and a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -253,6 +263,10 @@ GL_SPECIAL_FORM(defmacro) {
     const char *name = name_node->value.symbol;
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
+    if (params == NULL) {
+        __emit_syntax_error(args->location, "defmacro requires a parameter list");
+        return NULL;
+    }
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
     if (params->type != GL_AST_NIL && !func_params) {
         return NULL;
@@ -266,8 +280,11 @@ GL_SPECIAL_FORM(defmacro) {
 }
 
 GL_SPECIAL_FORM(lambda) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "lambda requires a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 0);
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
@@ -401,11 +418,14 @@ GL_SPECIAL_FORM(while) {
 }
 
 GL_SPECIAL_FORM(quote) {
-    assert(args);
+    gl_ast_node_t *node = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_car(args, 0) : NULL;
+    gl_ast_node_t *rest = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_cdr(args, 0) : NULL;
 
-    assert(args->value.cons.cdr->type == GL_AST_NIL);
-
-    gl_ast_node_t *node = gl_ast_cons_nth_car(args, 0);
+    if (node == NULL || rest == NULL || rest->type != GL_AST_NIL) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "quote requires exactly one argument");
+        return NULL;
+    }
 
     if (node->type == GL_AST_SYMBOL) {
         return gl_value_make_symbol(node->value.symbol);
@@ -762,21 +782,36 @@ GL_SPECIAL_FORM(unquote_splicing) {
 }
 
 GL_SPECIAL_FORM(function) {
-    assert(args);
+    gl_ast_node_t *func = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_car(args, 0) : NULL;
+    gl_ast_node_t *rest = args && args->type == GL_AST_CONS ? gl_ast_cons_nth_cdr(args, 0) : NULL;
 
-    assert(args->value.cons.cdr->type == GL_AST_NIL);
-
-    gl_ast_node_t *func = gl_ast_cons_nth_car(args, 0);
+    if (func == NULL || rest == NULL || rest->type != GL_AST_NIL) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "function requires exactly one argument");
+        return NULL;
+    }
 
     if (func->type == GL_AST_SYMBOL) {
         const char *func_name = func->value.symbol;
+        gl_value_t *res = gl_env_get_callable(env, func_name);
 
-        return gl_env_get_callable(env, func_name);
+        if (res == NULL) {
+            char buf[512];
+            snprintf(buf, sizeof(buf), "undefined function '%s'", func_name);
+            __emit_syntax_error(func->location, buf);
+        }
+        return res;
     }
 
+    // The expression may fail to evaluate; a NULL result already reported the
+    // error and must not be dereferenced.
     gl_value_t *res = gl_eval(func);
+    if (res == NULL) {
+        return NULL;
+    }
 
     if (res->type != GL_VAL_FUNCTION && res->type != GL_VAL_BUILTIN && res->type != GL_VAL_SPFORM) {
+        __emit_syntax_error(func->location, "Expression does not name a function");
         return NULL;
     }
     return res;

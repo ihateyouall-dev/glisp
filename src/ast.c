@@ -29,30 +29,31 @@ VECTOR_DEFINE(struct gl_ast_node_t *, gl_ast_vector)
 
 // Returns the car of the n-th cons cell; NULL when the list is too short.
 gl_ast_node_t *gl_ast_cons_nth_car(gl_ast_node_t *cons, size_t n) {
-    if (cons->type != GL_AST_CONS) {
-        return NULL;
-    }
-    for (size_t i = 0; i < n; ++i) {
-        if (cons->value.cons.cdr->type == GL_AST_NIL) {
+    for (size_t i = 0; i <= n; ++i) {
+        if (cons == NULL || cons->type != GL_AST_CONS) {
             return NULL;
+        }
+        if (i == n) {
+            return cons->value.cons.car;
         }
         cons = cons->value.cons.cdr;
     }
-    return cons->value.cons.car;
+    return NULL;
 }
 
 // Returns the cdr after skipping n cells; NULL when the list is too short.
 gl_ast_node_t *gl_ast_cons_nth_cdr(gl_ast_node_t *cons, size_t n) {
-    if (cons->type != GL_AST_CONS) {
+    if (cons == NULL || cons->type != GL_AST_CONS) {
         return NULL;
     }
-    for (size_t i = 0; i < n; ++i) {
-        if (cons->type == GL_AST_NIL) {
-            return NULL;
+    for (size_t i = 0; i <= n; ++i) {
+        if (cons->type != GL_AST_CONS) {
+            // A NIL tail is the empty list, so it is returned as is.
+            return cons->type == GL_AST_NIL ? cons : NULL;
         }
         cons = cons->value.cons.cdr;
     }
-    return cons->value.cons.cdr;
+    return cons;
 }
 
 size_t gl_ast_cons_length(gl_ast_node_t *cons) {

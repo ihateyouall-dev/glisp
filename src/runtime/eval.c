@@ -166,7 +166,9 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     gl_function_args_init(res, argc, gl_function_arg_free);
     // Arguments past a failing one are never filled, so the partial array is
     // zeroed to let the cleanup path free it safely.
-    memset(res->data, 0, sizeof(gl_function_arg_t *) * argc);
+    if (argc > 0) {
+        memset(res->data, 0, sizeof(gl_function_arg_t *) * argc);
+    }
 
     current = args;
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {

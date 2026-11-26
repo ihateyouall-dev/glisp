@@ -28,6 +28,10 @@ void gl_init_call_stack() {
 
 // A call frame gets a fresh child environment of the function's closure.
 void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_node) {
+    // A host embedder may evaluate code before the stack is initialised; frames
+    // pushed onto an uninitialised stack are never popped.
+    gl_init_call_stack();
+
     gl_value_t *local_env = gl_value_make_env(gl_make_env(function->closure));
     __gl_call_stack_push_back(&gl_call_stack, (gl_call_frame_t){.call_node = function_node,
                                                                 .func_name = function->name,
