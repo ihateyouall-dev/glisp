@@ -249,7 +249,10 @@ gl_value_t *gl_value_make_file(FILE *handle, char *name, int is_open, gl_file_mo
     gl_value_t *res = malloc(sizeof(gl_value_t));
     res->type = GL_VAL_FILE;
     res->val = malloc(sizeof(gl_file_t));
-    gl_file_t port = (gl_file_t){handle, name, is_open, mode, 1};
+    // The name usually comes from a string value, which the collector may free
+    // while the file stays open, so the payload keeps its own copy.
+    gl_file_t port =
+        (gl_file_t){handle, gl_xstrdup(name != NULL ? name : "<unnamed>"), is_open, mode, 1};
     *(gl_file_t *)res->val = port;
     gl_register_value(res);
     return res;
@@ -573,6 +576,8 @@ void gl_value_destroy(gl_value_t **val) {
                     fclose(file->handle);
                     file->is_open = 0;
                 }
+                free(file->name);
+                file->name = NULL;
                 free(file);
             }
             (*val)->val = NULL;
