@@ -5,9 +5,10 @@
  * @brief Generic growable vector macros.
  */
 
+#include "alloc.h"
+
 #include <assert.h>
 #include <stddef.h>
-#include <stdlib.h>
 
 /**
  * Declares a growable typed vector named @p Name with elements of type @p T.
@@ -36,23 +37,18 @@
 
 #define VECTOR_DEFINE(T, Name)                                                                     \
     void Name##_init(Name##_t *vec, void (*destroy_fn)(T *)) {                                     \
-        vec->capacity = 8;                                                                         \
-        vec->data = malloc(vec->capacity * sizeof(T));                                             \
+        vec->capacity = 0;                                                                         \
+        vec->data = NULL;                                                                          \
         vec->size = 0;                                                                             \
         vec->destroy_fn = destroy_fn;                                                              \
     }                                                                                              \
-    static int __##Name##_realloc(Name##_t *vec, size_t capacity) {                                \
-        T *tmp = realloc(vec->data, capacity * sizeof(T));                                         \
-        if (tmp) {                                                                                 \
-            vec->data = tmp;                                                                       \
-            vec->capacity = capacity;                                                              \
-            return 1;                                                                              \
-        }                                                                                          \
-        return 0;                                                                                  \
+    static void __##Name##_grow(Name##_t *vec, size_t capacity) {                                  \
+        vec->data = gl_xrealloc(vec->data, capacity * sizeof(T));                                  \
+        vec->capacity = capacity;                                                                  \
     }                                                                                              \
     void Name##_push_back(Name##_t *vec, T val) {                                                  \
         if (vec->size == vec->capacity) {                                                          \
-            __##Name##_realloc(vec, vec->capacity ? vec->capacity * 2 : 8);                        \
+            __##Name##_grow(vec, vec->capacity ? vec->capacity * 2 : 8);                           \
         }                                                                                          \
         vec->data[vec->size++] = val;                                                              \
     }                                                                                              \
@@ -77,14 +73,14 @@
     }                                                                                              \
     void Name##_reserve(Name##_t *vec, size_t capacity) {                                          \
         if (capacity > vec->capacity) {                                                            \
-            __##Name##_realloc(vec, capacity);                                                     \
+            __##Name##_grow(vec, capacity);                                                        \
         }                                                                                          \
     }                                                                                              \
     void Name##_resize(Name##_t *vec, size_t size) {                                               \
-        vec->size = size;                                                                          \
         if (size > vec->capacity) {                                                                \
-            __##Name##_realloc(vec, size);                                                         \
+            __##Name##_grow(vec, size);                                                            \
         }                                                                                          \
+        vec->size = size;                                                                          \
     }                                                                                              \
     void Name##_clear(Name##_t *vec) {                                                             \
         for (size_t i = 0; i < vec->size; ++i) {                                                   \
@@ -97,6 +93,7 @@
     Name##_t Name##_copy(Name##_t *vec, T (*copy_fn)(T)) {                                         \
         Name##_t res;                                                                              \
         Name##_init(&res, vec->destroy_fn);                                                        \
+        Name##_reserve(&res, vec->size);                                                           \
         Name##_reserve(&res, vec->capacity);                                                       \
         res.size = vec->size;                                                                      \
         for (size_t i = 0; i < vec->size; ++i) {                                                   \

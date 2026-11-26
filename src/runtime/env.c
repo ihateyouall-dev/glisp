@@ -8,6 +8,7 @@
 #include "runtime/builtins.h"
 #include "runtime/specforms.h"
 #include "runtime/value.h"
+#include "utils/alloc.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -22,23 +23,36 @@ gl_value_t *gl_global_env = NULL;
 // the constants table are created on first use: a function frame binds
 // parameters far more often than it defines functions, and an empty table per
 // frame is not free.
-gl_env_t *gl_make_env(gl_value_t *parent) {
-    gl_env_t *res = malloc(sizeof(gl_env_t));
-    res->parent = parent;
+//
+// The variable table lives in the same allocation as the frame. A call creates
+// a frame on every invocation, so one malloc instead of two matters here.
+typedef struct {
+    gl_env_t env;
+    gl_value_table_t variables;
+} gl_env_frame_t;
 
-    gl_value_table_t *values = malloc(sizeof(gl_value_table_t));
-    gl_value_table_init(values, NULL, gl_value_copy);
-    res->variables = values;
+gl_env_t *gl_make_env(gl_value_t *parent) {
+    gl_env_frame_t *frame = gl_xmalloc(sizeof(gl_env_frame_t));
+    gl_env_t *res = &frame->env;
+
+    res->parent = parent;
+    gl_value_table_init(&frame->variables, NULL, gl_value_copy);
+    res->variables = &frame->variables;
 
     res->functions = NULL;
     res->constants = NULL;
+
+    res->params = NULL;
+    res->param_count = 0;
+    res->param_capacity = 0;
+    res->param_owner = NULL;
 
     return res;
 }
 
 static gl_value_table_t *__gl_env_functions(gl_env_t *env) {
     if (env->functions == NULL) {
-        env->functions = malloc(sizeof(gl_value_table_t));
+        env->functions = gl_xmalloc(sizeof(gl_value_table_t));
         gl_value_table_init(env->functions, NULL, gl_value_copy);
     }
     return env->functions;
@@ -218,8 +232,8 @@ void gl_init_global_env(void) { gl_global_env = gl_value_make_env(gl_make_global
 void gl_env_destroy(gl_env_t *env) {
     if (!env)
         return;
+    // The variable table is embedded in the frame allocation.
     gl_value_table_destroy(env->variables);
-    free(env->variables);
     if (env->functions) {
         gl_value_table_destroy(env->functions);
         free(env->functions);
@@ -230,12 +244,66 @@ void gl_env_destroy(gl_env_t *env) {
         free(env->constants);
         env->constants = NULL;
     }
+    free(env->params);
+    env->params = NULL;
+    env->param_capacity = 0;
+    env->param_count = 0;
+    env->param_owner = NULL;
     free(env);
     env = NULL;
 }
 
+// Returns the slot that holds @p sym, or NULL when the frame does not bind it.
+// Callers write through the returned pointer, which also tells the static
+// analyser that the slot is inside a live array.
+static gl_value_t **__gl_env_param_slot(gl_env_t *env, const char *sym) {
+    if (env == NULL || env->params == NULL) {
+        return NULL;
+    }
+    for (size_t i = 0; i < env->param_count; ++i) {
+        if (strcmp(env->params[i].name, sym) == 0) {
+            return &env->params[i].value;
+        }
+    }
+    return NULL;
+}
+
+void gl_env_set_param_owner(gl_env_t *env, gl_value_t *owner) { env->param_owner = owner; }
+
+void gl_env_bind_param(gl_env_t *env, const char *sym, gl_value_t *val) {
+    gl_value_t **slot = __gl_env_param_slot(env, sym);
+    if (slot != NULL) {
+        *slot = val;
+        return;
+    }
+
+    if (env->param_count == env->param_capacity) {
+        size_t capacity = env->param_capacity == 0 ? 4 : env->param_capacity * 2;
+        env->params = gl_xrealloc(env->params, capacity * sizeof(gl_env_param_t));
+        env->param_capacity = capacity;
+    }
+    env->params[env->param_count].name = sym;
+    env->params[env->param_count].value = val;
+    ++env->param_count;
+}
+
 void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val) {
+    gl_value_t **slot = __gl_env_param_slot(env, sym);
+    if (slot != NULL) {
+        *slot = val;
+        return;
+    }
     gl_value_table_insert(env->variables, sym, val);
+}
+
+int gl_env_has_local_var(gl_env_t *env, const char *sym) {
+    if (env == NULL) {
+        return 0;
+    }
+    if (__gl_env_param_slot(env, sym) != NULL) {
+        return 1;
+    }
+    return gl_value_table_get(env->variables, sym) != NULL;
 }
 
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
@@ -248,7 +316,7 @@ void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val) {
 void gl_env_set_const(gl_env_t *env, const char *sym, gl_value_t *val) {
     gl_env_set_var(env, sym, val);
     if (env->constants == NULL) {
-        gl_value_table_t *constants = malloc(sizeof(gl_value_table_t));
+        gl_value_table_t *constants = gl_xmalloc(sizeof(gl_value_table_t));
         gl_value_table_init(constants, NULL, gl_value_copy);
         env->constants = constants;
     }
@@ -270,19 +338,20 @@ int gl_env_is_const(gl_env_t *env, const char *sym) {
 
 // Lookups walk the parent chain; a NULL result means the name is unbound.
 gl_value_t *gl_env_get_var(gl_env_t *env, const char *sym) {
-    gl_value_t **obj = gl_value_table_get(env->variables, sym);
+    while (env != NULL) {
+        gl_value_t **slot = __gl_env_param_slot(env, sym);
+        if (slot != NULL && *slot != NULL) {
+            return *slot;
+        }
 
-    gl_value_t *res = (obj != NULL ? *obj : NULL);
+        gl_value_t **obj = gl_value_table_get(env->variables, sym);
+        if (obj != NULL && *obj != NULL) {
+            return *obj;
+        }
 
-    // Checking for variable in parent environment if not found in current
-    if (res == NULL && env->parent != NULL) {
-        return gl_env_get_var((gl_env_t *)env->parent->val, sym);
+        env = env->parent != NULL ? (gl_env_t *)env->parent->val : NULL;
     }
-    // If have not found in parent environments, return NULL
-    if (res == NULL) {
-        return NULL;
-    }
-    return res;
+    return NULL;
 }
 
 gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym) {
@@ -290,6 +359,11 @@ gl_value_t *gl_env_get_callable(gl_env_t *env, const char *sym) {
         gl_value_t **fun = env->functions ? gl_value_table_get(env->functions, sym) : NULL;
         if (fun != NULL && *fun != NULL) {
             return *fun;
+        }
+
+        gl_value_t **slot = __gl_env_param_slot(env, sym);
+        if (slot != NULL && *slot != NULL) {
+            return *slot;
         }
 
         gl_value_t **var = gl_value_table_get(env->variables, sym);
@@ -408,6 +482,9 @@ char *gl_env_suggest_name(gl_env_t *env, const char *sym) {
     while (env != NULL) {
         __gl_scan_table(env->functions, sym, &best_distance, &best);
         __gl_scan_table(env->variables, sym, &best_distance, &best);
+        for (size_t i = 0; i < env->param_count; ++i) {
+            __gl_consider_name(env->params[i].name, sym, &best_distance, &best);
+        }
 
         env = env->parent ? (gl_env_t *)env->parent->val : NULL;
     }

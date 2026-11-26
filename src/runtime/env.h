@@ -16,12 +16,29 @@
 
 HASHMAP_DECLARE(gl_value_t *, gl_value_table)
 
+/**
+ * One parameter bound in a call frame.
+ *
+ * The name is borrowed from the function's parameter list, which lives as long
+ * as the function value that owns the frame. Parameters are kept in a small
+ * dense array instead of the frame's variable table: a call binds a handful of
+ * names, and a linear scan beats hashing plus a key copy at that size.
+ */
+typedef struct {
+    const char *name;
+    gl_value_t *value;
+} gl_env_param_t;
+
 /** A lexical environment frame. */
 typedef struct gl_env_t {
     gl_value_table_t *variables; /**< Variable bindings. */
     gl_value_table_t *functions; /**< Function bindings (separate namespace). */
     gl_value_table_t *constants; /**< Protected names; NULL until first defconst. */
     gl_value_t *parent;          /**< Enclosing GL_VAL_ENV, or NULL for the global frame. */
+    gl_env_param_t *params;      /**< Call parameters; NULL until first binding. */
+    size_t param_count;          /**< Number of bound parameters. */
+    size_t param_capacity;       /**< Allocated parameter slots. */
+    gl_value_t *param_owner;     /**< Function value that owns the parameter names. */
 } gl_env_t;
 
 /** The global environment value. */
@@ -41,6 +58,22 @@ void gl_env_destroy(gl_env_t *env);
 
 /** Inserts or replaces a variable binding in @p env. */
 void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val);
+
+/**
+ * Binds a function parameter in @p env. The name is borrowed, not copied; the
+ * frame keeps @p env's parameter owner alive, which owns the names.
+ */
+void gl_env_bind_param(gl_env_t *env, const char *sym, gl_value_t *val);
+
+/**
+ * Records the function value whose parameter names @p env borrows. The frame
+ * keeps that value alive, so the names stay valid even when the frame outlives
+ * every other reference to the function.
+ */
+void gl_env_set_param_owner(gl_env_t *env, gl_value_t *owner);
+
+/** Returns non-zero when @p sym is bound in @p env itself, ignoring parents. */
+int gl_env_has_local_var(gl_env_t *env, const char *sym);
 
 /** Inserts or replaces a function binding; asserts the value is callable. */
 void gl_env_set_fun(gl_env_t *env, const char *sym, gl_value_t *val);

@@ -86,6 +86,9 @@ gl_value_t *gl_value_make_cons_raw(gl_value_t *car, gl_value_t *cdr);
 
 gl_value_t *gl_value_make_string(char *str);
 
+/** Wraps a heap-allocated string, taking ownership of it instead of copying. */
+gl_value_t *gl_value_make_string_owned(char *str);
+
 gl_value_t *gl_value_make_nil(void);
 
 gl_value_t *gl_value_make_bool(int b);
@@ -99,7 +102,7 @@ typedef enum { GL_FILE_READ = 1, GL_FILE_WRITE = 2, GL_FILE_APPEND = 4 } gl_file
 /** Shared file payload. Copies of a file value share this structure. */
 typedef struct {
     FILE *handle;        /**< stdio handle, or NULL when closed. */
-    char *name;          /**< File name used in diagnostics and printing. */
+    char *name;          /**< Owned copy of the file name used in diagnostics. */
     int is_open;         /**< Non-zero while the handle is open. */
     gl_file_mode_t mode; /**< Mode bitmask the file was opened with. */
     int ref_count;       /**< Number of value copies referencing this payload. */

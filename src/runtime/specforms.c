@@ -22,10 +22,17 @@
 #include "utils/strdup.h"
 #endif
 
+static void __emit_syntax_error(gl_location_t loc, const char *msg) {
+    gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
+}
+
 // Only the selected branch is evaluated; without an alternate the result is nil.
 GL_SPECIAL_FORM(if) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0}, "if requires a condition");
+        return NULL;
+    }
+
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
     gl_value_t *condition_val = gl_eval(condition);
     if (condition_val == NULL) {
@@ -54,8 +61,20 @@ GL_SPECIAL_FORM(if) {
     }
 }
 
-static void __emit_syntax_error(gl_location_t loc, const char *msg) {
-    gl_diagnostic_report_error(gl_make_error(GL_SYNTAX_ERROR, GL_ERROR, loc, (char *)msg));
+// Returns the single operand of a special form, or NULL after reporting an
+// error when the operand is missing, extra operands follow it, or the form was
+// applied to something that is not an argument list.
+static gl_ast_node_t *__gl_single_operand(gl_ast_node_t *args, const char *form) {
+    gl_ast_node_t *node = gl_ast_cons_nth_car(args, 0);
+    gl_ast_node_t *rest = gl_ast_cons_nth_cdr(args, 0);
+
+    if (node == NULL || rest == NULL || rest->type != GL_AST_NIL) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%s requires exactly one argument", form);
+        __emit_syntax_error(args != NULL ? args->location : (gl_location_t){0}, buf);
+        return NULL;
+    }
+    return node;
 }
 
 // Grows the temporary parameter buffer. Reallocating through a separate
@@ -215,8 +234,11 @@ error:
 }
 
 GL_SPECIAL_FORM(defun) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "defun requires a name and a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -227,6 +249,10 @@ GL_SPECIAL_FORM(defun) {
     const char *name = name_node->value.symbol;
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
+    if (params == NULL) {
+        __emit_syntax_error(args->location, "defun requires a parameter list");
+        return NULL;
+    }
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
     if (params->type != GL_AST_NIL && !func_params) {
         return NULL;
@@ -241,8 +267,11 @@ GL_SPECIAL_FORM(defun) {
 }
 
 GL_SPECIAL_FORM(defmacro) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "defmacro requires a name and a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -253,6 +282,10 @@ GL_SPECIAL_FORM(defmacro) {
     const char *name = name_node->value.symbol;
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 1);
+    if (params == NULL) {
+        __emit_syntax_error(args->location, "defmacro requires a parameter list");
+        return NULL;
+    }
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
     if (params->type != GL_AST_NIL && !func_params) {
         return NULL;
@@ -266,8 +299,11 @@ GL_SPECIAL_FORM(defmacro) {
 }
 
 GL_SPECIAL_FORM(lambda) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "lambda requires a parameter list");
+        return NULL;
+    }
 
     gl_ast_node_t *params = gl_ast_cons_nth_car(args, 0);
     gl_function_params_t *func_params = __gl_parse_function_params(args->location, params);
@@ -283,8 +319,11 @@ GL_SPECIAL_FORM(lambda) {
 }
 
 GL_SPECIAL_FORM(set) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "set requires a variable name and a value");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -301,12 +340,20 @@ GL_SPECIAL_FORM(set) {
         return NULL;
     }
 
-    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
+    gl_ast_node_t *value_form = gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0);
+    if (value_form == NULL) {
+        __emit_syntax_error(args->location, "set requires a variable name and a value");
+        return NULL;
+    }
+    gl_value_t *var_value = gl_eval(value_form);
+    if (var_value == NULL) {
+        return NULL;
+    }
 
     // Find the nearest environment where var_name is bound
     gl_env_t *target_env = env;
     while (target_env != NULL) {
-        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+        if (gl_env_has_local_var(target_env, var_name)) {
             break;
         }
         target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;
@@ -321,8 +368,11 @@ GL_SPECIAL_FORM(set) {
 }
 
 GL_SPECIAL_FORM(set_global) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "set-global requires a variable name and a value");
+        return NULL;
+    }
 
     gl_ast_node_t *name_node = gl_ast_cons_nth_car(args, 0);
     if (!name_node || name_node->type != GL_AST_SYMBOL) {
@@ -339,7 +389,15 @@ GL_SPECIAL_FORM(set_global) {
         return NULL;
     }
 
-    gl_value_t *var_value = gl_eval(gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0));
+    gl_ast_node_t *value_form = gl_ast_cons_nth_car(gl_ast_cons_nth_cdr(args, 0), 0);
+    if (value_form == NULL) {
+        __emit_syntax_error(args->location, "set-global requires a variable name and a value");
+        return NULL;
+    }
+    gl_value_t *var_value = gl_eval(value_form);
+    if (var_value == NULL) {
+        return NULL;
+    }
 
     // Getting the global environment
     gl_env_t *global_env = env;
@@ -354,12 +412,13 @@ GL_SPECIAL_FORM(set_global) {
 }
 
 GL_SPECIAL_FORM(progn) {
-    assert(args);
-
-    if (args->type == GL_AST_NIL) {
+    if (args == NULL || args->type == GL_AST_NIL) {
         return gl_value_make_nil();
     }
-    assert(args->type == GL_AST_CONS);
+    if (args->type != GL_AST_CONS) {
+        __emit_syntax_error(args->location, "progn requires a list of forms");
+        return NULL;
+    }
 
     gl_ast_node_t *current = args;
     gl_value_t *res = gl_value_make_nil();
@@ -375,8 +434,12 @@ GL_SPECIAL_FORM(progn) {
 }
 
 GL_SPECIAL_FORM(while) {
-    assert(args);
-    assert(args->type == GL_AST_CONS);
+    if (!args || args->type != GL_AST_CONS) {
+        __emit_syntax_error(args ? args->location : (gl_location_t){0},
+                            "while requires a condition");
+        return NULL;
+    }
+
     gl_ast_node_t *condition = gl_ast_cons_nth_car(args, 0);
     gl_value_t *condition_val = gl_eval(condition);
     if (condition_val == NULL) {
@@ -401,11 +464,10 @@ GL_SPECIAL_FORM(while) {
 }
 
 GL_SPECIAL_FORM(quote) {
-    assert(args);
-
-    assert(args->value.cons.cdr->type == GL_AST_NIL);
-
-    gl_ast_node_t *node = gl_ast_cons_nth_car(args, 0);
+    gl_ast_node_t *node = __gl_single_operand(args, "quote");
+    if (node == NULL) {
+        return NULL;
+    }
 
     if (node->type == GL_AST_SYMBOL) {
         return gl_value_make_symbol(node->value.symbol);
@@ -762,21 +824,32 @@ GL_SPECIAL_FORM(unquote_splicing) {
 }
 
 GL_SPECIAL_FORM(function) {
-    assert(args);
-
-    assert(args->value.cons.cdr->type == GL_AST_NIL);
-
-    gl_ast_node_t *func = gl_ast_cons_nth_car(args, 0);
+    gl_ast_node_t *func = __gl_single_operand(args, "function");
+    if (func == NULL) {
+        return NULL;
+    }
 
     if (func->type == GL_AST_SYMBOL) {
         const char *func_name = func->value.symbol;
+        gl_value_t *res = gl_env_get_callable(env, func_name);
 
-        return gl_env_get_callable(env, func_name);
+        if (res == NULL) {
+            char buf[512];
+            snprintf(buf, sizeof(buf), "undefined function '%s'", func_name);
+            __emit_syntax_error(func->location, buf);
+        }
+        return res;
     }
 
+    // The expression may fail to evaluate; a NULL result already reported the
+    // error and must not be dereferenced.
     gl_value_t *res = gl_eval(func);
+    if (res == NULL) {
+        return NULL;
+    }
 
     if (res->type != GL_VAL_FUNCTION && res->type != GL_VAL_BUILTIN && res->type != GL_VAL_SPFORM) {
+        __emit_syntax_error(func->location, "Expression does not name a function");
         return NULL;
     }
     return res;
@@ -1235,7 +1308,7 @@ GL_SPECIAL_FORM(add_to_list) {
     // Find the nearest environment where var_name is bound
     gl_env_t *target_env = env;
     while (target_env != NULL) {
-        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+        if (gl_env_has_local_var(target_env, var_name)) {
             break;
         }
         target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;

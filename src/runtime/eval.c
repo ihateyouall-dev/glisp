@@ -166,7 +166,9 @@ gl_function_args_t *gl_eval_args(gl_ast_node_t *args) {
     gl_function_args_init(res, argc, gl_function_arg_free);
     // Arguments past a failing one are never filled, so the partial array is
     // zeroed to let the cleanup path free it safely.
-    memset(res->data, 0, sizeof(gl_function_arg_t *) * argc);
+    if (argc > 0) {
+        memset(res->data, 0, sizeof(gl_function_arg_t *) * argc);
+    }
 
     current = args;
     for (size_t i = 0; i < argc; ++i, current = current->value.cons.cdr) {
@@ -222,20 +224,20 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
         gl_function_param_t *p = function->params->data[i];
         if (p->kind == GL_PARAM_REQUIRED) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
+                gl_env_bind_param(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             }
         } else if (p->kind == GL_PARAM_OPTIONAL) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
+                gl_env_bind_param(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             } else {
                 if (p->default_val) {
                     gl_value_t *val = gl_eval(p->default_val);
-                    gl_env_set_var(env, p->name,
-                                   val ? __gl_bind_argument(val) : gl_value_make_nil());
+                    gl_env_bind_param(env, p->name,
+                                      val ? __gl_bind_argument(val) : gl_value_make_nil());
                 } else {
-                    gl_env_set_var(env, p->name, gl_value_make_nil());
+                    gl_env_bind_param(env, p->name, gl_value_make_nil());
                 }
             }
         } else if (p->kind == GL_PARAM_REST) {
@@ -244,7 +246,7 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
                 rest_list =
                     gl_value_make_cons_raw(gl_value_copy(args->data[j - 1]->val), rest_list);
             }
-            gl_env_set_var(env, p->name, rest_list);
+            gl_env_bind_param(env, p->name, rest_list);
             arg_idx = argc;
         }
     }
@@ -448,6 +450,10 @@ static gl_value_t *__gl_eval_tail_impl(gl_ast_node_t *node, gl_owned_ast_t *owne
         gl_value_t *func_val = callee;
         gl_function_t *function = func_val->val;
         size_t root_mark = gl_gc_root_mark();
+        // The callee stays reachable through the frame that replaces this one,
+        // but argument evaluation runs first and may collect an anonymous value
+        // that no variable holds.
+        gl_gc_push_root(func_val);
 
         // Arguments are evaluated in the frame that is about to be replaced.
         gl_function_args_t *argv = gl_eval_args(body);
@@ -464,7 +470,7 @@ static gl_value_t *__gl_eval_tail_impl(gl_ast_node_t *node, gl_owned_ast_t *owne
         }
 
         gl_call_stack_pop_call();
-        gl_call_stack_push_call(function, head);
+        gl_call_stack_push_call(func_val, head);
         __gl_define_function_args(function, argv, (gl_env_t *)gl_current_env()->val);
 
         gl_function_args_destroy(argv);
@@ -535,7 +541,7 @@ static gl_value_t *__gl_call_macro(gl_value_t *macro_val, gl_function_args_t *ar
 
     ++gl_macro_depth;
     gl_init_call_stack();
-    gl_call_stack_push_call(macro, call_node);
+    gl_call_stack_push_call(macro_val, call_node);
 
     gl_value_t *res = __gl_eval_function(macro, argv);
     if (!res) {
@@ -803,7 +809,7 @@ static gl_value_t *__gl_eval_list(gl_ast_node_t *node) {
         }
 
         gl_init_call_stack();
-        gl_call_stack_push_call(function, func_node);
+        gl_call_stack_push_call(func_val, func_node);
 
         gl_value_t *res = __gl_eval_function(function, argv);
 
@@ -866,7 +872,7 @@ gl_value_t *gl_call_function(gl_location_t loc, gl_value_t *func_val, gl_functio
             return NULL;
         }
         gl_init_call_stack();
-        gl_call_stack_push_call(function, NULL);
+        gl_call_stack_push_call(func_val, NULL);
         gl_value_t *res = __gl_eval_function(function, argv);
         if (!res) {
             gl_call_stack_print_stacktrace();

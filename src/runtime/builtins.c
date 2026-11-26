@@ -14,6 +14,7 @@
 #include "parser.h"
 #include "runtime/value.h"
 #include "syntax.h"
+#include "utils/alloc.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -1250,15 +1251,18 @@ GL_BUILTIN(string_append) {
         total += strlen(gl_value_get_string(NTH_VAL(i)));
     }
 
-    char *buf = malloc(total + 1);
-    buf[0] = '\0';
+    // Measure first, then copy once per argument; a strcat loop rescans the
+    // prefix on every step.
+    char *buf = gl_xmalloc(total + 1);
+    size_t offset = 0;
     for (size_t i = 0; i < ARGC; ++i) {
-        strcat(buf, gl_value_get_string(NTH_VAL(i)));
+        size_t len = strlen(gl_value_get_string(NTH_VAL(i)));
+        memcpy(buf + offset, gl_value_get_string(NTH_VAL(i)), len);
+        offset += len;
     }
+    buf[offset] = '\0';
 
-    gl_value_t *res = gl_value_make_string(buf);
-    free(buf);
-    return res;
+    return gl_value_make_string_owned(buf);
 }
 
 // Returns the bytes in [start, end); end defaults to the string length.
@@ -1290,13 +1294,11 @@ GL_BUILTIN(substring) {
     }
 
     size_t size = (size_t)(end - start);
-    char *buf = malloc(size + 1);
+    char *buf = gl_xmalloc(size + 1);
     memcpy(buf, str + start, size);
     buf[size] = '\0';
 
-    gl_value_t *res = gl_value_make_string(buf);
-    free(buf);
-    return res;
+    return gl_value_make_string_owned(buf);
 }
 
 GL_BUILTIN(string_upcase) {
@@ -1305,14 +1307,12 @@ GL_BUILTIN(string_upcase) {
     gl_value_t *val = NTH_VAL(0);
     EXPECT_STRING(val);
 
-    char *buf = strdup(gl_value_get_string(val));
+    char *buf = gl_xstrdup(gl_value_get_string(val));
     for (char *p = buf; *p != '\0'; ++p) {
         *p = (char)toupper((unsigned char)*p);
     }
 
-    gl_value_t *res = gl_value_make_string(buf);
-    free(buf);
-    return res;
+    return gl_value_make_string_owned(buf);
 }
 
 GL_BUILTIN(string_downcase) {
@@ -1321,14 +1321,12 @@ GL_BUILTIN(string_downcase) {
     gl_value_t *val = NTH_VAL(0);
     EXPECT_STRING(val);
 
-    char *buf = strdup(gl_value_get_string(val));
+    char *buf = gl_xstrdup(gl_value_get_string(val));
     for (char *p = buf; *p != '\0'; ++p) {
         *p = (char)tolower((unsigned char)*p);
     }
 
-    gl_value_t *res = gl_value_make_string(buf);
-    free(buf);
-    return res;
+    return gl_value_make_string_owned(buf);
 }
 
 // Follows the reader's number syntax: an optional '-', digits, and an optional
@@ -2062,8 +2060,9 @@ GL_BUILTIN(to_str) {
 
     gl_value_t *val = NTH_VAL(0);
 
+    // Strings are immutable, so the same value can be returned.
     if (val->type == GL_VAL_STRING) {
-        return gl_value_copy(val);
+        return val;
     }
 
     char *str = gl_value_to_string(val);

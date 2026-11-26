@@ -13,11 +13,13 @@ int main(void) {
     vector_init(&vec, dummy);
 
     TEST(vec.size == 0, "Initial size");
-    TEST(vec.capacity == 8, "Initial capacity");
+    TEST(vec.capacity == 0, "Initial capacity");
+    TEST(vec.data == NULL, "Storage is allocated on the first push");
 
     vector_push_back(&vec, 1);
 
     TEST(vec.size == 1, "Size after push");
+    TEST(vec.capacity == 8, "Capacity after the first push");
     TEST(*vector_at(&vec, 0) == 1, "Access");
 
     // This will cause reallocation and increase capacity

@@ -12,7 +12,14 @@ int main(void) {
     map_t hm;
     map_init(&hm, dummy, copy_fn);
 
+    // Storage is allocated on the first insert, so an empty map must answer
+    // lookups and removals without reaching into a bucket array.
+    TEST(hm.buckets == NULL, "No buckets before the first insert");
+    TEST(map_get(&hm, "x") == NULL, "Lookup in an empty map");
+    TEST(map_remove(&hm, "x") == 0, "Removal from an empty map");
+
     map_insert(&hm, "x", 12);
+    TEST(hm.buckets != NULL, "Buckets after the first insert");
     TEST(*map_get(&hm, "x") == 12, "Access by key");
     TEST(hm.size == 1, "Size after inserting");
 
