@@ -10,16 +10,12 @@
 
 #include <string.h>
 
-#ifdef _MSC_VER
-#include "strdup.h"
-#endif
-
 /**
  * Declares a string-keyed hash map named @p Name with values of type @p T.
  *
- * Use HASHMAP_DEFINE(T, Name) in exactly one translation unit. Keys are copied
- * with strdup, buckets chain on collisions, and the load factor is kept below
- * 0.75 by doubling the bucket count. Element ownership is controlled by the
+ * Use HASHMAP_DEFINE(T, Name) in exactly one translation unit. Keys are copied,
+ * buckets chain on collisions, and the load factor is kept below 0.75 by
+ * doubling the bucket count. Element ownership is controlled by the
  * destroy callback passed to Name_init.
  */
 #define HASHMAP_DECLARE(T, Name)                                                                   \
@@ -65,30 +61,27 @@
         res.value = Name##_copy_fn ? Name##_copy_fn(entry->value) : entry->value;                  \
         return res;                                                                                \
     }                                                                                              \
-    static void __##Name##_rehash(Name##_t *map, size_t new_buckets_count) {                       \
-        Name##Bucket_t *new = gl_xcalloc(new_buckets_count, sizeof(Name##Bucket_t));               \
-        for (size_t i = 0; i < new_buckets_count; ++i) {                                           \
-            Name##Bucket_init(&new[i], &Name##Entry_destroy);                                      \
-        }                                                                                          \
-        for (size_t i = 0; i < map->buckets_count; ++i) {                                          \
-            Name##Bucket_t *bucket = &map->buckets[i];                                             \
-            for (size_t j = 0; j < bucket->size; ++j) {                                            \
-                Name##Entry_t *entry = Name##Bucket_at(bucket, j);                                 \
-                size_t idx = __##Name##_fnv1a(entry->key) % new_buckets_count;                     \
-                Name##Bucket_push_back(&new[idx], *entry);                                         \
-            }                                                                                      \
-            free(bucket->data);                                                                    \
-        }                                                                                          \
-        free(map->buckets);                                                                        \
-        map->buckets = new;                                                                        \
-        map->buckets_count = new_buckets_count;                                                    \
-    }                                                                                              \
     static void __##Name##_init_buckets(Name##_t *map, size_t count) {                             \
         map->buckets = gl_xcalloc(count, sizeof(Name##Bucket_t));                                  \
         map->buckets_count = count;                                                                \
         for (size_t i = 0; i < count; ++i) {                                                       \
             Name##Bucket_init(&map->buckets[i], &Name##Entry_destroy);                             \
         }                                                                                          \
+    }                                                                                              \
+    static void __##Name##_rehash(Name##_t *map, size_t new_buckets_count) {                       \
+        Name##Bucket_t *old = map->buckets;                                                        \
+        size_t old_count = map->buckets_count;                                                     \
+        __##Name##_init_buckets(map, new_buckets_count);                                           \
+        for (size_t i = 0; i < old_count; ++i) {                                                   \
+            Name##Bucket_t *bucket = &old[i];                                                      \
+            for (size_t j = 0; j < bucket->size; ++j) {                                            \
+                Name##Entry_t *entry = Name##Bucket_at(bucket, j);                                 \
+                size_t idx = __##Name##_fnv1a(entry->key) % new_buckets_count;                     \
+                Name##Bucket_push_back(&map->buckets[idx], *entry);                                \
+            }                                                                                      \
+            free(bucket->data);                                                                    \
+        }                                                                                          \
+        free(old);                                                                                 \
     }                                                                                              \
     void Name##_init(Name##_t *map, void (*destroy_fn)(T *), T (*copy_fn)(T)) {                    \
         map->buckets_count = 0;                                                                    \
