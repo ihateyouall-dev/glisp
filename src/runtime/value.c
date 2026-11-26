@@ -725,7 +725,7 @@ void gl_value_fprint(FILE *file, gl_value_t *val) {
     }
     switch (val->type) {
     case GL_VAL_INT:
-        fprintf(file, "%lld", (*(int64_t *)val->val));
+        fprintf(file, "%" PRId64, (*(int64_t *)val->val));
         break;
     case GL_VAL_BIGNUM: {
         char *text = gl_bignum_to_string(val->val);
