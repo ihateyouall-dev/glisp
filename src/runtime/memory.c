@@ -196,6 +196,9 @@ static void __gl_trace_env_raw(gl_env_t *raw) {
     for (size_t i = 0; i < raw->param_count; ++i) {
         __gl_trace_value(raw->params[i].value);
     }
+    // The frame borrows the parameter names from this value, so it must stay
+    // alive as long as the frame does.
+    __gl_trace_value(raw->param_owner);
 
     if (raw->parent != NULL) {
         __gl_trace_environment(raw->parent);

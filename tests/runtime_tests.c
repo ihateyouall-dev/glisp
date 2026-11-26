@@ -2000,6 +2000,28 @@ void test_malformed_forms(void) {
     TEST(eval_str("(lambda)") == NULL, "lambda without parameters is an error");
 }
 
+void test_param_lifetime(void) {
+    // The frame that holds the parameter outlives the anonymous function that
+    // declared it, so the frame must keep the function alive with it.
+    TEST(eval_str("(set keep-param ((lambda (n) (lambda () n)) 42))") != NULL,
+         "capture a parameter of an anonymous function");
+    TEST(eval_str("(defun param-spin (i) (if (< i 20000) (param-spin (+ i 1)) i))") != NULL,
+         "define a recursive helper");
+    TEST(eval_str("(param-spin 0)") != NULL, "force collections");
+    gl_gc_collect();
+    gl_value_t *kept = eval_str("(keep-param)");
+    TEST(kept != NULL && gl_value_get_int(kept) == 42, "captured parameter survives a collection");
+
+    // set on a parameter updates the frame slot, and the closure observes it.
+    TEST(eval_str("(defun count-up (n) (lambda () (set n (+ n 1))))") != NULL,
+         "define a closure over a parameter");
+    TEST(eval_str("(set tally (count-up 10))") != NULL, "create the closure");
+    gl_value_t *first = eval_str("(tally)");
+    TEST(first != NULL && gl_value_get_int(first) == 11, "set updates a parameter");
+    gl_value_t *second = eval_str("(tally)");
+    TEST(second != NULL && gl_value_get_int(second) == 12, "set updates the same parameter again");
+}
+
 void test_file_name_owned(void) {
     char path[512];
     int created = gl_test_make_temp(path, sizeof(path));
@@ -2095,6 +2117,7 @@ int main(void) {
     test_gensym();
     test_recursion();
     test_malformed_forms();
+    test_param_lifetime();
     test_file_name_owned();
 
     gl_destroy_memory_heap();

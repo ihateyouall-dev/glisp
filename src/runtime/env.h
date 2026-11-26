@@ -38,6 +38,7 @@ typedef struct gl_env_t {
     gl_env_param_t *params;      /**< Call parameters; NULL until first binding. */
     size_t param_count;          /**< Number of bound parameters. */
     size_t param_capacity;       /**< Allocated parameter slots. */
+    gl_value_t *param_owner;     /**< Function value that owns the parameter names. */
 } gl_env_t;
 
 /** The global environment value. */
@@ -59,10 +60,17 @@ void gl_env_destroy(gl_env_t *env);
 void gl_env_set_var(gl_env_t *env, const char *sym, gl_value_t *val);
 
 /**
- * Binds a function parameter in @p env. The name is borrowed, not copied, and
- * must outlive the frame.
+ * Binds a function parameter in @p env. The name is borrowed, not copied; the
+ * frame keeps @p env's parameter owner alive, which owns the names.
  */
 void gl_env_bind_param(gl_env_t *env, const char *sym, gl_value_t *val);
+
+/**
+ * Records the function value whose parameter names @p env borrows. The frame
+ * keeps that value alive, so the names stay valid even when the frame outlives
+ * every other reference to the function.
+ */
+void gl_env_set_param_owner(gl_env_t *env, gl_value_t *owner);
 
 /** Returns non-zero when @p sym is bound in @p env itself, ignoring parents. */
 int gl_env_has_local_var(gl_env_t *env, const char *sym);

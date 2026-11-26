@@ -28,7 +28,7 @@ void gl_init_call_stack(void);
 gl_value_t *gl_current_env(void);
 
 /** Pushes a frame with a fresh child environment of the function's closure. */
-void gl_call_stack_push_call(gl_function_t *function, gl_ast_node_t *function_node);
+void gl_call_stack_push_call(gl_value_t *callee, gl_ast_node_t *function_node);
 
 /** Pops the top function-call frame. */
 void gl_call_stack_pop_call(void);

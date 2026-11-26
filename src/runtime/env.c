@@ -45,6 +45,7 @@ gl_env_t *gl_make_env(gl_value_t *parent) {
     res->params = NULL;
     res->param_count = 0;
     res->param_capacity = 0;
+    res->param_owner = NULL;
 
     return res;
 }
@@ -247,6 +248,7 @@ void gl_env_destroy(gl_env_t *env) {
     env->params = NULL;
     env->param_capacity = 0;
     env->param_count = 0;
+    env->param_owner = NULL;
     free(env);
     env = NULL;
 }
@@ -265,6 +267,8 @@ static gl_value_t **__gl_env_param_slot(gl_env_t *env, const char *sym) {
     }
     return NULL;
 }
+
+void gl_env_set_param_owner(gl_env_t *env, gl_value_t *owner) { env->param_owner = owner; }
 
 void gl_env_bind_param(gl_env_t *env, const char *sym, gl_value_t *val) {
     gl_value_t **slot = __gl_env_param_slot(env, sym);

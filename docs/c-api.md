@@ -170,9 +170,10 @@ costs a single allocation.
 - `gl_init_global_env()` wraps the global frame in a `GL_VAL_ENV` and stores it
   in `gl_global_env`.
 - `gl_env_set_var` / `gl_env_set_fun` / `gl_env_set_const` insert bindings.
-- `gl_env_bind_param` binds a call parameter. The name is borrowed and must
-  outlive the frame. Parameters are looked up before the variable table and are
-  traced by the collector.
+- `gl_env_bind_param` binds a call parameter. The name is borrowed from the
+  function's parameter list, and `gl_env_set_param_owner` records the function
+  value so the frame keeps those names alive. Parameters are looked up before
+  the variable table, and the collector traces the slots and the owner.
 - `gl_env_has_local_var` reports whether a name is bound in this frame alone.
 - `gl_env_get_var` / `gl_env_get_fun` search the frame chain.
 - `gl_env_get_callable` resolves a callable using the nearest lexical binding.
@@ -184,8 +185,9 @@ The call stack stores `gl_call_frame_t` entries (`func_name`, call AST node,
 and lexical environment). It serves two purposes: resolving the current
 environment and producing stack traces.
 
-- `gl_call_stack_push_call(function, node)` allocates a child environment of the
-  function's closure and pushes a frame.
+- `gl_call_stack_push_call(callee, node)` allocates a child environment of the
+  callee's closure and pushes a frame. The frame keeps the callee value alive,
+  because its parameter names are borrowed from that value.
 - `gl_call_stack_push_env(env, node, name)` pushes an explicit frame (used by
   `let`, `let*`, and `for`).
 - `gl_call_stack_pop_call` / `pop_env` remove the top frame.
