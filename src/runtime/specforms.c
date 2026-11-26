@@ -306,7 +306,7 @@ GL_SPECIAL_FORM(set) {
     // Find the nearest environment where var_name is bound
     gl_env_t *target_env = env;
     while (target_env != NULL) {
-        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+        if (gl_env_has_local_var(target_env, var_name)) {
             break;
         }
         target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;
@@ -1235,7 +1235,7 @@ GL_SPECIAL_FORM(add_to_list) {
     // Find the nearest environment where var_name is bound
     gl_env_t *target_env = env;
     while (target_env != NULL) {
-        if (gl_value_table_get(target_env->variables, var_name) != NULL) {
+        if (gl_env_has_local_var(target_env, var_name)) {
             break;
         }
         target_env = target_env->parent ? (gl_env_t *)target_env->parent->val : NULL;

@@ -222,20 +222,20 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
         gl_function_param_t *p = function->params->data[i];
         if (p->kind == GL_PARAM_REQUIRED) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
+                gl_env_bind_param(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             }
         } else if (p->kind == GL_PARAM_OPTIONAL) {
             if (arg_idx < argc) {
-                gl_env_set_var(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
+                gl_env_bind_param(env, p->name, __gl_bind_argument(args->data[arg_idx]->val));
                 arg_idx++;
             } else {
                 if (p->default_val) {
                     gl_value_t *val = gl_eval(p->default_val);
-                    gl_env_set_var(env, p->name,
-                                   val ? __gl_bind_argument(val) : gl_value_make_nil());
+                    gl_env_bind_param(env, p->name,
+                                      val ? __gl_bind_argument(val) : gl_value_make_nil());
                 } else {
-                    gl_env_set_var(env, p->name, gl_value_make_nil());
+                    gl_env_bind_param(env, p->name, gl_value_make_nil());
                 }
             }
         } else if (p->kind == GL_PARAM_REST) {
@@ -244,7 +244,7 @@ static void __gl_define_function_args(const gl_function_t *function, gl_function
                 rest_list =
                     gl_value_make_cons_raw(gl_value_copy(args->data[j - 1]->val), rest_list);
             }
-            gl_env_set_var(env, p->name, rest_list);
+            gl_env_bind_param(env, p->name, rest_list);
             arg_idx = argc;
         }
     }

@@ -193,6 +193,9 @@ static void __gl_trace_env_raw(gl_env_t *raw) {
     if (raw->constants) {
         __gl_trace_value_table(raw->constants);
     }
+    for (size_t i = 0; i < raw->param_count; ++i) {
+        __gl_trace_value(raw->params[i].value);
+    }
 
     if (raw->parent != NULL) {
         __gl_trace_environment(raw->parent);
