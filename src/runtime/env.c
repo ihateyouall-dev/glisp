@@ -478,7 +478,7 @@ char *gl_env_suggest_name(gl_env_t *env, const char *sym) {
     while (env != NULL) {
         __gl_scan_table(env->functions, sym, &best_distance, &best);
         __gl_scan_table(env->variables, sym, &best_distance, &best);
-        for (size_t i = 0; env->params != NULL && i < env->param_count; ++i) {
+        for (size_t i = 0; i < env->param_count; ++i) {
             __gl_consider_name(env->params[i].name, sym, &best_distance, &best);
         }
 
